@@ -27,7 +27,7 @@
   <div class="auth-card">
     <div class="auth-brand"><div class="logo">CB</div><div><h2>Нужна настройка базы</h2><p style="margin:0">Этот файл уже готов к защищённой работе, но сначала подключи Supabase.</p></div></div>
     <p>Внизу HTML найди блок <b>CONFIG</b> и вставь URL проекта и Publishable/anon key. Схема базы лежит рядом в файле <b>supabase_setup.sql</b>.</p>
-    <div class="config-code">const SUPABASE_URL = 'PASTE_SUPABASE_URL';<br>const SUPABASE_ANON_KEY = 'PASTE_SUPABASE_ANON_KEY';</div>
+    <div class="config-code">const SUPABASE_URL = 'https://kcjzrwmznahhischkrah.supabase.co';<br>const SUPABASE_ANON_KEY = 'sb_publishable_x1zCcIIgf7fmAEFocColrA_wEtxB4hc';</div>
   </div>
 </div>
 
@@ -149,8 +149,8 @@
    можно использовать в браузере при включённом RLS.
    НИКОГДА не вставляй сюда service_role key.
 ==================================================== */
-const SUPABASE_URL = 'PASTE_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'PASTE_SUPABASE_ANON_KEY';
+const SUPABASE_URL = 'https://kcjzrwmznahhischkrah.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_x1zCcIIgf7fmAEFocColrA_wEtxB4hc';
 
 const metricKeys=['calls','booked','meetings','offers','follow','connected'];
 const metricLabels={calls:'Звонки',booked:'Назначено встреч',meetings:'Проведено встреч',offers:'КП / расчёты',follow:'Follow-up',connected:'Подключено лагерей'};
