@@ -1,0 +1,15 @@
+{
+  "name": "CampBox Sales Board",
+  "short_name": "CampBox Sales",
+  "description": "Закрытая рабочая доска отдела продаж CampBox",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09101f",
+  "theme_color": "#09101f",
+  "lang": "ru",
+  "icons": [
+    {"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
