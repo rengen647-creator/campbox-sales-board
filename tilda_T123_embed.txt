@@ -1,0 +1,26 @@
+<!-- CampBox Sales Board — вставить целиком в блок T123 на Tilda -->
+<div id="campbox-sales-board-wrap" style="width:100%;max-width:100%;overflow:hidden;background:#0b1020;">
+  <iframe
+    id="campbox-sales-board-frame"
+    src="https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/"
+    title="CampBox Sales Board"
+    style="display:block;width:100%;height:900px;border:0;background:#0b1020;"
+    loading="eager"
+    allow="clipboard-write"
+  ></iframe>
+</div>
+<script>
+(function(){
+  var frame = document.getElementById('campbox-sales-board-frame');
+  if(!frame) return;
+  window.addEventListener('message', function(event){
+    if(event.source !== frame.contentWindow) return;
+    var data = event.data || {};
+    if(data.type !== 'campbox-salesboard-height') return;
+    var h = Number(data.height || 0);
+    if(!Number.isFinite(h)) return;
+    h = Math.max(720, Math.min(h, 12000));
+    frame.style.height = Math.ceil(h) + 'px';
+  });
+})();
+</script>
