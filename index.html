@@ -91,7 +91,7 @@
         <div id="loginError" class="error"></div>
         <button class="btn primary" onclick="login()">Войти</button>
       </div>
-      <div class="auth-links"><span style="color:var(--muted);font-size:12px">Нет учётной записи?</span><button class="link-btn" onclick="showSignup(true)">Запросить доступ</button></div>
+      <div class="auth-links"><button class="link-btn" onclick="showForgot()">Забыли пароль?</button><span style="color:var(--muted);font-size:12px">Нет учётной записи?</span><button class="link-btn" onclick="showSignup(true)">Запросить доступ</button></div>
     </div>
     <div id="signupForm" class="hidden">
       <div class="auth-grid">
@@ -102,6 +102,24 @@
         <button class="btn primary" onclick="signup()">Создать заявку на доступ</button>
       </div>
       <div class="auth-links"><button class="link-btn" onclick="showSignup(false)">← Вернуться ко входу</button></div>
+    </div>
+    <div id="forgotForm" class="hidden">
+      <div class="auth-grid">
+        <div><h3 style="margin:0">Восстановление пароля</h3><p style="margin:0">Укажи рабочую почту. На неё придёт ссылка для смены пароля.</p></div>
+        <div><label>Рабочая почта</label><input id="forgotEmail" type="email" autocomplete="email" placeholder="name@company.ru"></div>
+        <div id="forgotMessage" class="error"></div>
+        <button class="btn primary" onclick="requestPasswordReset()">Отправить ссылку</button>
+      </div>
+      <div class="auth-links"><button class="link-btn" onclick="showLogin()">← Вернуться ко входу</button></div>
+    </div>
+    <div id="resetForm" class="hidden">
+      <div class="auth-grid">
+        <div><h3 style="margin:0">Новый пароль</h3><p style="margin:0">Придумай новый пароль не короче 8 символов.</p></div>
+        <div><label>Новый пароль</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8"></div>
+        <div><label>Повтори пароль</label><input id="newPassword2" type="password" autocomplete="new-password" minlength="8"></div>
+        <div id="resetMessage" class="error"></div>
+        <button class="btn primary" onclick="submitNewPassword()">Сохранить новый пароль</button>
+      </div>
     </div>
   </div>
 </div>
@@ -320,10 +338,13 @@ function packReflection(v){return JSON.stringify({__type:'daily_reflection',resu
 function reflectionState(raw){const r=parseReflection(raw),parts=[!!r.result.trim(),!!(r.blockers.trim()||r.reasons.length),!!r.tomorrow.trim()],n=parts.filter(Boolean).length;return {data:r,count:n,state:n===3?'done':n>0?'partial':'empty',label:n===3?'Готово':n>0?'Частично':'Заполнить'}}
 function setStatus(text,kind=''){const el=$('saveStatus');el.textContent=text;el.style.color=kind==='bad'?'#ff9ca8':kind==='good'?'#74e7b7':''}
 function showOnly(id){['configScreen','authScreen','pendingScreen','mainApp'].forEach(x=>$(x).classList.toggle('hidden',x!==id))}
-function showSignup(on){$('loginForm').classList.toggle('hidden',on);$('signupForm').classList.toggle('hidden',!on);$('loginError').textContent='';$('signupMessage').textContent=''}
+function setAuthView(view){['loginForm','signupForm','forgotForm','resetForm'].forEach(id=>$(id).classList.toggle('hidden',id!==view))}
+function showSignup(on){setAuthView(on?'signupForm':'loginForm');$('loginError').textContent='';$('signupMessage').textContent=''}
+function showLogin(){setAuthView('loginForm');$('loginError').className='error';$('loginError').textContent=''}
+function showForgot(){$('forgotEmail').value=$('loginEmail').value.trim();$('forgotMessage').className='error';$('forgotMessage').textContent='';setAuthView('forgotForm')}
 
 async function login(){
-  $('loginError').textContent='';
+  $('loginError').className='error';$('loginError').textContent='';
   const email=$('loginEmail').value.trim(),password=$('loginPassword').value;
   if(!email||!password){$('loginError').textContent='Заполни почту и пароль';return}
   const {error}=await sb.auth.signInWithPassword({email,password});
@@ -336,6 +357,29 @@ async function signup(){
   const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name}}});
   if(error){msg.textContent=error.message;return}
   msg.className='success';msg.textContent=data.session?'Заявка создана. Руководитель должен активировать доступ.':'Учётная запись создана. Если включено подтверждение почты — сначала подтверди email, затем руководитель активирует доступ.';
+}
+async function requestPasswordReset(){
+  const email=$('forgotEmail').value.trim(),msg=$('forgotMessage');msg.className='error';msg.textContent='';
+  if(!email){msg.textContent='Укажи рабочую почту.';return}
+  msg.textContent='Отправляем ссылку…';
+  const redirectTo=location.origin+location.pathname;
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo});
+  if(error){msg.textContent='Не удалось отправить письмо: '+error.message;return}
+  msg.className='success';msg.textContent='Если аккаунт с такой почтой существует, ссылка для смены пароля отправлена. Проверь также папку «Спам».';
+}
+function enterPasswordRecovery(){
+  showOnly('authScreen');setAuthView('resetForm');
+  $('resetMessage').className='success';$('resetMessage').textContent='Ссылка подтверждена. Укажи новый пароль.';
+}
+async function submitNewPassword(){
+  const p1=$('newPassword').value,p2=$('newPassword2').value,msg=$('resetMessage');msg.className='error';msg.textContent='';
+  if(p1.length<8){msg.textContent='Пароль должен быть не короче 8 символов.';return}
+  if(p1!==p2){msg.textContent='Пароли не совпадают.';return}
+  const {error}=await sb.auth.updateUser({password:p1});
+  if(error){msg.textContent='Не удалось изменить пароль: '+error.message;return}
+  await sb.auth.signOut();history.replaceState({},document.title,location.pathname);
+  showOnly('authScreen');setAuthView('loginForm');$('loginPassword').value='';
+  $('loginError').className='success';$('loginError').textContent='Пароль изменён. Войди с новым паролем.';
 }
 async function logout(){if(sb)await sb.auth.signOut();currentUser=currentProfile=null;if($('mobileBar'))$('mobileBar').classList.add('hidden');showOnly('authScreen')}
 
@@ -638,9 +682,17 @@ function bind(){
 async function init(){
   bind();
   if(SUPABASE_URL.startsWith('PASTE_')||SUPABASE_ANON_KEY.startsWith('PASTE_')){showOnly('configScreen');return}
-  sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
-  sb.auth.onAuthStateChange((_event,session)=>setTimeout(()=>handleSession(session),0));
-  const {data}=await sb.auth.getSession();await handleSession(data.session);
+  sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  let recoverySeen=false;
+  sb.auth.onAuthStateChange((event,session)=>{
+    if(event==='PASSWORD_RECOVERY'){recoverySeen=true;setTimeout(enterPasswordRecovery,0);return}
+    if(recoverySeen)return;
+    setTimeout(()=>handleSession(session),0);
+  });
+  const recoveryUrl=location.hash.includes('type=recovery')||location.search.includes('type=recovery');
+  const {data}=await sb.auth.getSession();
+  if(recoveryUrl){recoverySeen=true;enterPasswordRecovery();return}
+  if(!recoverySeen)await handleSession(data.session);
 }
 init();
 
