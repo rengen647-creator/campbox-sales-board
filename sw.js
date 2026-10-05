@@ -1,5 +1,5 @@
-const CACHE = 'campbox-sales-v8-gap-plan-2026-10-05';
-const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg','./sales-coach.css?v=20261005b','./sales-coach.js?v=20261005b'];
+const CACHE = 'campbox-sales-v13-release-2026-10-05';
+const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg','./sales-coach.css?v=20261005b','./sales-coach.js?v=20261005b','./ui-v13.css?v=20261005','./ui-v13.js?v=20261005'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
