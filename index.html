@@ -182,10 +182,11 @@
   </section>
 
   <section class="grid two-col">
-    <div class="card"><div class="section-head"><div class="section-title"><h2>Фокус дня</h2><p>Три конкретных результата, которые команда должна продвинуть сегодня</p></div></div><div class="section-body focus-list">
-      <div class="focus-item"><div class="focus-num">1</div><input id="focus1" type="text" placeholder="Например: закрыть 2 клиента на следующий шаг"></div>
-      <div class="focus-item"><div class="focus-num">2</div><input id="focus2" type="text" placeholder="Например: провести 4 демонстрации"></div>
-      <div class="focus-item"><div class="focus-num">3</div><input id="focus3" type="text" placeholder="Например: сделать 8 повторных контактов по тёплым сделкам"></div>
+    <div class="card"><div class="section-head"><div class="section-title"><h2>Фокус дня</h2><p>Ставится автоматически из командного отставания и слабых мест воронки</p></div></div><div class="section-body focus-list">
+      <div class="focus-item"><div class="focus-num">1</div><input id="focus1" type="text" readonly></div>
+      <div class="focus-item"><div class="focus-num">2</div><input id="focus2" type="text" readonly></div>
+      <div class="focus-item"><div class="focus-num">3</div><input id="focus3" type="text" readonly></div>
+      <div class="focus-auto-hint">Фокус пересчитывается по общей воронке команды: доска выбирает показатели, где отставание сильнее всего, и поднимает именно их дневной план.</div>
     </div></div>
     <div class="card"><div class="section-head"><div class="section-title"><h2>План месяца</h2><p>Минимум / цель / максимум. Факт считается автоматически.</p></div></div><div class="section-body"><div class="month-bar">
       <div class="month-target min"><small>Минимум</small><input id="monthMin" type="number" min="0" value="5"></div>
@@ -247,7 +248,7 @@
   </section>
 
   <section class="card" style="margin-bottom:14px">
-    <div class="section-head"><div class="section-title"><h2>Ежедневный отчёт команды</h2><p>Планируем управляемые действия. Подключение лагеря фиксируем только как факт — это результат сделки, а не ежедневная активность.</p></div><div class="section-actions"><button id="copyYesterdayBtn" class="btn" onclick="copyPreviousWorkdayPlan()">↩ Повторить план прошлого рабочего дня</button></div></div>
+    <div class="section-head"><div class="section-title"><h2>Ежедневный отчёт команды</h2><p>План на день рассчитывается автоматически из месячного отставания и фактической конверсии. Менеджер заполняет только факт.</p></div></div>
     <div class="section-body">
       <div class="table-legend">
         <span class="legend-item"><i class="legend-dot plan"></i>План активности</span>
@@ -494,6 +495,7 @@ function blankSales(userId,date,contracts=[]){return {report_date:date,user_id:u
 function renderAll(){
   $('owner').value=monthSettings.owner||'';$('monthMin').value=num(monthSettings.min_plan);$('monthTarget').value=num(monthSettings.target_plan);$('monthMax').value=num(monthSettings.max_plan);
   $('daySummary').value=daySettings.day_summary||'';$('focus1').value=daySettings.focus1||'';$('focus2').value=daySettings.focus2||'';$('focus3').value=daySettings.focus3||'';$('resultText').value=daySettings.result_text||'';$('blockersText').value=daySettings.blockers_text||'';$('tomorrowText').value=daySettings.tomorrow_text||'';
+  applyAutoDailyPlans();if(isManager())applyAutoTeamFocus();
   renderTeam();renderCheckpoints();recalc();
 }
 function renderTeam(){
@@ -501,7 +503,8 @@ function renderTeam(){
   dayRows.forEach(r=>{
     const pr=profiles.find(p=>p.id===r.user_id)||{full_name:'Сотрудник'};const editable=isManager()||r.user_id===currentUser.id;
     const tr=document.createElement('tr');if(r.user_id===currentUser.id)tr.classList.add('me-row');tr.dataset.userId=r.user_id;
-    const cells=activityKeys.map(k=>`<td><div class="pair"><input data-k="${k}_plan" type="number" min="0" value="${num(r[k+'_plan'])}" ${editable?'':'disabled'}><input data-k="${k}_fact" type="number" min="0" value="${num(r[k+'_fact'])}" ${editable?'':'disabled'}></div></td>`).join('');
+    const auto=selectedDate===todayISO()?coachAutoPlan(r.user_id):null;
+    const cells=activityKeys.map(k=>{const note=auto?.metrics?.[k];return `<td><div class="pair"><div class="auto-plan-field"><input data-k="${k}_plan" type="number" min="0" value="${num(r[k+'_plan'])}" disabled title="${esc(note?.reason||'План зафиксирован для выбранной даты')}"><small class="auto-plan-note">${esc(note?.shortReason||'автоплан')}</small></div><input data-k="${k}_fact" type="number" min="0" value="${num(r[k+'_fact'])}" ${editable?'':'disabled'}></div></td>`}).join('');
     const cs=contractRowStats(r),contractCls=cs.over7>0?'bad':cs.over3>0?'':'good';
     const contractCell=`<td class="contract-cell"><button class="contract-btn ${contractCls}" onclick="openContracts('${r.user_id}')"><span>${cs.active} на подписании</span></button><div class="contract-caption">${cs.active?`0–3 дн.: ${cs.fresh} · 4–7: ${cs.mid} · >7: ${cs.over7}`:'нет активных договоров'}</div></td>`;
     const connectedCell=`<td class="outcome-cell"><input data-k="connected_fact" type="number" min="0" value="${num(r.connected_fact)}" ${editable?'':'disabled'}><div class="cell-caption">факт за день</div></td>`;
@@ -524,7 +527,8 @@ function renderMobileTeam(){
   rows.forEach(r=>{
     const pr=profiles.find(p=>p.id===r.user_id)||{full_name:'Сотрудник'},editable=isManager()||r.user_id===currentUser.id,rs=reflectionState(r.comment),cs=contractRowStats(r),card=document.createElement('div');
     card.className='employee-card'+(r.user_id===currentUser.id?' me':'');card.dataset.userId=r.user_id;
-    const metricHtml=activityKeys.map(k=>`<div class="mobile-metric"><div class="mobile-metric-title">${esc(metricLabels[k])}</div><div class="mobile-pair"><div><label>план</label><input data-k="${k}_plan" type="number" min="0" value="${num(r[k+'_plan'])}" ${editable?'':'disabled'}></div><div><label>факт</label><input data-k="${k}_fact" type="number" min="0" value="${num(r[k+'_fact'])}" ${editable?'':'disabled'}></div></div></div>`).join('');
+    const auto=selectedDate===todayISO()?coachAutoPlan(r.user_id):null;
+    const metricHtml=activityKeys.map(k=>{const note=auto?.metrics?.[k];return `<div class="mobile-metric"><div class="mobile-metric-title">${esc(metricLabels[k])}</div><div class="mobile-pair"><div class="auto-plan-field"><label>автоплан</label><input data-k="${k}_plan" type="number" min="0" value="${num(r[k+'_plan'])}" disabled title="${esc(note?.reason||'План зафиксирован для выбранной даты')}"><small class="auto-plan-note">${esc(note?.shortReason||'автоплан')}</small></div><div><label>факт</label><input data-k="${k}_fact" type="number" min="0" value="${num(r[k+'_fact'])}" ${editable?'':'disabled'}></div></div></div>`}).join('');
     card.innerHTML=`<div class="employee-card-head"><div><b>${esc(pr.full_name||pr.email||'Сотрудник')}</b><br><small>Активности: ${rowActivityPct(r)}%</small></div><span class="pill ${statusClass(rowActivityPct(r))}">${rowActivityPct(r)}%</span></div><div class="mobile-metrics">${metricHtml}<div class="mobile-metric"><div class="mobile-metric-title">Договоры на подписании</div><button class="contract-btn ${cs.over7>0?'bad':cs.over3>0?'':'good'}" onclick="openContracts('${r.user_id}')">${cs.active} активных</button><div class="contract-caption">4–7 дн.: ${cs.mid} · >7: ${cs.over7}</div></div><div class="mobile-metric mobile-outcome"><div class="mobile-metric-title">Подключено лагерей</div><label>только факт</label><input data-k="connected_fact" type="number" min="0" value="${num(r.connected_fact)}" ${editable?'':'disabled'}></div></div><button style="margin-top:10px" class="reflection-btn ${rs.state}" onclick="openReflection('${r.user_id}')"><span>Итог дня: ${rs.label}</span><i class="r-dot"></i></button>`;
     card.querySelectorAll('input').forEach(el=>el.addEventListener('input',()=>{updateDayRowFromContainer(card);syncSalesInputs(r.user_id,card);changed()}));wrap.appendChild(card);
   });
