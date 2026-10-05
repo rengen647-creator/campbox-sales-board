@@ -202,17 +202,20 @@ function coachAutoPlan(userId){
   var metrics={};
   activityKeys.forEach(function(k){
     var factBefore=sum(beforeRows,k+'_fact');
+    var plannedBefore=sum(beforeRows,k+'_plan');
     var needMonth=Math.max(0,num(required[k]));
     var remainingNeed=Math.max(0,needMonth-factBefore);
     var base=coachDailyBase(userId,k);
     var baseline=Math.ceil(base.v);
-    var catchup=Math.ceil(remainingNeed/remaining);
-    var plan=Math.max(baseline,catchup);
+    var backlog=Math.max(0,plannedBefore-factBefore);
+    var backlogAdd=backlog>0?Math.ceil(backlog/remaining):0;
+    var goalRate=Math.ceil(remainingNeed/remaining);
+    var plan=Math.max(baseline+backlogAdd,goalRate);
     var uplift=Math.max(0,plan-baseline);
     var pressure=baseline>0?plan/baseline:(plan>0?1:0);
-    var shortReason=uplift>0?('база '+baseline+' · +'+uplift+' из-за отставания'):('база '+baseline+' · темп достаточен');
-    var reason='Базовый дневной план: '+baseline+'. До конца месяца по показателю «'+metricLabels[k]+'» нужно '+needMonth+'. До сегодня сделано '+factBefore+'. Осталось '+remainingNeed+' на '+remaining+' рабочих дней — для компенсации нужно '+catchup+' в день. Поэтому план на сегодня '+plan+(uplift>0?' (повышен на '+uplift+')':' (базовый темп достаточен)')+'. Основа расчёта: '+source+'.';
-    metrics[k]={plan:plan,requiredMonth:needMonth,factBefore:factBefore,remainingNeed:remainingNeed,remainingDays:remaining,baseline:baseline,uplift:uplift,pressure:pressure,shortReason:shortReason,reason:reason};
+    var shortReason=uplift>0?('база '+baseline+' · долг '+backlog+' → +'+uplift):('база '+baseline+' · темп достаточен');
+    var reason='Базовый дневной план: '+baseline+'. Накопленный план к сегодняшнему дню: '+plannedBefore+', факт: '+factBefore+(backlog>0?', отставание: '+backlog:'. Отставания по накопленному плану нет')+'. Для закрытия этого отставания нужно добавить '+backlogAdd+' в день. По месячной цели нужно ещё '+remainingNeed+' на '+remaining+' рабочих дней, то есть минимум '+goalRate+' в день. Поэтому план на сегодня '+plan+(uplift>0?' (повышен на '+uplift+')':' (базовый темп достаточен)')+'. Основа месячного расчёта: '+source+'.';
+    metrics[k]={plan:plan,requiredMonth:needMonth,factBefore:factBefore,plannedBefore:plannedBefore,backlog:backlog,remainingNeed:remainingNeed,remainingDays:remaining,baseline:baseline,uplift:uplift,pressure:pressure,shortReason:shortReason,reason:reason};
   });
   return {userId:userId,target:target,remainingDays:remaining,source:source,ratios:ratios,metrics:metrics};
 }
