@@ -495,7 +495,7 @@ function blankSales(userId,date,contracts=[]){return {report_date:date,user_id:u
 function renderAll(){
   $('owner').value=monthSettings.owner||'';$('monthMin').value=num(monthSettings.min_plan);$('monthTarget').value=num(monthSettings.target_plan);$('monthMax').value=num(monthSettings.max_plan);
   $('daySummary').value=daySettings.day_summary||'';$('focus1').value=daySettings.focus1||'';$('focus2').value=daySettings.focus2||'';$('focus3').value=daySettings.focus3||'';$('resultText').value=daySettings.result_text||'';$('blockersText').value=daySettings.blockers_text||'';$('tomorrowText').value=daySettings.tomorrow_text||'';
-  applyAutoDailyPlans();if(isManager())applyAutoTeamFocus();
+  applyAutoDailyPlans();applyAutoTeamFocus();
   renderTeam();renderCheckpoints();recalc();
 }
 function renderTeam(){
