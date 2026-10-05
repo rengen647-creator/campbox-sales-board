@@ -109,6 +109,130 @@ function coachContractRisk(userId){
   var ours=all.filter(function(c){return c.ball==='us';}).length;
   return {all:all,over7:over7,over3:over3,late:late,ours:ours};
 }
+
+function coachRatioFromRows(rows,numKey,denKey){
+  var den=sum(rows,denKey+'_fact'),n=sum(rows,numKey+'_fact');
+  if(den<3||n<=0)return null;
+  return Math.max(0.03,Math.min(1,n/den));
+}
+function coachFunnelRatios(userId){
+  var ownPrev=coachScopeRows(prevMonthRows,userId,false);
+  var ownNow=coachScopeRows(monthRows,userId,true);
+  var teamPrev=coachScopeRows(prevMonthRows,'team',false);
+  var teamNow=coachScopeRows(monthRows,'team',true);
+  function pick(numKey,denKey){
+    var candidates=[
+      {v:coachRatioFromRows(ownPrev,numKey,denKey),src:'прошлый месяц'},
+      {v:coachRatioFromRows(ownNow,numKey,denKey),src:'текущий месяц'}
+    ];
+    if(isManager()&&userId!=='team'){
+      candidates.splice(1,0,
+        {v:coachRatioFromRows(teamPrev,numKey,denKey),src:'команда · прошлый месяц'},
+        {v:coachRatioFromRows(teamNow,numKey,denKey),src:'команда · текущий месяц'}
+      );
+    }
+    if(userId==='team'){
+      candidates=[
+        {v:coachRatioFromRows(teamPrev,numKey,denKey),src:'прошлый месяц'},
+        {v:coachRatioFromRows(teamNow,numKey,denKey),src:'текущий месяц'}
+      ];
+    }
+    return candidates.find(function(x){return x.v!==null;})||null;
+  }
+  return {
+    callBook:pick('booked','calls'),
+    bookMeet:pick('meetings','booked'),
+    meetOffer:pick('offers','meetings'),
+    offerConnect:pick('connected','offers')
+  };
+}
+function coachDailyBase(userId,key){
+  var before=coachScopeRows(monthRows,userId,true).filter(function(r){return String(r.report_date)<selectedDate&&num(r[key+'_plan'])>0;});
+  if(before.length)return {v:sum(before,key+'_plan')/before.length,src:'средний план этого месяца'};
+  var prev=coachScopeRows(prevMonthRows,userId,false).filter(function(r){return num(r[key+'_plan'])>0;});
+  if(prev.length)return {v:sum(prev,key+'_plan')/prev.length,src:'средний план прошлого месяца'};
+  if(userId!=='team'){
+    var row=dayRows.find(function(r){return r.user_id===userId;});
+    if(row&&num(row[key+'_plan'])>0)return {v:num(row[key+'_plan']),src:'последний заданный план'};
+  }
+  return {v:0,src:'нет базы'};
+}
+function coachAutoPlan(userId){
+  var target=coachTarget(userId);
+  var beforeRows=coachScopeRows(monthRows,userId,true).filter(function(r){return String(r.report_date)<selectedDate;});
+  var wdTotal=totalWorkdays(selectedMonth)||1;
+  var day=Number(selectedDate.slice(8,10));
+  var wdBefore=Math.max(0,workdaysThrough(selectedMonth,day)-(isWorkdayISO(selectedDate)?1:0));
+  var remaining=Math.max(1,wdTotal-wdBefore);
+  var ratios=coachFunnelRatios(userId);
+  var required={};
+  var source='';
+  if(ratios.callBook&&ratios.bookMeet&&ratios.meetOffer&&ratios.offerConnect){
+    required.connected=target;
+    required.offers=Math.ceil(required.connected/ratios.offerConnect.v);
+    required.meetings=Math.ceil(required.offers/ratios.meetOffer.v);
+    required.booked=Math.ceil(required.meetings/ratios.bookMeet.v);
+    required.calls=Math.ceil(required.booked/ratios.callBook.v);
+    var followBase=coachDailyBase(userId,'follow');
+    required.follow=Math.max(0,Math.ceil(followBase.v*wdTotal));
+    source='от цели месяца и реальной конверсии';
+  }else{
+    activityKeys.forEach(function(k){
+      var base=coachDailyBase(userId,k);
+      required[k]=Math.ceil(base.v*wdTotal);
+    });
+    source='от рабочего темпа прошлых планов';
+  }
+  var metrics={};
+  activityKeys.forEach(function(k){
+    var factBefore=sum(beforeRows,k+'_fact');
+    var needMonth=Math.max(0,num(required[k]));
+    var remainingNeed=Math.max(0,needMonth-factBefore);
+    var plan=Math.ceil(remainingNeed/remaining);
+    var base=coachDailyBase(userId,k);
+    var baseline=Math.ceil(base.v);
+    var uplift=baseline>0?plan-baseline:0;
+    var pressure=baseline>0?plan/baseline:(plan>0?1:0);
+    var shortReason='осталось '+remainingNeed+' / '+remaining+' раб. дн.';
+    var reason='До конца месяца по показателю «'+metricLabels[k]+'» нужно '+needMonth+'. До сегодня сделано '+factBefore+'. Осталось '+remainingNeed+' на '+remaining+' рабочих дней → план на сегодня '+plan+'. Основа расчёта: '+source+'.';
+    metrics[k]={plan:plan,requiredMonth:needMonth,factBefore:factBefore,remainingNeed:remainingNeed,remainingDays:remaining,baseline:baseline,uplift:uplift,pressure:pressure,shortReason:shortReason,reason:reason};
+  });
+  return {userId:userId,target:target,remainingDays:remaining,source:source,ratios:ratios,metrics:metrics};
+}
+function applyAutoDailyPlans(){
+  if(selectedDate!==todayISO())return;
+  dayRows.forEach(function(r){
+    var auto=coachAutoPlan(r.user_id);
+    activityKeys.forEach(function(k){r[k+'_plan']=auto.metrics[k].plan;});
+  });
+}
+function coachTeamFocusItems(){
+  var auto=coachAutoPlan('team');
+  var diag=coachDiagnostics('team');
+  var convWeak=diag.filter(function(x){return x.type==='conversion'&&x.tone!=='good';});
+  var items=activityKeys.map(function(k){
+    var m=auto.metrics[k];
+    var related=k==='booked'?'call_book':k==='meetings'?'book_meet':k==='offers'?'meet_offer':null;
+    var conv=related?convWeak.find(function(x){return x.key===related;}):null;
+    var severity=(m.pressure||0)+(conv?(conv.tone==='bad'?1.5:.7):0);
+    return {key:k,m:m,conv:conv,severity:severity};
+  }).filter(function(x){return x.m.plan>0;}).sort(function(a,b){return b.severity-a.severity;});
+  return items.slice(0,3).map(function(x){
+    var why=x.conv?('просадка конверсии '+x.conv.fact+' при ориентире '+x.conv.guide):('нужно добрать '+x.m.remainingNeed+' до месячной потребности');
+    return metricLabels[x.key]+': план команды сегодня '+x.m.plan+' — '+why+'.';
+  });
+}
+function applyAutoTeamFocus(){
+  if(selectedDate!==todayISO())return;
+  var items=coachTeamFocusItems();
+  for(var i=1;i<=3;i++){
+    var value=items[i-1]||'';
+    daySettings['focus'+i]=value;
+    var el=$('focus'+i);
+    if(el)el.value=value;
+  }
+}
+
 function coachPriorityData(userId,diag,fd,cr){
   var out=[];
   if(fd.forecast<fd.target){
