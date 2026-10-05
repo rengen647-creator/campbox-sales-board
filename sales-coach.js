@@ -5,7 +5,11 @@ function setCoachUser(v){
 function coachScopeRows(source,userId,cut){
   if(cut===undefined)cut=true;
   var ids=userId==='team'?profiles.map(function(p){return p.id;}):[userId];
-  return source.filter(function(r){
+  var rows=source;
+  if(source===monthRows&&Array.isArray(dayRows)&&dayRows.length){
+    rows=monthRows.filter(function(r){return String(r.report_date)!==selectedDate;}).concat(dayRows.map(function(r){return Object.assign({},r,{report_date:selectedDate});}));
+  }
+  return rows.filter(function(r){
     return ids.indexOf(r.user_id)>=0&&(!cut||String(r.report_date)<=selectedDate);
   });
 }
@@ -45,7 +49,7 @@ function coachConversionRows(rows){
 function coachBenchmark(userId,key){
   var prev=coachConversionRows(coachScopeRows(prevMonthRows,userId,false)).find(function(x){return x.key===key;});
   if(prev&&prev.den>=3)return {v:prev.v,label:'прошлый месяц'};
-  if(userId!=='team'&&isManager()){
+  if(userId!=='team'){
     var team=coachConversionRows(coachScopeRows(monthRows,'team',true)).find(function(x){return x.key===key;});
     if(team&&team.den>=3)return {v:team.v,label:'команда сейчас'};
   }
@@ -125,7 +129,7 @@ function coachFunnelRatios(userId){
       {v:coachRatioFromRows(ownPrev,numKey,denKey),src:'прошлый месяц'},
       {v:coachRatioFromRows(ownNow,numKey,denKey),src:'текущий месяц'}
     ];
-    if(isManager()&&userId!=='team'){
+    if(userId!=='team'){
       candidates.splice(1,0,
         {v:coachRatioFromRows(teamPrev,numKey,denKey),src:'команда · прошлый месяц'},
         {v:coachRatioFromRows(teamNow,numKey,denKey),src:'команда · текущий месяц'}
