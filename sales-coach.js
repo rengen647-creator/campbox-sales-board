@@ -45,7 +45,7 @@ function coachConversionRows(rows){
 function coachBenchmark(userId,key){
   var prev=coachConversionRows(coachScopeRows(prevMonthRows,userId,false)).find(function(x){return x.key===key;});
   if(prev&&prev.den>=3)return {v:prev.v,label:'прошлый месяц'};
-  if(userId!=='team'){
+  if(userId!=='team'&&isManager()){
     var team=coachConversionRows(coachScopeRows(monthRows,'team',true)).find(function(x){return x.key===key;});
     if(team&&team.den>=3)return {v:team.v,label:'команда сейчас'};
   }
