@@ -147,10 +147,22 @@ function coachFunnelRatios(userId){
   };
 }
 function coachDailyBase(userId,key){
-  var before=coachScopeRows(monthRows,userId,true).filter(function(r){return String(r.report_date)<selectedDate&&num(r[key+'_plan'])>0;});
-  if(before.length)return {v:sum(before,key+'_plan')/before.length,src:'средний план этого месяца'};
-  var prev=coachScopeRows(prevMonthRows,userId,false).filter(function(r){return num(r[key+'_plan'])>0;});
-  if(prev.length)return {v:sum(prev,key+'_plan')/prev.length,src:'средний план прошлого месяца'};
+  function avgDaily(rows){
+    if(userId!=='team'){
+      var own=rows.filter(function(r){return num(r[key+'_plan'])>0;});
+      return own.length?sum(own,key+'_plan')/own.length:0;
+    }
+    var byDate={};
+    rows.forEach(function(r){if(num(r[key+'_plan'])>0)byDate[r.report_date]=(byDate[r.report_date]||0)+num(r[key+'_plan']);});
+    var vals=Object.values(byDate);
+    return vals.length?vals.reduce(function(a,b){return a+b;},0)/vals.length:0;
+  }
+  var before=coachScopeRows(monthRows,userId,true).filter(function(r){return String(r.report_date)<selectedDate;});
+  var beforeAvg=avgDaily(before);
+  if(beforeAvg>0)return {v:beforeAvg,src:'средний план этого месяца'};
+  var prev=coachScopeRows(prevMonthRows,userId,false);
+  var prevAvg=avgDaily(prev);
+  if(prevAvg>0)return {v:prevAvg,src:'средний план прошлого месяца'};
   if(userId!=='team'){
     var row=dayRows.find(function(r){return r.user_id===userId;});
     if(row&&num(row[key+'_plan'])>0)return {v:num(row[key+'_plan']),src:'последний заданный план'};
@@ -235,29 +247,24 @@ function applyAutoTeamFocus(){
 
 function coachPriorityData(userId,diag,fd,cr){
   var out=[];
-  if(fd.forecast<fd.target){
+  var auto=coachAutoPlan(userId);
+  var weakByKey={};
+  diag.filter(function(x){return x.tone!=='good';}).forEach(function(x){weakByKey[x.key]=x;});
+  var ranked=activityKeys.map(function(k){
+    var m=auto.metrics[k];
+    var related=k==='booked'?'call_book':k==='meetings'?'book_meet':k==='offers'?'meet_offer':null;
+    var weak=weakByKey[k]||(related?weakByKey[related]:null);
+    var severity=(m.pressure||0)+(weak?(weak.tone==='bad'?1.5:.7):0)+(m.uplift>0?.5:0);
+    return {key:k,m:m,weak:weak,severity:severity};
+  }).filter(function(x){return x.m.plan>0;}).sort(function(a,b){return b.severity-a.severity;});
+  ranked.slice(0,2).forEach(function(x){
+    var extra=x.m.uplift>0?' Это на '+x.m.uplift+' выше базового темпа.':'';
     out.push({
-      tone:fd.risk>1?'bad':'warn',
-      title:'Прогноз '+fd.forecast+' из '+fd.target,
-      text:'При текущем темпе есть риск недобрать '+fd.risk+'. Нужен рост результата, а не просто активности.'
+      tone:x.weak?x.weak.tone:(x.m.uplift>0?'warn':'good'),
+      title:'Сегодня: '+metricLabels[x.key]+' — '+x.m.plan,
+      text:x.m.reason+extra
     });
-  }
-  var badAct=diag.filter(function(x){return x.type==='activity'&&x.tone!=='good';}).sort(function(a,b){return a.score-b.score;})[0];
-  if(badAct){
-    out.push({
-      tone:badAct.tone,
-      title:'Поджать: '+badAct.label,
-      text:'Факт '+badAct.fact+' при ориентире '+badAct.guide+'. Сначала восстановить необходимый объём на этом участке.'
-    });
-  }
-  var badConv=diag.filter(function(x){return x.type==='conversion'&&x.tone!=='good';}).sort(function(a,b){return a.score-b.score;})[0];
-  if(badConv){
-    out.push({
-      tone:badConv.tone,
-      title:'Разобрать качество: '+badConv.label,
-      text:'Сейчас '+badConv.fact+'; ориентир '+badConv.guide+'. Больше действий не исправят эту просадку без работы со скриптом / следующим шагом.'
-    });
-  }
+  });
   if(cr.over7||cr.late){
     out.push({
       tone:cr.over7?'bad':'warn',
@@ -265,13 +272,14 @@ function coachPriorityData(userId,diag,fd,cr){
       text:'Активных договоров '+cr.all.length+'; старше 7 дней — '+cr.over7+'; с просроченной датой — '+cr.late+'.'
     });
   }
-  if(!out.length){
+  if(out.length<3&&fd.forecast<fd.target){
     out.push({
-      tone:'good',
-      title:'Сохранить текущий темп',
-      text:'Критичных просадок по текущим данным нет. Не снижать активность и контролировать следующий шаг.'
+      tone:fd.risk>1?'bad':'warn',
+      title:'Риск месяца: '+fd.forecast+' из '+fd.target,
+      text:'Если текущая скорость подключений не изменится, недобор составит '+fd.risk+'. Автоплан выше уже распределяет нужный объём по оставшимся рабочим дням.'
     });
   }
+  if(!out.length)out.push({tone:'good',title:'Сохранить текущий темп',text:'Критичных просадок по текущим данным нет. План на сегодня рассчитан из оставшегося объёма месяца.'});
   return out.slice(0,3);
 }
 function coachWorstLabel(userId){
