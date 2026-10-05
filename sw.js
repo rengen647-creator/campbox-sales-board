@@ -1,4 +1,4 @@
-const CACHE = 'campbox-sales-v7-auto-plan-2026-10-05';
+const CACHE = 'campbox-sales-v8-gap-plan-2026-10-05';
 const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg','./sales-coach.css?v=20261005','./sales-coach.js?v=20261005'];
 
 self.addEventListener('install', event => {
