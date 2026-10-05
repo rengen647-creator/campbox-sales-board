@@ -462,13 +462,13 @@ function renderTeam(){
   dayRows.forEach(r=>{
     const pr=profiles.find(p=>p.id===r.user_id)||{full_name:'Сотрудник'};const editable=isManager()||r.user_id===currentUser.id;
     const tr=document.createElement('tr');if(r.user_id===currentUser.id)tr.classList.add('me-row');tr.dataset.userId=r.user_id;
-    const cells=metricKeys.map(k=>{
-      if(k==='connected')return `<td class="outcome-cell"><input data-k="connected_fact" type="number" min="0" value="${num(r.connected_fact)}" ${editable?'':'disabled'}><div class="cell-caption">факт за день</div></td>`;
-      return `<td><div class="pair"><input data-k="${k}_plan" type="number" min="0" value="${num(r[k+'_plan'])}" ${editable?'':'disabled'}><input data-k="${k}_fact" type="number" min="0" value="${num(r[k+'_fact'])}" ${editable?'':'disabled'}></div></td>`;
-    }).join('');
+    const cells=activityKeys.map(k=>`<td><div class="pair"><input data-k="${k}_plan" type="number" min="0" value="${num(r[k+'_plan'])}" ${editable?'':'disabled'}><input data-k="${k}_fact" type="number" min="0" value="${num(r[k+'_fact'])}" ${editable?'':'disabled'}></div></td>`).join('');
+    const cs=contractRowStats(r),contractCls=cs.over7>0?'bad':cs.over3>0?'':'good';
+    const contractCell=`<td class="contract-cell"><button class="contract-btn ${contractCls}" onclick="openContracts('${r.user_id}')"><span>${cs.active} на подписании</span></button><div class="contract-caption">${cs.active?`0–3 дн.: ${cs.fresh} · 4–7: ${cs.mid} · >7: ${cs.over7}`:'нет активных договоров'}</div></td>`;
+    const connectedCell=`<td class="outcome-cell"><input data-k="connected_fact" type="number" min="0" value="${num(r.connected_fact)}" ${editable?'':'disabled'}><div class="cell-caption">факт за день</div></td>`;
     const rs=reflectionState(r.comment);
     const caption=rs.state==='done'?'3 из 3 блоков заполнены':rs.state==='partial'?`${rs.count} из 3 блоков заполнено`:'результат / блокеры / завтра';
-    tr.innerHTML=`<td><b>${esc(pr.full_name||pr.email||'Сотрудник')}</b>${r.user_id===currentUser.id?'<div style="font-size:10px;color:#8d99b3;margin-top:3px">твоя строка</div>':''}</td>${cells}<td class="reflection-cell"><button class="reflection-btn ${rs.state}" onclick="openReflection('${r.user_id}')"><span>${rs.label}</span><i class="r-dot"></i></button><div class="reflection-caption">${caption}</div></td>`;
+    tr.innerHTML=`<td><b>${esc(pr.full_name||pr.email||'Сотрудник')}</b>${r.user_id===currentUser.id?'<div style="font-size:10px;color:#8d99b3;margin-top:3px">твоя строка</div>':''}</td>${cells}${contractCell}${connectedCell}<td class="reflection-cell"><button class="reflection-btn ${rs.state}" onclick="openReflection('${r.user_id}')"><span>${rs.label}</span><i class="r-dot"></i></button><div class="reflection-caption">${caption}</div></td>`;
     tr.querySelectorAll('input').forEach(el=>el.addEventListener('input',()=>{updateDayRowFromContainer(tr);syncSalesInputs(r.user_id,tr);changed()}));tb.appendChild(tr);
   });
   renderMobileTeam();
@@ -483,10 +483,10 @@ function renderMobileTeam(){
   const rows=isManager()?dayRows:dayRows.filter(r=>r.user_id===currentUser.id);
   wrap.innerHTML='';
   rows.forEach(r=>{
-    const pr=profiles.find(p=>p.id===r.user_id)||{full_name:'Сотрудник'},editable=isManager()||r.user_id===currentUser.id,rs=reflectionState(r.comment),card=document.createElement('div');
+    const pr=profiles.find(p=>p.id===r.user_id)||{full_name:'Сотрудник'},editable=isManager()||r.user_id===currentUser.id,rs=reflectionState(r.comment),cs=contractRowStats(r),card=document.createElement('div');
     card.className='employee-card'+(r.user_id===currentUser.id?' me':'');card.dataset.userId=r.user_id;
     const metricHtml=activityKeys.map(k=>`<div class="mobile-metric"><div class="mobile-metric-title">${esc(metricLabels[k])}</div><div class="mobile-pair"><div><label>план</label><input data-k="${k}_plan" type="number" min="0" value="${num(r[k+'_plan'])}" ${editable?'':'disabled'}></div><div><label>факт</label><input data-k="${k}_fact" type="number" min="0" value="${num(r[k+'_fact'])}" ${editable?'':'disabled'}></div></div></div>`).join('');
-    card.innerHTML=`<div class="employee-card-head"><div><b>${esc(pr.full_name||pr.email||'Сотрудник')}</b><br><small>Активности: ${rowActivityPct(r)}%</small></div><span class="pill ${statusClass(rowActivityPct(r))}">${rowActivityPct(r)}%</span></div><div class="mobile-metrics">${metricHtml}<div class="mobile-metric mobile-outcome"><div class="mobile-metric-title">Подключено лагерей</div><label>только факт</label><input data-k="connected_fact" type="number" min="0" value="${num(r.connected_fact)}" ${editable?'':'disabled'}></div></div><button style="margin-top:10px" class="reflection-btn ${rs.state}" onclick="openReflection('${r.user_id}')"><span>Итог дня: ${rs.label}</span><i class="r-dot"></i></button>`;
+    card.innerHTML=`<div class="employee-card-head"><div><b>${esc(pr.full_name||pr.email||'Сотрудник')}</b><br><small>Активности: ${rowActivityPct(r)}%</small></div><span class="pill ${statusClass(rowActivityPct(r))}">${rowActivityPct(r)}%</span></div><div class="mobile-metrics">${metricHtml}<div class="mobile-metric"><div class="mobile-metric-title">Договоры на подписании</div><button class="contract-btn ${cs.over7>0?'bad':cs.over3>0?'':'good'}" onclick="openContracts('${r.user_id}')">${cs.active} активных</button><div class="contract-caption">4–7 дн.: ${cs.mid} · >7: ${cs.over7}</div></div><div class="mobile-metric mobile-outcome"><div class="mobile-metric-title">Подключено лагерей</div><label>только факт</label><input data-k="connected_fact" type="number" min="0" value="${num(r.connected_fact)}" ${editable?'':'disabled'}></div></div><button style="margin-top:10px" class="reflection-btn ${rs.state}" onclick="openReflection('${r.user_id}')"><span>Итог дня: ${rs.label}</span><i class="r-dot"></i></button>`;
     card.querySelectorAll('input').forEach(el=>el.addEventListener('input',()=>{updateDayRowFromContainer(card);syncSalesInputs(r.user_id,card);changed()}));wrap.appendChild(card);
   });
 }
@@ -503,14 +503,70 @@ function renderReasonTags(canEdit=true){const box=$('reasonTags');if(!box)return
 function toggleReason(v){if(!reflectionUserId)return;if(v==='Нет блокеров'){reflectionReasons=reflectionReasons.includes(v)?[]:[v]}else{reflectionReasons=reflectionReasons.filter(x=>x!=='Нет блокеров');reflectionReasons=reflectionReasons.includes(v)?reflectionReasons.filter(x=>x!==v):[...reflectionReasons,v]}renderReasonTags(true)}
 function renderTomorrowQuickTags(canEdit=true){const box=$('tomorrowQuickTags');if(!box)return;const lines=$('reflectionTomorrow').value.split('\n').map(x=>x.trim()).filter(Boolean);box.innerHTML=tomorrowActions.map(x=>`<button type="button" class="quick-tag action ${lines.includes(x)?'active':''}" ${canEdit?'':'disabled'} onclick="toggleTomorrowAction('${x}')">${x}</button>`).join('')}
 function toggleTomorrowAction(v){const ta=$('reflectionTomorrow'),lines=ta.value.split('\n').map(x=>x.trim()).filter(Boolean),i=lines.indexOf(v);if(i>=0)lines.splice(i,1);else lines.push(v);ta.value=lines.slice(0,3).join('\n');renderTomorrowQuickTags(true)}
-function fillAutoReflection(){if(!reflectionUserId)return;const r=dayRows.find(x=>x.user_id===reflectionUserId);if(!r)return;const vals=activityKeys.filter(k=>num(r[k+'_plan'])>0),score=rowActivityPct(r),parts=[];if(vals.length)parts.push(`Активности ${score}%`);parts.push(`звонки ${num(r.calls_fact)}/${num(r.calls_plan)}`);parts.push(`проведено встреч ${num(r.meetings_fact)}/${num(r.meetings_plan)}`);parts.push(`КП ${num(r.offers_fact)}/${num(r.offers_plan)}`);if(num(r.connected_fact)>0)parts.push(`подключено лагерей: ${num(r.connected_fact)}`);$('reflectionResult').value=parts.join(' · ')+'.'}
+function fillAutoReflection(){if(!reflectionUserId)return;const r=dayRows.find(x=>x.user_id===reflectionUserId);if(!r)return;const vals=activityKeys.filter(k=>num(r[k+'_plan'])>0),score=rowActivityPct(r),parts=[];if(vals.length)parts.push(`Активности ${score}%`);parts.push(`звонки ${num(r.calls_fact)}/${num(r.calls_plan)}`);parts.push(`проведено встреч ${num(r.meetings_fact)}/${num(r.meetings_plan)}`);parts.push(`КП ${num(r.offers_fact)}/${num(r.offers_plan)}`);const signing=contractRowStats(r).active;if(signing>0)parts.push(`на подписании: ${signing}`);if(num(r.connected_fact)>0)parts.push(`подключено лагерей: ${num(r.connected_fact)}`);$('reflectionResult').value=parts.join(' · ')+'.'}
 function closeReflection(){$('reflectionModal').classList.add('hidden');reflectionUserId=null;reflectionReasons=[]}
 async function saveReflection(){
   if(!reflectionUserId)return;const r=dayRows.find(x=>x.user_id===reflectionUserId);if(!r)return;
   if(!(isManager()||reflectionUserId===currentUser.id))return;
-  r.comment=packReflection({result:$('reflectionResult').value,blockers:$('reflectionBlockers').value,tomorrow:$('reflectionTomorrow').value,reasons:reflectionReasons});
+  const prev=parseReflection(r.comment);r.comment=packReflection({...prev,result:$('reflectionResult').value,blockers:$('reflectionBlockers').value,tomorrow:$('reflectionTomorrow').value,reasons:reflectionReasons});
   renderTeam();recalc();closeReflection();await saveCurrent(true);
 }
+function carryForwardContracts(userId,date){
+  const prev=monthRows.filter(r=>r.user_id===userId&&String(r.report_date)<date).sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date))).pop();
+  return prev?parseReflection(prev.comment).contracts.filter(c=>c.status==='signing').map(c=>({...c})):[];
+}
+function contractAge(c,ref=selectedDate){if(!c?.sent_date)return 0;const a=new Date(c.sent_date+'T12:00:00'),b=new Date(ref+'T12:00:00');return Math.max(0,Math.floor((b-a)/86400000))}
+function contractRowStats(r){const active=parseReflection(r?.comment).contracts.filter(c=>c.status==='signing'),ages=active.map(c=>contractAge(c));return {active:active.length,fresh:ages.filter(x=>x<=3).length,mid:ages.filter(x=>x>=4&&x<=7).length,over3:ages.filter(x=>x>=4).length,over7:ages.filter(x=>x>7).length}}
+function activeContractEntries(){
+  return dayRows.flatMap(r=>{const pr=profiles.find(p=>p.id===r.user_id)||{};return parseReflection(r.comment).contracts.filter(c=>c.status==='signing').map(c=>({...c,user_id:r.user_id,manager:pr.full_name||pr.email||'Сотрудник',age:contractAge(c)}))});
+}
+function monthlyContractEntries(){
+  const rows=[...monthRows.filter(r=>String(r.report_date)!==selectedDate),...dayRows.map(r=>({...r,report_date:selectedDate}))].sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date)));
+  const map=new Map();
+  rows.forEach(r=>parseReflection(r.comment).contracts.forEach(c=>{const key=c.id||`${r.user_id}|${c.client}|${c.sent_date}`;const prev=map.get(key);map.set(key,{...(prev||{}),...c,user_id:r.user_id,first_seen:prev?.first_seen||r.report_date,last_seen:r.report_date})}));
+  return [...map.values()];
+}
+function monthlySigningCount(rows=null){
+  if(!rows)return monthlyContractEntries().length;
+  const map=new Map();rows.forEach(r=>parseReflection(r.comment).contracts.forEach(c=>{const key=c.id||`${r.user_id}|${c.client}|${c.sent_date}`;if(!map.has(key))map.set(key,c)}));return map.size;
+}
+function contractTone(c){const age=contractAge(c),targetLate=c.target_date&&c.target_date<selectedDate,nextLate=c.next_contact&&c.next_contact<selectedDate;return age>7||targetLate||nextLate?'bad':age>=4?'warn':'good'}
+function contractStatusLabel(v){return v==='signed'?'Подписан':v==='lost'?'Не состоялся':'На подписании'}
+function openContracts(userId){
+  const r=dayRows.find(x=>x.user_id===userId);if(!r)return;const pr=profiles.find(p=>p.id===userId)||{full_name:'Сотрудник'},canEdit=isManager()||userId===currentUser.id;
+  contractUserId=userId;contractDraft=parseReflection(r.comment).contracts.map(c=>({...c}));$('contractUserName').textContent=pr.full_name||pr.email||'Сотрудник';$('contractDateLabel').textContent=selectedDate;$('contractAddBtn').classList.toggle('hidden',!canEdit);$('contractSaveBtn').classList.toggle('hidden',!canEdit);renderContractDraft(canEdit);$('contractModal').classList.remove('hidden');
+}
+function closeContracts(){$('contractModal').classList.add('hidden');contractUserId=null;contractDraft=[]}
+function addContractRow(){if(!contractUserId)return;contractDraft.push(normalizeContract({sent_date:selectedDate,status:'signing',ball:'client'}));renderContractDraft(true)}
+function removeContractRow(i){contractDraft.splice(i,1);renderContractDraft(true)}
+function updateContractDraft(i,field,value){if(!contractDraft[i])return;contractDraft[i][field]=value;renderContractSummary()}
+function renderContractSummary(){
+  const active=contractDraft.filter(c=>c.status==='signing'),fresh=active.filter(c=>contractAge(c)<=3).length,mid=active.filter(c=>{const a=contractAge(c);return a>=4&&a<=7}).length,old=active.filter(c=>contractAge(c)>7).length;
+  $('contractSummary').innerHTML=`<span class="pill ${active.length?'warn':'good'}">На подписании: ${active.length}</span><span class="pill good">0–3 дня: ${fresh}</span><span class="pill ${mid?'warn':'good'}">4–7 дней: ${mid}</span><span class="pill ${old?'bad':'good'}">&gt;7 дней: ${old}</span>`;
+}
+function renderContractDraft(canEdit=true){
+  const box=$('contractList');if(!contractDraft.length){box.innerHTML='<div class="contract-empty">Договоров на подписании пока нет. Добавь лагерь, когда договор отправлен клиенту.</div>';renderContractSummary();return}
+  box.innerHTML=contractDraft.map((c,i)=>{const tone=contractTone(c),age=contractAge(c);return `<div class="contract-row ${tone}">
+    <div class="contract-row-head">
+      <div><label>Лагерь / клиент</label><input value="${esc(c.client)}" oninput="updateContractDraft(${i},'client',this.value)" ${canEdit?'':'disabled'} placeholder="Название лагеря"></div>
+      <div><label>Статус</label><select onchange="updateContractDraft(${i},'status',this.value)" ${canEdit?'':'disabled'}><option value="signing" ${c.status==='signing'?'selected':''}>На подписании</option><option value="signed" ${c.status==='signed'?'selected':''}>Подписан</option><option value="lost" ${c.status==='lost'?'selected':''}>Не состоялся</option></select></div>
+      <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}</span>
+      ${canEdit?`<button class="btn danger" onclick="removeContractRow(${i})">Удалить</button>`:''}
+    </div>
+    <div class="contract-fields">
+      <div><label>Договор отправлен</label><input type="date" value="${esc(c.sent_date)}" onchange="updateContractDraft(${i},'sent_date',this.value)" ${canEdit?'':'disabled'}></div>
+      <div><label>Плановая подпись</label><input type="date" value="${esc(c.target_date)}" onchange="updateContractDraft(${i},'target_date',this.value)" ${canEdit?'':'disabled'}></div>
+      <div><label>У кого мяч</label><select onchange="updateContractDraft(${i},'ball',this.value)" ${canEdit?'':'disabled'}><option value="client" ${c.ball==='client'?'selected':''}>У клиента</option><option value="us" ${c.ball==='us'?'selected':''}>У нас</option></select></div>
+      <div><label>Что блокирует</label><input value="${esc(c.blocker)}" oninput="updateContractDraft(${i},'blocker',this.value)" ${canEdit?'':'disabled'} placeholder="Юристы / цена / реквизиты"></div>
+      <div><label>Следующее действие</label><input value="${esc(c.next_action)}" oninput="updateContractDraft(${i},'next_action',this.value)" ${canEdit?'':'disabled'} placeholder="Позвонить ЛПР / получить правки"></div>
+      <div><label>Следующий контакт</label><input type="date" value="${esc(c.next_contact)}" onchange="updateContractDraft(${i},'next_contact',this.value)" ${canEdit?'':'disabled'}></div>
+    </div>
+  </div>`}).join('');renderContractSummary();
+}
+async function saveContracts(){
+  if(!contractUserId)return;const r=dayRows.find(x=>x.user_id===contractUserId);if(!r||!(isManager()||contractUserId===currentUser.id))return;const prev=parseReflection(r.comment),clean=contractDraft.filter(c=>c.client.trim()).map(normalizeContract);r.comment=packReflection({...prev,contracts:clean});renderTeam();recalc();closeContracts();await saveCurrent(true);
+}
+
 async function copyPreviousWorkdayPlan(){
   const prev=previousWorkdayISO(selectedDate),targets=isManager()?dayRows:dayRows.filter(r=>r.user_id===currentUser.id);
   if(targets.some(r=>activityKeys.some(k=>num(r[k+'_plan'])>0))&&!confirm('Текущий план активности будет заменён планом прошлого рабочего дня. Продолжить?'))return;
