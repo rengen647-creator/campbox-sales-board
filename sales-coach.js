@@ -254,7 +254,7 @@ function coachPriorityData(userId,diag,fd,cr){
     var m=auto.metrics[k];
     var related=k==='booked'?'call_book':k==='meetings'?'book_meet':k==='offers'?'meet_offer':null;
     var weak=weakByKey[k]||(related?weakByKey[related]:null);
-    var severity=(m.pressure||0)+(weak?(weak.tone==='bad'?1.5:.7):0)+(m.uplift>0?.5:0);
+    var severity=(m.pressure||0)+(weak?(weak.tone==='bad'?1.5:.7):0)+(m.uplift>0?0.5:0);
     return {key:k,m:m,weak:weak,severity:severity};
   }).filter(function(x){return x.m.plan>0;}).sort(function(a,b){return b.severity-a.severity;});
   ranked.slice(0,2).forEach(function(x){
