@@ -220,7 +220,7 @@ function renderSalesCoach(){
     $('coachTeam').innerHTML=profiles.map(function(p){
       var d=coachForecastData(p.id);
       var pt=d.forecast>=d.target?'good':d.risk<=1?'warn':'bad';
-      return '<div class="coach-person" onclick="setCoachUser(''+p.id+'')">'+
+      return '<div class="coach-person" data-coach-user="'+esc(p.id)+'" onclick="setCoachUser(this.dataset.coachUser)">'+
         '<div class="coach-person-head"><div><h3>'+esc(p.full_name||p.email||'Сотрудник')+'</h3><small>нажми для диагностики</small></div><span class="pill '+pt+'">'+(d.forecast>=d.target?'по плану':'риск')+'</span></div>'+
         '<div class="coach-person-kpis"><div><span>Факт</span><b>'+d.fact+'/'+d.target+'</b></div><div><span>Прогноз</span><b>'+d.forecast+'/'+d.target+'</b></div><div><span>До цели</span><b>'+Math.max(d.target-d.fact,0)+'</b></div></div>'+
         '<div class="coach-person-diagnosis">'+esc(coachWorstLabel(p.id))+'</div></div>';
