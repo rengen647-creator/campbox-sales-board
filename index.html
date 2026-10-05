@@ -11,11 +11,13 @@
   <meta name="apple-mobile-web-app-title" content="CampBox Sales" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="stylesheet" href="./sales-coach.css?v=20261005" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <meta name="referrer" content="no-referrer" />
   <title>CampBox — Sales Board</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="./sales-coach.js?v=20261005"></script>
   <style>
     :root{
       --bg:#09101f;--bg2:#0d1527;--panel:#121c32;--panel2:#17233d;--panel3:#0e1830;
@@ -192,6 +194,38 @@
     </div><div class="hint" style="margin-top:10px">Подключения — месячный результат. Дневной план на подключения не ставим: в ежедневном отчёте фиксируется только факт.</div></div></div>
   </section>
 
+
+  <section class="card coach-card">
+    <div class="section-head coach-top">
+      <div class="section-title"><h2>Sales Coach · где тормозим по месяцу</h2><p>Не CRM: здесь только темп к плану, просадки, причины и что нужно усилить сегодня.</p></div>
+      <div class="field coach-select"><label>Диагностика</label><select id="coachUser" onchange="setCoachUser(this.value)"></select></div>
+    </div>
+    <div class="section-body">
+      <div class="coach-kpis">
+        <div class="coach-kpi"><span>Цель месяца</span><b id="coachTarget">0</b><small id="coachTargetNote">—</small></div>
+        <div class="coach-kpi good"><span>Факт к дате</span><b id="coachFact">0</b><small>подключённых лагерей</small></div>
+        <div class="coach-kpi"><span>По темпу должно быть</span><b id="coachNeed">0</b><small>на выбранную дату</small></div>
+        <div id="coachForecastCard" class="coach-kpi warn"><span>Прогноз темпа</span><b id="coachForecast">0</b><small>если работать с текущей скоростью</small></div>
+        <div id="coachRiskCard" class="coach-kpi bad"><span>Риск к цели</span><b id="coachRisk">0</b><small id="coachRiskNote">ожидаемый недобор</small></div>
+      </div>
+      <div class="coach-grid">
+        <div>
+          <div id="coachDiagnosis" class="coach-diagnosis">Диагностика появится после загрузки данных.</div>
+          <div class="coach-table-wrap"><table class="coach-table"><thead><tr><th>Участок</th><th>Ориентир</th><th>Факт</th><th>Отклонение</th><th>Диагноз</th></tr></thead><tbody id="coachDiagBody"></tbody></table></div>
+        </div>
+        <div>
+          <div class="section-title" style="margin-bottom:8px"><h2 style="font-size:13px">Что поджать сегодня</h2><p>Не «работать больше», а усилить конкретное место.</p></div>
+          <div id="coachPriorities" class="coach-priorities"></div>
+        </div>
+      </div>
+      <div class="coach-bottom">
+        <div class="coach-box"><h3>Почему тормозим · из итогов дня</h3><div id="coachReasons" class="coach-reasons"></div></div>
+        <div class="coach-box"><h3>Контрактинг · только риск месячного результата</h3><div id="coachContracts" class="coach-contract-line"></div></div>
+      </div>
+      <div id="coachTeamWrap" class="coach-box manager-only" style="margin-top:10px"><h3>Команда · у кого какая проблема</h3><div id="coachTeam" class="coach-team"></div></div>
+    </div>
+  </section>
+
   <section class="pulse-grid">
     <div class="card chart-card">
       <div class="section-head"><div class="section-title"><h2>Темп к цели месяца</h2><p>Синяя линия — основная цель. Зелёная — фактические подключения. Полупрозрачная зона — коридор между минимумом и максимумом.</p></div><span id="paceStatus" class="pill warn">Нет данных</span></div>
@@ -328,8 +362,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_x1zCcIIgf7fmAEFocColrA_wEtxB4hc';
 const metricKeys=['calls','booked','meetings','offers','follow','connected'];
 const activityKeys=['calls','booked','meetings','offers','follow'];
 const metricLabels={calls:'Звонки',booked:'Назначено встреч',meetings:'Проведено встреч',offers:'КП / расчёты',follow:'Повторные контакты',connected:'Подключено лагерей'};
-let sb=null,currentUser=null,currentProfile=null,selectedMonth='',selectedDate='',profiles=[],dayRows=[],monthRows=[],checkpoints=[],monthSettings={},daySettings={};
-let saveTimer=null,isLoading=false,reflectionUserId=null,reflectionReasons=[],activeActivityMetric='calls',contractUserId=null,contractDraft=[];
+let sb=null,currentUser=null,currentProfile=null,selectedMonth='',selectedDate='',profiles=[],dayRows=[],monthRows=[],prevMonthRows=[],checkpoints=[],monthSettings={},daySettings={};
+let saveTimer=null,isLoading=false,reflectionUserId=null,reflectionReasons=[],activeActivityMetric='calls',contractUserId=null,contractDraft=[],coachUserId='team';
+const PERSONAL_MONTH_TARGET=5;
 const reasonOptions=['Нет блокеров','Не дозвонился','Перенесли','Нет ЛПР','Ждём решение','Цена','Тех. вопрос','Договор у юристов','Нет времени / ресурса','Другое'];
 const tomorrowActions=['Позвонить','Назначить встречу','Провести встречу','Отправить КП','Повторный контакт','Дожать договор','Дожать решение'];
 
@@ -341,6 +376,7 @@ function todayISO(){const d=new Date();const z=d.getTimezoneOffset()*60000;retur
 function monthISO(date=todayISO()){return date.slice(0,7)}
 function monthStart(m){return `${m}-01`}
 function nextMonthStart(m){const [y,mo]=m.split('-').map(Number);return new Date(Date.UTC(y,mo,1)).toISOString().slice(0,10)}
+function previousMonthStart(m){const [y,mo]=m.split('-').map(Number);return new Date(Date.UTC(y,mo-2,1)).toISOString().slice(0,10)}
 function daysInMonth(m){const [y,mo]=m.split('-').map(Number);return new Date(y,mo,0).getDate()}
 function isoForDay(m,d){return `${m}-${String(d).padStart(2,'0')}`}
 function isWorkdayISO(iso){const d=new Date(iso+'T12:00:00');const w=d.getDay();return w>=1&&w<=5}
@@ -435,18 +471,21 @@ function applyRoleUI(){
 async function loadAll(){
   isLoading=true;setStatus('Загрузка…');
   try{
-    const [{data:p,error:pe},{data:ms,error:mse},{data:ds,error:dse},{data:dr,error:dre},{data:mr,error:mre},{data:cp,error:cpe}]=await Promise.all([
+    const prevStart=previousMonthStart(selectedMonth);
+    const [{data:p,error:pe},{data:ms,error:mse},{data:ds,error:dse},{data:dr,error:dre},{data:mr,error:mre},{data:pmr,error:pmre},{data:cp,error:cpe}]=await Promise.all([
       sb.from('profiles').select('id,full_name,email,role,active').eq('active',true).order('full_name'),
       sb.from('month_settings').select('*').eq('month',monthStart(selectedMonth)).maybeSingle(),
       sb.from('day_settings').select('*').eq('report_date',selectedDate).maybeSingle(),
       sb.from('daily_sales').select('*').eq('report_date',selectedDate),
       sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),
+      sb.from('daily_sales').select('*').gte('report_date',prevStart).lt('report_date',monthStart(selectedMonth)),
       sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date')
     ]);
-    const err=pe||mse||dse||dre||mre||cpe;if(err)throw err;
-    profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];checkpoints=cp||[];
+    const err=pe||mse||dse||dre||mre||pmre||cpe;if(err)throw err;
+    profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];prevMonthRows=pmr||[];checkpoints=cp||[];
     const byUser=Object.fromEntries((dr||[]).map(r=>[r.user_id,r]));
     dayRows=profiles.map(pr=>byUser[pr.id]||blankSales(pr.id,selectedDate,carryForwardContracts(pr.id,selectedDate)));
+    if(!isManager())coachUserId=currentUser.id;else if(coachUserId!=='team'&&!profiles.some(p=>p.id===coachUserId))coachUserId='team';
     renderAll();setStatus('Все данные актуальны','good');
   }catch(e){console.error(e);setStatus('Ошибка загрузки','bad');alert('Не удалось загрузить данные. Проверь подключение к Supabase и политики доступа.');}
   finally{isLoading=false}
@@ -703,7 +742,7 @@ function renderAttention(totals,overall){
   $('attentionList').innerHTML=a.slice(0,3).map(i=>`<div class="attention-item ${i.k}"><b>${i.t}</b>${i.x}</div>`).join('');
   const active=activeContractEntries(),over7=active.filter(c=>c.age>7).length;$('autoTeamSummary').textContent=`Автосводка: активности ${overall}%. Звонки ${totals.callsF}/${totals.callsP}, проведено встреч ${totals.meetingsF}/${totals.meetingsP}, КП ${totals.offersF}/${totals.offersP}, повторные контакты ${totals.followF}/${totals.followP}. На подписании сейчас: ${active.length}${over7?` (из них >7 дней: ${over7})`:''}. Подключено сегодня: ${totals.connectedF}.`;
 }
-function renderAnalytics(totals,overall){renderPersonal();renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();renderAttention(totals,overall)}
+function renderAnalytics(totals,overall){renderPersonal();renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();renderAttention(totals,overall);renderSalesCoach()}
 
 function changed(){if(isLoading)return;recalc();setStatus('Есть несохранённые изменения');clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveCurrent(false),900)}
 async function saveCurrent(manual=false){
