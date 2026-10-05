@@ -187,7 +187,7 @@
     plan.querySelectorAll('[data-v13-fact]').forEach(function(inp){
       inp.addEventListener('input',function(){
         var k=this.getAttribute('data-v13-fact');row[k+'_fact']=Number(this.value)||0;
-        document.querySelectorAll('[data-user-id="'+uid+'"] [data-k="'+k+'_fact+'"]').forEach(function(x){x.value=row[k+'_fact'];});
+        document.querySelectorAll('[data-user-id="'+uid+'"] [data-k="'+k+'_fact"]').forEach(function(x){x.value=row[k+'_fact'];});
         if(typeof changed==='function')changed();if(typeof recalc==='function')recalc();
       });
     });
