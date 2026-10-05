@@ -1,4 +1,4 @@
-const CACHE = 'campbox-sales-v4-2026-10-01';
+const CACHE = 'campbox-sales-v5-contracting-2026-10-05';
 const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg'];
 
 self.addEventListener('install', event => {
