@@ -48,8 +48,10 @@
   function renderMobileNav(){
     var mobile=document.getElementById('v13MobileNav');if(!mobile)return;
     var manager=typeof isManager==='function'&&isManager();
+    var fixed=manager?['today','month','team']:['today','month','funnel'];
     mobile.innerHTML=mobileButton('today','⚡','Сегодня')+mobileButton('month','🎯','Месяц')+(manager?mobileButton('team','👥','Команда'):mobileButton('funnel','📊','Воронка'))+'<button type="button" id="v13MoreBtn"><span class="mi">•••</span><span class="ml">Ещё</span></button>';
     mobile.querySelectorAll('[data-v13-view]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-v13-view')===V.view);});
+    var more=document.getElementById('v13MoreBtn');if(more)more.classList.toggle('active',fixed.indexOf(V.view)<0);
   }
   function renderMoreSheet(){
     var sheet=document.getElementById('v13MobileMore');if(!sheet)return;
@@ -200,16 +202,31 @@
     if(!row){plan.innerHTML='<div class="v13-empty">План появится после загрузки строки сотрудника.</div>';return;}
     var auto=null;try{auto=coachAutoPlan(uid);}catch(e){}
     var prio=[];try{prio=coachPriorityData(uid,diag(uid),f,risk(uid));}catch(e){}
-    var rows=(typeof activityKeys!=='undefined'?activityKeys:[]).map(function(k){
+    var keys=typeof activityKeys!=='undefined'?activityKeys:[];
+    var vals=keys.filter(function(k){return Number(row[k+'_plan']||0)>0;}).map(function(k){return Math.min(100,pct(Number(row[k+'_fact']||0),Number(row[k+'_plan']||0)));});
+    var dayPct=vals.length?Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length):0;
+    var focus=prio[0]||{title:'Сохранить текущий темп',text:'Критичных просадок по текущим данным нет.'};
+
+    var rows=keys.map(function(k){
       var why=auto&&auto.metrics&&auto.metrics[k]?auto.metrics[k].shortReason:'автоплан';
       return '<tr><td><b>'+h(metricLabels[k])+'</b></td><td><b>'+Number(row[k+'_plan']||0)+'</b></td><td><input type="number" min="0" data-v13-fact="'+k+'" value="'+Number(row[k+'_fact']||0)+'"></td><td class="v13-plan-why">'+h(why)+'</td></tr>';
     }).join('');
-    var focus=prio[0]||{title:'Сохранить текущий темп',text:'Критичных просадок по текущим данным нет.'};
-    plan.innerHTML='<div class="v13-my-plan"><div><table class="v13-plan-table"><thead><tr><th>Действие</th><th>План</th><th>Факт</th><th>Почему</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="v13-focus-hero"><b>'+h(focus.title)+'</b><p>'+h(focus.text)+'</p><strong>'+h(worst(uid))+'</strong></div></div>';
+
+    var mobileCards=keys.map(function(k){
+      var p=Number(row[k+'_plan']||0),fact=Number(row[k+'_fact']||0),remaining=Math.max(p-fact,0);
+      var m=auto&&auto.metrics&&auto.metrics[k]?auto.metrics[k]:null;
+      var why=m?m.shortReason:'автоплан',critical=remaining>0&&m&&m.uplift>0;
+      return '<article class="v13-plan-mobile-card '+(critical?'critical':'')+'"><div class="v13-plan-mobile-head"><div><b>'+h(metricLabels[k])+'</b><span>'+(critical?' · усиленный фокус':'')+'</span></div>'+pill(remaining===0?'good':critical?'bad':'warn',remaining===0?'готово':'осталось '+remaining)+'</div><div class="v13-plan-mobile-values"><div><span>План</span><b>'+p+'</b></div><div><span>Факт</span><input type="number" min="0" inputmode="numeric" data-v13-fact="'+k+'" value="'+fact+'"></div><div><span>Осталось</span><b>'+remaining+'</b></div></div><div class="v13-plan-mobile-why">'+h(why)+'</div></article>';
+    }).join('');
+
+    plan.innerHTML='<div class="v13-day-progress"><div class="v13-day-progress-head"><b>Прогресс дня</b><strong>'+dayPct+'%</strong></div><div class="v13-day-progress-bar"><i style="width:'+Math.min(dayPct,100)+'%"></i></div><small>'+h(focus.title)+'</small></div>'+
+      '<div class="v13-my-plan"><div><table class="v13-plan-table v13-plan-table-desktop"><thead><tr><th>Действие</th><th>План</th><th>Факт</th><th>Почему</th></tr></thead><tbody>'+rows+'</tbody></table><div class="v13-mobile-plan-list">'+mobileCards+'</div></div><div class="v13-focus-hero"><b>'+h(focus.title)+'</b><p>'+h(focus.text)+'</p><strong>'+h(worst(uid))+'</strong></div></div>';
+
     plan.querySelectorAll('[data-v13-fact]').forEach(function(inp){
       inp.addEventListener('input',function(){
-        var k=this.getAttribute('data-v13-fact');row[k+'_fact']=Number(this.value)||0;
-        document.querySelectorAll('[data-user-id="'+uid+'"] [data-k="'+k+'_fact"]').forEach(function(x){x.value=row[k+'_fact'];});
+        var k=this.getAttribute('data-v13-fact'),v=Number(this.value)||0;row[k+'_fact']=v;
+        plan.querySelectorAll('[data-v13-fact="'+k+'"]').forEach(function(x){if(x!==inp)x.value=v;});
+        document.querySelectorAll('[data-user-id="'+uid+'"] [data-k="'+k+'_fact"]').forEach(function(x){x.value=v;});
         if(typeof changed==='function')changed();
       });
       inp.addEventListener('change',function(){if(typeof recalc==='function')recalc();});
@@ -228,14 +245,17 @@
     var grid=document.getElementById('v13TeamGrid'),sumBox=document.getElementById('v13TeamSummary');if(!grid||!sumBox||typeof profiles==='undefined')return;
     var ids=(typeof isManager==='function'&&isManager())?profiles.map(function(p){return p.id;}):[currentSelf()];
     ids=ids.filter(Boolean);if(!ids.length)return;
-    var tf=fd((typeof isManager==='function'&&isManager())?'team':ids[0]);
-    sumBox.innerHTML='<div><span>Цель</span><b>'+tf.target+'</b></div><div><span>Факт</span><b>'+tf.fact+'</b></div><div><span>Прогноз</span><b style="color:'+(tf.forecast>=tf.target?'#8fe2c5':'#ffd17e')+'">'+tf.forecast+'</b></div><div><span>Главная просадка</span><b style="font-size:12px">'+h(worst((typeof isManager==='function'&&isManager())?'team':ids[0]))+'</b></div>';
+    var teamScope=(typeof isManager==='function'&&isManager())?'team':ids[0],tf=fd(teamScope);
+    sumBox.innerHTML='<div><span>Цель</span><b>'+tf.target+'</b></div><div><span>Факт</span><b>'+tf.fact+'</b></div><div><span>Прогноз</span><b style="color:'+(tf.forecast>=tf.target?'#8fe2c5':'#ffd17e')+'">'+tf.forecast+'</b></div><div><span>Главная просадка</span><b style="font-size:12px">'+h(worst(teamScope))+'</b></div>';
     if(!V.managerId||ids.indexOf(V.managerId)<0)V.managerId=ids[0];
     grid.innerHTML=ids.map(function(id){
       var p=profiles.find(function(x){return x.id===id;})||{},f=fd(id),w=worst(id),tone=f.forecast>=f.target?'good':f.risk<=1?'warn':'bad';
-      return '<div class="v13-person '+(V.managerId===id?'active':'')+'" data-v13-manager="'+h(id)+'"><div class="v13-person-head"><div><h3>'+h(p.full_name||p.email||'Сотрудник')+'</h3><small>менеджер</small></div>'+pill(tone,tone==='good'?'по плану':'риск')+'</div><div class="v13-person-stats"><div><span>Факт</span><b>'+f.fact+'/'+f.target+'</b></div><div><span>Прогноз</span><b>'+f.forecast+'/'+f.target+'</b></div><div><span>До цели</span><b>'+Math.max(f.target-f.fact,0)+'</b></div></div><div class="v13-diagnosis">'+h(w)+'</div></div>';
+      return '<div class="v13-person '+(V.managerId===id&&(!isMobile()||V.managerOpen)?'active':'')+'" data-v13-manager="'+h(id)+'"><div class="v13-person-head"><div><h3>'+h(p.full_name||p.email||'Сотрудник')+'</h3><small>менеджер</small></div>'+pill(tone,tone==='good'?'по плану':'риск')+'</div><div class="v13-person-stats"><div><span>Факт</span><b>'+f.fact+'/'+f.target+'</b></div><div><span>Прогноз</span><b>'+f.forecast+'/'+f.target+'</b></div><div><span>До цели</span><b>'+Math.max(f.target-f.fact,0)+'</b></div></div><div class="v13-diagnosis">'+h(w)+'</div><small class="v13-mobile-only" style="margin-top:8px;color:#83cfff;font-size:10px">Открыть разбор →</small></div>';
     }).join('');
-    grid.querySelectorAll('[data-v13-manager]').forEach(function(x){x.addEventListener('click',function(){V.managerId=this.getAttribute('data-v13-manager');renderTeam();});});
+    grid.querySelectorAll('[data-v13-manager]').forEach(function(x){x.addEventListener('click',function(){
+      V.managerId=this.getAttribute('data-v13-manager');V.managerOpen=true;renderTeam();
+      if(isMobile())setTimeout(function(){var p=document.getElementById('v13ManagerPanel');if(p)p.scrollIntoView({behavior:'smooth',block:'start'});},50);
+    });});
     renderManagerPanel(V.managerId);
   }
 
@@ -245,15 +265,18 @@
   }
   function renderManagerPanel(id){
     var box=document.getElementById('v13ManagerPanel');if(!box||!id)return;
+    box.classList.toggle('mobile-open',!isMobile()||V.managerOpen);
     var p=(typeof profiles!=='undefined'?profiles:[]).find(function(x){return x.id===id;})||{},f=fd(id),ds=diag(id),cr=risk(id);
     var weak=ds.filter(function(x){return x.tone!=='good';}).sort(function(a,b){return a.score-b.score;});
     var good=ds.filter(function(x){return x.tone==='good';}).slice(0,3);
     function get(key){return ds.find(function(x){return x.key===key;});}
-    var calls=get('calls'),cb=get('call_book'),bm=get('book_meet'),mo=get('meet_offer');
-    box.innerHTML='<div class="v13-person-head"><div><h3>'+h(p.full_name||p.email||'Сотрудник')+'</h3><small>'+h(worst(id))+'</small></div>'+pill(f.forecast>=f.target?'good':f.risk<=1?'warn':'bad',f.forecast>=f.target?'ПО ПЛАНУ':'РИСК')+'</div>'+
+    var calls=get('calls'),cb=get('call_book'),mo=get('meet_offer');
+    box.innerHTML='<button type="button" class="v13-manager-close v13-mobile-only" id="v13ManagerClose">← К списку менеджеров</button>'+
+      '<div class="v13-person-head"><div><h3>'+h(p.full_name||p.email||'Сотрудник')+'</h3><small>'+h(worst(id))+'</small></div>'+pill(f.forecast>=f.target?'good':f.risk<=1?'warn':'bad',f.forecast>=f.target?'ПО ПЛАНУ':'РИСК')+'</div>'+
       '<div class="v13-health"><div><span>Факт</span><b>'+f.fact+'/'+f.target+'</b></div><div><span>Прогноз</span><b>'+f.forecast+'/'+f.target+'</b></div><div><span>Звонки</span><b>'+(calls?h(calls.fact):'—')+'</b></div><div><span>Звонок→встреча</span><b>'+(cb?h(cb.fact):'—')+'</b></div><div><span>Встреча→КП</span><b>'+(mo?h(mo.fact):'—')+'</b></div></div>'+
       '<div class="v13-manager-columns"><div class="v13-coach-box"><h4>Что получается</h4><ul>'+(good.length?good.map(function(x){return '<li>'+h(x.label)+': '+h(x.diagnosis)+'</li>';}).join(''):'<li>Нужно больше данных для устойчивого вывода.</li>')+'</ul></div><div class="v13-coach-box"><h4>Что тянет вниз</h4><ul>'+(weak.length?weak.slice(0,4).map(function(x){return '<li>'+h(x.label)+': '+h(x.fact)+' при ориентире '+h(x.guide)+'</li>';}).join(''):'<li>Критичных просадок нет.</li>')+(cr.over7?'<li>Контрактинг: '+cr.over7+' договор(а) старше 7 дней.</li>':'')+'</ul></div></div>'+
       '<div class="v13-coach-box" style="margin-top:8px;border-color:rgba(163,109,245,.35)"><h4>Фокус Coach</h4><p>'+h(actionFor(weak[0]))+'</p></div>';
+    var close=document.getElementById('v13ManagerClose');if(close)close.addEventListener('click',function(){V.managerOpen=false;renderTeam();setTimeout(function(){var g=document.getElementById('v13TeamGrid');if(g)g.scrollIntoView({behavior:'smooth',block:'start'});},30);});
   }
 
   function renderContracts(){
@@ -344,6 +367,9 @@
     if(!V.built)return;updateSide();
     var manager=typeof isManager==='function'&&isManager();
     document.querySelectorAll('[data-v13-view="report"]').forEach(function(b){b.style.display=manager?'':'none';});
+    renderMobileNav();renderMoreSheet();
+    var more=document.getElementById('v13MobileMore');if(more)more.classList.toggle('open',V.moreOpen);
+    var mb=document.getElementById('v13MoreBtn');if(mb)mb.classList.toggle('more-active',V.moreOpen);
     try{renderToday();renderMonth();renderTeam();renderContracts();renderFunnel();renderAnalytics();renderReport();}catch(e){console.error('V13 refresh',e);}
   }
 
