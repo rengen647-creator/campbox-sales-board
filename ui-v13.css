@@ -92,6 +92,8 @@ body.v13-print-report .v13-sidebar,body.v13-print-report .v13-mobile-nav{display
   .mobile-metrics{grid-template-columns:1fr!important}.employee-card{padding:11px}
   .v13-team-summary{grid-template-columns:1fr 1fr;gap:7px}
   .v13-team-grid{gap:8px}
+  .v13-team-legacy,.v13-team-daily{display:none!important}
+  #v13-team.show-daily .v13-team-daily{display:block!important}
   .v13-person{padding:12px}
   .v13-person-stats{margin:8px 0}
   .v13-manager-panel{display:none;margin-top:8px;padding:12px}
