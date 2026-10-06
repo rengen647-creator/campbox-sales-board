@@ -119,12 +119,12 @@
     var teamWrap=document.getElementById('coachTeamWrap');
     if(teamWrap){
       teamWrap.classList.remove('manager-only');
-      var tc=el('section','card v13-block','<div class="v13-section-title"><div><h2>Команда · у кого какая проблема</h2><p>Быстрый общий срез по просадкам менеджеров.</p></div></div>');
+      var tc=el('section','card v13-block v13-team-legacy','<div class="v13-section-title"><div><h2>Команда · у кого какая проблема</h2><p>Быстрый общий срез по просадкам менеджеров.</p></div></div>');
       var body=el('div','v13-body');body.appendChild(teamWrap);tc.appendChild(body);screen('team').appendChild(tc);
     }
     if(coach){coach.classList.add('v13-funnel-legacy');screen('funnel').appendChild(coach);}
 
-    var daily=cardByTitle('Ежедневный отчёт команды');if(daily)screen('team').appendChild(daily);
+    var daily=cardByTitle('Ежедневный отчёт команды');if(daily){daily.classList.add('v13-team-daily');screen('team').appendChild(daily);}
     var funnel=cardByTitle('Воронка месяца');if(funnel){funnel.classList.add('v13-funnel-legacy');screen('funnel').appendChild(funnel);}
 
     var analyticsGrid=Array.from(a.children).find(function(x){return x.classList&&x.classList.contains('analytics-grid');});
@@ -158,8 +158,9 @@
     var recovery=el('section','card v13-block','<div class="v13-section-title"><div><h2>План восстановления месяца</h2><p>Что должно измениться, чтобы вернуться к цели.</p></div></div><div class="v13-body"><div class="v13-recovery" id="v13Recovery"></div></div>');
     screen('month').appendChild(recovery);
 
-    var team=el('section','card v13-block','<div class="v13-section-title"><div><h2>Команда</h2><p>Общий результат и детальный разбор каждого менеджера.</p></div></div><div class="v13-body"><div class="v13-team-summary" id="v13TeamSummary"></div><div class="v13-team-grid" id="v13TeamGrid"></div><div class="v13-manager-panel" id="v13ManagerPanel"></div></div>');
+    var team=el('section','card v13-block','<div class="v13-section-title"><div><h2>Команда</h2><p>Общий результат и детальный разбор каждого менеджера.</p></div></div><div class="v13-body"><div class="v13-team-summary" id="v13TeamSummary"></div><div class="v13-team-grid" id="v13TeamGrid"></div><div class="v13-manager-panel" id="v13ManagerPanel"></div><button type="button" class="v13-mobile-only v13-analytics-toggle" id="v13TeamDailyToggle">Показать ежедневный отчёт ↓</button></div>');
     screen('team').insertBefore(team,screen('team').firstChild);
+    document.getElementById('v13TeamDailyToggle').addEventListener('click',function(){screen('team').classList.toggle('show-daily');var on=screen('team').classList.contains('show-daily');this.textContent=on?'Скрыть ежедневный отчёт ↑':'Показать ежедневный отчёт ↓';});
 
     var fd=el('section','card v13-block','<div class="v13-section-title"><div><h2>Разбор каждого этапа</h2><p>Факт → ориентир → диагноз → самоанализ → действие.</p></div></div><div class="v13-body"><div class="v13-stage-tabs" id="v13StageTabs"></div><div class="v13-stage-panel" id="v13StagePanel"></div></div>');
     screen('funnel').appendChild(fd);
