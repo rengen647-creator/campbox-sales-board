@@ -1,12 +1,14 @@
 
 (function(){
-  var V={built:false,view:'today',managerId:null,stage:'call_book',analytics:'activity'};
+  var V={built:false,view:'today',managerId:null,managerOpen:false,stage:'call_book',analytics:'activity',moreOpen:false,analyticsLegacy:false};
 
   function h(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];});}
   function el(tag,cls,html){var x=document.createElement(tag);if(cls)x.className=cls;if(html!=null)x.innerHTML=html;return x;}
   function pill(tone,text){return '<span class="v13-pill '+tone+'">'+h(text)+'</span>';}
   function app(){return document.getElementById('mainApp');}
   function screen(id){return document.getElementById('v13-'+id);}
+  function isMobile(){return !!(window.matchMedia&&window.matchMedia('(max-width:820px)').matches);}
+  function closeMore(){V.moreOpen=false;var m=document.getElementById('v13MobileMore');if(m)m.classList.remove('open');var b=document.getElementById('v13MoreBtn');if(b)b.classList.remove('more-active');}
   function cardByTitle(title){
     return Array.from(app().querySelectorAll('.card')).find(function(c){
       var q=c.querySelector('.section-title h2,h2');return q&&q.textContent.trim()===title;
@@ -27,6 +29,8 @@
   }
   function go(id){
     if(!screen(id))id='today';
+    closeMore();
+    if(id!=='team')V.managerOpen=false;
     V.view=id;
     document.querySelectorAll('.v13-screen').forEach(function(x){x.classList.toggle('active',x.id==='v13-'+id);});
     document.querySelectorAll('[data-v13-view]').forEach(function(x){x.classList.toggle('active',x.getAttribute('data-v13-view')===id);});
@@ -39,6 +43,22 @@
 
   function navButton(id,icon,label){
     return '<button type="button" data-v13-view="'+id+'">'+icon+' &nbsp;'+label+'</button>';
+  }
+  function mobileButton(id,icon,label){return '<button type="button" data-v13-view="'+id+'"><span class="mi">'+icon+'</span><span class="ml">'+label+'</span></button>';}
+  function renderMobileNav(){
+    var mobile=document.getElementById('v13MobileNav');if(!mobile)return;
+    var manager=typeof isManager==='function'&&isManager();
+    mobile.innerHTML=mobileButton('today','⚡','Сегодня')+mobileButton('month','🎯','Месяц')+(manager?mobileButton('team','👥','Команда'):mobileButton('funnel','📊','Воронка'))+'<button type="button" id="v13MoreBtn"><span class="mi">•••</span><span class="ml">Ещё</span></button>';
+    mobile.querySelectorAll('[data-v13-view]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-v13-view')===V.view);});
+  }
+  function renderMoreSheet(){
+    var sheet=document.getElementById('v13MobileMore');if(!sheet)return;
+    var manager=typeof isManager==='function'&&isManager();
+    var items=[];
+    if(manager)items.push(['funnel','📊','Воронка']);
+    items.push(['contracts','✍️','Контрактинг'],['analytics','📈','Аналитика'],['summary','✅','Итоги']);
+    if(manager)items.push(['report','🧾','Отчёт']);
+    sheet.innerHTML='<div class="v13-more-sheet"><div class="v13-more-handle"></div><div class="v13-more-title"><b>Ещё</b><small>Дополнительные разделы</small></div><div class="v13-more-grid">'+items.map(function(x){return '<button type="button" data-v13-view="'+x[0]+'"><span>'+x[1]+'</span>'+x[2]+'</button>';}).join('')+'</div></div>';
   }
 
   function build(){
@@ -70,10 +90,11 @@
     });
     a.appendChild(host);
 
-    var mobile=el('nav','v13-mobile-nav',
-      navButton('today','⚡','Сегодня')+navButton('month','🎯','Месяц')+navButton('funnel','📊','Воронка')+navButton('team','👥','Команда'));
-    document.body.appendChild(mobile);
-    mobile.addEventListener('click',function(e){var b=e.target.closest('[data-v13-view]');if(b)go(b.getAttribute('data-v13-view'));});
+    var mobile=el('nav','v13-mobile-nav');mobile.id='v13MobileNav';document.body.appendChild(mobile);
+    var more=el('div','v13-mobile-more');more.id='v13MobileMore';document.body.appendChild(more);
+    renderMobileNav();renderMoreSheet();
+    mobile.addEventListener('click',function(e){var b=e.target.closest('[data-v13-view]');if(b){go(b.getAttribute('data-v13-view'));return;}if(e.target.closest('#v13MoreBtn')){V.moreOpen=!V.moreOpen;more.classList.toggle('open',V.moreOpen);var mb=document.getElementById('v13MoreBtn');if(mb)mb.classList.toggle('more-active',V.moreOpen);}});
+    more.addEventListener('click',function(e){var b=e.target.closest('[data-v13-view]');if(b){go(b.getAttribute('data-v13-view'));return;}if(e.target===more)closeMore();});
 
     var hiddenKpi=a.querySelector(':scope > .kpi-grid');
     if(hiddenKpi){hiddenKpi.classList.add('v13-data-only');screen('today').appendChild(hiddenKpi);}
@@ -99,14 +120,14 @@
       var tc=el('section','card v13-block','<div class="v13-section-title"><div><h2>Команда · у кого какая проблема</h2><p>Быстрый общий срез по просадкам менеджеров.</p></div></div>');
       var body=el('div','v13-body');body.appendChild(teamWrap);tc.appendChild(body);screen('team').appendChild(tc);
     }
-    if(coach)screen('funnel').appendChild(coach);
+    if(coach){coach.classList.add('v13-funnel-legacy');screen('funnel').appendChild(coach);}
 
     var daily=cardByTitle('Ежедневный отчёт команды');if(daily)screen('team').appendChild(daily);
-    var funnel=cardByTitle('Воронка месяца');if(funnel)screen('funnel').appendChild(funnel);
+    var funnel=cardByTitle('Воронка месяца');if(funnel){funnel.classList.add('v13-funnel-legacy');screen('funnel').appendChild(funnel);}
 
     var analyticsGrid=Array.from(a.children).find(function(x){return x.classList&&x.classList.contains('analytics-grid');});
-    if(analyticsGrid)screen('analytics').appendChild(analyticsGrid);
-    var calendar=cardByTitle('Календарь выполнения плана');if(calendar)screen('analytics').appendChild(calendar);
+    if(analyticsGrid){analyticsGrid.classList.add('v13-analytics-legacy');screen('analytics').appendChild(analyticsGrid);}
+    var calendar=cardByTitle('Календарь выполнения плана');if(calendar){calendar.classList.add('v13-analytics-legacy');screen('analytics').appendChild(calendar);}
 
     var checkpoints=cardByTitle('Контрольные точки месяца'),lead=cardByTitle('Командный итог руководителя');
     var cpParent=checkpoints&&checkpoints.parentNode,leadParent=lead&&lead.parentNode;
@@ -115,7 +136,7 @@
     cleanupEmpty(cpParent);if(leadParent!==cpParent)cleanupEmpty(leadParent);
 
     var miniGrid=Array.from(a.children).find(function(x){return x.classList&&x.classList.contains('three-col');});
-    if(miniGrid)screen('analytics').appendChild(miniGrid);
+    if(miniGrid){miniGrid.classList.add('v13-analytics-legacy');screen('analytics').appendChild(miniGrid);}
 
     createLiveBlocks();
 
@@ -144,8 +165,9 @@
     var cont=el('section','card v13-block','<div class="v13-section-title"><div><h2>Контрактинг</h2><p>Только договоры, способные повлиять на результат текущего месяца.</p></div><span id="v13ContractBadge"></span></div><div class="v13-body"><div class="v13-contract-grid" id="v13ContractsGrid"></div></div>');
     screen('contracts').appendChild(cont);
 
-    var ag=el('section','card v13-block','<div class="v13-section-title"><div><h2>Как читать аналитику</h2><p>Откуда цифра взялась, что она означает и куда идти дальше.</p></div>'+pill('good','COACH MODE')+'</div><div class="v13-body"><div class="v13-analytics-tabs" id="v13AnalyticsTabs"></div><div class="v13-analytics-panel" id="v13AnalyticsPanel"></div></div>');
+    var ag=el('section','card v13-block','<div class="v13-section-title"><div><h2>Как читать аналитику</h2><p>Откуда цифра взялась, что она означает и куда идти дальше.</p></div>'+pill('good','COACH MODE')+'</div><div class="v13-body"><div class="v13-analytics-tabs" id="v13AnalyticsTabs"></div><div class="v13-analytics-panel" id="v13AnalyticsPanel"></div><button type="button" class="v13-mobile-only v13-analytics-toggle" id="v13AnalyticsToggle">Показать динамику ↓</button></div>');
     screen('analytics').insertBefore(ag,screen('analytics').firstChild);
+    document.getElementById('v13AnalyticsToggle').addEventListener('click',function(){V.analyticsLegacy=!V.analyticsLegacy;screen('analytics').classList.toggle('show-legacy',V.analyticsLegacy);this.textContent=V.analyticsLegacy?'Скрыть динамику ↑':'Показать динамику ↓';});
 
     var rep=el('div','v13-report-layout','<section class="card v13-report-settings"><div class="v13-section-title" style="padding:0 0 8px"><div><h2>Сформировать отчёт</h2><p>Краткий управленческий отчёт из живых данных.</p></div></div><label>Период</label><select id="v13ReportPeriod"><option value="current">К выбранной дате</option><option value="month">Весь выбранный месяц</option></select><label>Формат</label><select id="v13ReportType"><option value="short">Краткий управленческий</option><option value="team">По команде</option></select><button type="button" class="btn primary" style="width:100%;margin-top:12px" id="v13BuildReport">Сформировать отчёт</button><div class="v13-report-actions"><button type="button" class="btn" id="v13PdfReport">PDF</button><button type="button" class="btn" id="v13ExcelReport">Excel</button></div></section><section class="v13-report-preview" id="v13ReportPreview"></section>');
     screen('report').appendChild(rep);
