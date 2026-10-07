@@ -24,7 +24,8 @@
       team:['Команда','Кто отстаёт, почему и куда руководителю вмешаться.'],
       analytics:['Аналитика','Откуда берутся цифры, что они означают и что делать дальше.'],
       summary:['Итоги','Итоги дня, контрольные точки и управленческий вывод.'],
-      report:['Отчёт','Готовый управленческий отчёт по живым данным доски.']
+      report:['Отчёт','Готовый управленческий отчёт по живым данным доски.'],
+      salary:['Зарплата','Начисления, поступления и прозрачный расчёт мотивации.']
     };return m[id]||m.today;
   }
   function go(id){
@@ -37,6 +38,7 @@
     var m=titleMeta(id),t=document.getElementById('v13PageTitle'),d=document.getElementById('v13PageDesc');
     if(t)t.textContent=m[0];if(d)d.textContent=m[1];
     refresh();
+    if(id==='salary'&&typeof window.salaryOpen==='function')window.salaryOpen();
     window.scrollTo({top:0,behavior:'smooth'});
   }
   window.v13Go=go;
@@ -58,7 +60,7 @@
     var manager=typeof isManager==='function'&&isManager();
     var items=[];
     if(manager)items.push(['funnel','📊','Воронка']);
-    items.push(['contracts','✍️','Контрактинг'],['analytics','📈','Аналитика'],['summary','✅','Итоги']);
+    items.push(['contracts','✍️','Контрактинг'],['analytics','📈','Аналитика'],['summary','✅','Итоги'],['salary','💰','Зарплата']);
     if(manager)items.push(['report','🧾','Отчёт']);
     sheet.innerHTML='<div class="v13-more-sheet"><div class="v13-more-handle"></div><div class="v13-more-title"><b>Ещё</b><small>Дополнительные разделы</small></div><div class="v13-more-grid">'+items.map(function(x){return '<button type="button" data-v13-view="'+x[0]+'"><span>'+x[1]+'</span>'+x[2]+'</button>';}).join('')+'</div></div>';
   }
@@ -72,7 +74,7 @@
       '<nav class="v13-nav">'+
       navButton('today','⚡','Сегодня')+navButton('month','🎯','Месяц')+navButton('funnel','📊','Воронка')+
       navButton('contracts','✍️','Контрактинг')+navButton('team','👥','Команда')+navButton('analytics','📈','Аналитика')+
-      navButton('summary','✅','Итоги')+navButton('report','🧾','Отчёт')+
+      navButton('summary','✅','Итоги')+navButton('report','🧾','Отчёт')+navButton('salary','💰','Зарплата')+
       '</nav><div class="v13-side-context"><span>Дата</span><b id="v13SideDate">—</b><span>Период</span><b id="v13SideMonth">—</b></div><div class="v13-side-tools" id="v13SideTools"></div>');
     document.body.appendChild(sidebar);
     sidebar.addEventListener('click',function(e){var b=e.target.closest('[data-v13-view]');if(b)go(b.getAttribute('data-v13-view'));});
@@ -87,7 +89,7 @@
     }
 
     var host=el('div','v13-view-host');
-    ['today','month','funnel','contracts','team','analytics','summary','report'].forEach(function(id){
+    ['today','month','funnel','contracts','team','analytics','summary','report','salary'].forEach(function(id){
       var s=el('section','v13-screen');s.id='v13-'+id;host.appendChild(s);
     });
     a.appendChild(host);
@@ -368,6 +370,7 @@
     if(!V.built)return;updateSide();
     var manager=typeof isManager==='function'&&isManager();
     document.querySelectorAll('[data-v13-view="report"]').forEach(function(b){b.style.display=manager?'':'none';});
+    document.querySelectorAll('[data-v13-view="salary"]').forEach(function(b){b.classList.add('salary-nav-separator');});
     renderMobileNav();renderMoreSheet();
     var more=document.getElementById('v13MobileMore');if(more)more.classList.toggle('open',V.moreOpen);
     var mb=document.getElementById('v13MoreBtn');if(mb)mb.classList.toggle('more-active',V.moreOpen);
