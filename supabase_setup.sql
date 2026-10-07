@@ -286,13 +286,15 @@ insert into public.salary_config(id) values(1) on conflict (id) do nothing;
 create table if not exists public.salary_audit (
   id uuid primary key default gen_random_uuid(),
   entity_type text not null,
-  entity_id uuid,
+  entity_id text,
   action text not null,
   old_data jsonb,
   new_data jsonb,
   actor_id uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+
+alter table public.salary_audit alter column entity_id type text using entity_id::text;
 
 create index if not exists salary_clients_contractor_idx on public.salary_clients(contractor_id);
 create index if not exists salary_clients_signed_date_idx on public.salary_clients(signed_date);
@@ -408,9 +410,9 @@ language plpgsql
 security definer set search_path = public
 as $$
 declare
-  v_id uuid;
+  v_id text;
 begin
-  if tg_op = 'DELETE' then v_id := old.id; else v_id := new.id; end if;
+  if tg_op = 'DELETE' then v_id := old.id::text; else v_id := new.id::text; end if;
   insert into public.salary_audit(entity_type,entity_id,action,old_data,new_data,actor_id)
   values(
     tg_table_name,
