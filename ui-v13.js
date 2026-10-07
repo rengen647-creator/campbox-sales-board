@@ -370,7 +370,7 @@
     if(!V.built)return;updateSide();
     var manager=typeof isManager==='function'&&isManager();
     document.querySelectorAll('[data-v13-view="report"]').forEach(function(b){b.style.display=manager?'':'none';});
-    document.querySelectorAll('[data-v13-view="salary"]').forEach(function(b){b.classList.add('salary-nav-separator');});
+    document.querySelectorAll('.v13-nav [data-v13-view="salary"]').forEach(function(b){b.classList.add('salary-nav-separator');});
     renderMobileNav();renderMoreSheet();
     var more=document.getElementById('v13MobileMore');if(more)more.classList.toggle('open',V.moreOpen);
     var mb=document.getElementById('v13MoreBtn');if(mb)mb.classList.toggle('more-active',V.moreOpen);
