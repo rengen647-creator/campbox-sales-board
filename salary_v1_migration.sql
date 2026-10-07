@@ -186,9 +186,9 @@ where p.contract_id is null;
 alter table public.salary_client_products
   drop constraint if exists salary_client_products_client_id_product_type_key;
 
-create unique index if not exists salary_products_contract_type_uidx
-  on public.salary_client_products(contract_id, product_type)
-  where contract_id is not null;
+drop index if exists public.salary_products_contract_type_uidx;
+create unique index salary_products_contract_type_uidx
+  on public.salary_client_products(contract_id, product_type);
 
 -- Одна незакрытая пауза на один договор.
 create unique index if not exists salary_contract_one_open_pause_uidx
