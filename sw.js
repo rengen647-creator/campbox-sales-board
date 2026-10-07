@@ -1,5 +1,5 @@
-const CACHE = 'campbox-sales-salary-v1-vat-2026-10-07';
-const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg','./sales-coach.css?v=20261005b','./sales-coach.js?v=20261005b','./ui-v13.css?v=20261006m','./ui-v13.js?v=20261007s2','./salary-v1.css?v=20261007','./salary-v1.js?v=20261007vat'];
+const CACHE = 'campbox-sales-salary-cycles-2026-10-07';
+const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg','./sales-coach.css?v=20261005b','./sales-coach.js?v=20261005b','./ui-v13.css?v=20261006m','./ui-v13.js?v=20261007s2','./salary-v1.css?v=20261007cycles','./salary-v1.js?v=20261007cycles'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
