@@ -30,6 +30,9 @@
   function active12(first,payDate){return !!first&&payDate>=first&&payDate<addMonthsIso(first,12)}
   function monthIndex(first,payDate){if(!first||!payDate)return null;const a=new Date(first+'T12:00:00'),b=new Date(payDate+'T12:00:00');return Math.max(1,(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth())+1)}
   function contractorRate(pct){pct=Number(pct)||0;if(pct<80)return 0;if(pct<100)return 2000;if(pct<=103)return 5000;return 7000}
+  function vatRate(){const v=Number(S.config?.vat_rate);return Number.isFinite(v)&&v>=0?v:22}
+  function netOfVat(gross){const k=1+vatRate()/100;return k>0?Number(gross||0)/k:Number(gross||0)}
+  function round2(v){return Math.round((Number(v||0)+Number.EPSILON)*100)/100}
   function manager(){try{return typeof isManager==='function'&&isManager()}catch(e){return false}}
   function profileName(id){const p=(typeof profiles!=='undefined'?profiles:[]).find(x=>x.id===id);return p?(p.full_name||p.email||'Сотрудник'):'—'}
   function userRole(id){const p=(typeof profiles!=='undefined'?profiles:[]).find(x=>x.id===id);return p?.role||'employee'}
@@ -165,9 +168,17 @@
     const isContractor=c.contractor_id===userId;
     if(!isContractor)return null;
     let amount=0,rate='',formula='',note='';
-    if(p.product_type==='campbox'||p.product_type==='order_management'||p.product_type==='comfort_booking'){
+    if(p.product_type==='campbox'){
       if(!active12(prod?.first_payment_date,p.payment_date))return null;
-      amount=Number(p.amount||0)*cfg.rate;rate=(cfg.rate*100).toLocaleString('ru-RU')+'%';formula=money(p.amount)+' × '+rate;
+      const gross=Number(p.amount||0),base=round2(netOfVat(gross));
+      amount=round2(base*cfg.rate);rate=(cfg.rate*100).toLocaleString('ru-RU')+'%';
+      formula=money(gross)+' / '+(1+vatRate()/100).toLocaleString('ru-RU')+' = '+money(base)+' × '+rate;
+      const mi=monthIndex(prod?.first_payment_date,p.payment_date);
+      note='Поступление с НДС '+money(gross)+' · НДС '+vatRate().toLocaleString('ru-RU')+'%'+(mi?' · '+mi+' месяц из 12':'');
+      return {date:p.payment_date,client:c.client_name,direction:cfg.short,event:'Поступление'+(p.payment_number?' №'+p.payment_number:''),base,rate,formula,amount,status:p.status,payment_id:p.id,note,gross};
+    }else if(p.product_type==='order_management'||p.product_type==='comfort_booking'){
+      if(!active12(prod?.first_payment_date,p.payment_date))return null;
+      amount=round2(Number(p.amount||0)*cfg.rate);rate=(cfg.rate*100).toLocaleString('ru-RU')+'%';formula=money(p.amount)+' × '+rate;
       const mi=monthIndex(prod?.first_payment_date,p.payment_date);note=mi?mi+' месяц из 12':'';
     }else if(p.product_type==='maps'){
       if(p.event_type!=='payment')return null;
@@ -198,8 +209,8 @@
         if(p.status==='excluded'||p.product_type!=='campbox'||p.event_type!=='payment')return;
         const c=client(p.client_id),prod=product(p.client_id,'campbox');if(!c||!prod?.first_payment_date)return;
         if(p.payment_date>=addMonthsIso(prod.first_payment_date,12)){
-          const amount=Number(p.amount||0)*.01;
-          rows.push({date:p.payment_date,client:c.client_name,direction:'1% руководителю',event:'CampBox после 12 мес.',base:Number(p.amount||0),rate:'1%',formula:money(p.amount)+' × 1%',amount,status:p.status,payment_id:p.id,note:'12-месячный период '+profileName(c.contractor_id)+' завершён'});
+          const gross=Number(p.amount||0),base=round2(netOfVat(gross)),amount=round2(base*.01);
+          rows.push({date:p.payment_date,client:c.client_name,direction:'1% руководителю',event:'CampBox после 12 мес.',base,rate:'1%',formula:money(gross)+' / '+(1+vatRate()/100).toLocaleString('ru-RU')+' = '+money(base)+' × 1%',amount,status:p.status,payment_id:p.id,note:'Поступление с НДС '+money(gross)+' · НДС '+vatRate().toLocaleString('ru-RU')+'% · 12-месячный период '+profileName(c.contractor_id)+' завершён',gross});
         }
       });
     }
@@ -275,11 +286,11 @@
       ['Отчёт по зарплате CampBox'],['Сотрудник',name],['Период',monthName(S.month)],['Итого начислено',t.total],[],
       ['Категория','Сумма'],['Контракторство',t.contract],['CampBox · 10%',t.campbox],['Доп. продукты',t.products],['Сайты / сопровождение',t.site],['1% руководителю',t.head]
     ];
-    const details=[['Дата','Клиент','Направление','Событие','База расчёта','Ставка','Формула','Начислено','Статус'],
-      ...rows.map(r=>[r.date,r.client,r.direction,r.event,r.base,r.rate,r.formula,r.amount,{paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
+    const details=[['Дата','Клиент','Направление','Событие','Поступление с НДС','База расчёта','Ставка','Формула','Начислено','Статус'],
+      ...rows.map(r=>[r.date,r.client,r.direction,r.event,r.gross??'',r.base,r.rate,r.formula,r.amount,{paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
     ];
     const wb=XLSX.utils.book_new(),ws1=XLSX.utils.aoa_to_sheet(summary),ws2=XLSX.utils.aoa_to_sheet(details);
-    ws1['!cols']=[{wch:28},{wch:25}];ws2['!cols']=[{wch:12},{wch:24},{wch:22},{wch:25},{wch:16},{wch:12},{wch:28},{wch:16},{wch:16}];
+    ws1['!cols']=[{wch:28},{wch:25}];ws2['!cols']=[{wch:12},{wch:24},{wch:22},{wch:25},{wch:18},{wch:16},{wch:12},{wch:34},{wch:16},{wch:16}];
     XLSX.utils.book_append_sheet(wb,ws1,'Итог');XLSX.utils.book_append_sheet(wb,ws2,'Начисления');
     XLSX.writeFile(wb,'Зарплата_'+name.replace(/[^\p{L}\p{N}_-]+/gu,'_')+'_'+S.month+'.xlsx');
   }
@@ -316,8 +327,11 @@
     else if(type==='site'||type==='site_support'){const r=num===1?.11:.0805;txt=money(amount)+' × '+(r*100).toLocaleString('ru-RU')+'% = '+money(amount*r)+' контрактору '+profileName(c.contractor_id)+'.';}
     else if(cfg.period){
       if(!prod?.first_payment_date)txt='Это может быть первая оплата направления. После сохранения дата запустит 12-месячный период.';
-      else if(active12(prod.first_payment_date,date))txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(c.contractor_id)+' · '+monthIndex(prod.first_payment_date,date)+' месяц из 12.';
-      else if(type==='campbox')txt='12 месяцев менеджера завершены → '+money(amount)+' × 1% = '+money(amount*.01)+' руководителю продаж.';
+      else if(active12(prod.first_payment_date,date)){
+        if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.10);txt='Поступление с НДС '+money(amount)+' → без НДС '+money(base)+' → 10% = '+money(mot)+' контрактору '+profileName(c.contractor_id)+' · '+monthIndex(prod.first_payment_date,date)+' месяц из 12.';}
+        else txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(c.contractor_id)+' · '+monthIndex(prod.first_payment_date,date)+' месяц из 12.';
+      }
+      else if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.01);txt='12 месяцев менеджера завершены → поступление с НДС '+money(amount)+' → без НДС '+money(base)+' → 1% = '+money(mot)+' руководителю продаж.';}
       else txt='12-месячный период менеджера завершён. По этому направлению начисление не создаётся.';
     }
     q('salPayPreview').innerHTML='<b>Предпросмотр:</b> '+esc(txt);
@@ -415,27 +429,28 @@
 
   function renderRules(){
     const box=q('salaryRules');if(!box||!manager())return;
-    const head=S.config?.sales_head_id||'';
+    const head=S.config?.sales_head_id||'',vat=vatRate();
     box.innerHTML=
-      '<div class="salary-card"><div class="salary-head"><div><h2>Настройки мотивации</h2><p>Правила V1 и получатель управленческого 1%.</p></div></div><div class="salary-body">'+
-        '<div class="salary-form-grid" style="margin-bottom:10px"><div class="salary-field"><label>Руководитель продаж · получатель 1%</label><select id="salaryHeadSelect"><option value="">Не выбран</option>'+employeeOptions(head)+'</select></div><div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="salaryHeadSave">Сохранить</button></div></div>'+
+      '<div class="salary-card"><div class="salary-head"><div><h2>Настройки мотивации</h2><p>Правила V1, НДС для CampBox и получатель управленческого 1%.</p></div></div><div class="salary-body">'+
+        '<div class="salary-form-grid" style="margin-bottom:10px"><div class="salary-field"><label>Руководитель продаж · получатель 1%</label><select id="salaryHeadSelect"><option value="">Не выбран</option>'+employeeOptions(head)+'</select></div><div class="salary-field"><label>НДС CampBox, %</label><input id="salaryVatRate" type="number" min="0" max="99.99" step="0.01" value="'+vat+'"></div><div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="salaryHeadSave">Сохранить настройки</button></div></div>'+
         '<div class="salary-rule-list">'+
           rule('Контракторство','Разово за договор. Ставка по выполнению плана отдела в месяце подписания.','<80% = 0 ₽ · 80–99,99% = 2 000 ₽ · 100–103% = 5 000 ₽ · >103% = 7 000 ₽','1 раз')+
           rule('2ГИС + Яндекс','Стоимость продукта 15 000 ₽.','15 000 × 40% = 6 000 ₽','40%')+
-          rule('CampBox / комиссия','От каждой оплаты в течение 12 месяцев от первой комиссии.','платёж × 10%','12 мес.')+
+          rule('CampBox / комиссия','Поступление вводится с НДС. Мотивация считается с суммы без НДС в течение 12 месяцев от первой комиссии.','(платёж / (1 + НДС)) × 10%','12 мес.')+
           rule('Order Management','От каждой оплаты в течение 12 месяцев от первой оплаты модуля.','платёж × 8,05%','12 мес.')+
           rule('Comfort Booking','От каждой оплаты в течение 12 месяцев от первой оплаты.','платёж × 8,05%','12 мес.')+
           rule('Разработка сайта','Первый платёж / следующие / выход в ЖР.','№1 = 11% · №2+ = 8,05% · ЖР = 4 025 ₽','по событиям')+
           rule('Сопровождение сайта','Первый и последующие платежи.','№1 = 11% · №2+ = 8,05%','по платежам')+
-          rule('Руководитель продаж','CampBox после окончания 12 месяцев менеджера.','комиссия × 1%','после 12 мес.')+
+          rule('Руководитель продаж','CampBox после окончания 12 месяцев менеджера. Поступление вводится с НДС, 1% считается с суммы без НДС.','(платёж / (1 + НДС)) × 1%','после 12 мес.')+
         '</div><div class="salary-callout warn" style="margin-top:10px"><b>Защита:</b> контракторский фикс возникает только в месяце подписания. Один CampBox-платёж не даёт одновременно 10% менеджеру и 1% руководителю.</div>'+
       '</div></div>';
     q('salaryHeadSave')?.addEventListener('click',saveHead);
   }
   function rule(name,desc,formula,badge){return '<div class="salary-rule"><div><b>'+esc(name)+'</b><small>'+esc(desc)+'</small></div><code>'+esc(formula)+'</code><span class="salary-pill blue">'+esc(badge)+'</span></div>'}
   async function saveHead(){
-    const id=q('salaryHeadSelect')?.value||null;
-    const {error}=await sb.from('salary_config').upsert({id:1,sales_head_id:id,updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'id'});
+    const id=q('salaryHeadSelect')?.value||null,vat=Number(q('salaryVatRate')?.value);
+    if(!Number.isFinite(vat)||vat<0||vat>=100){alert('Укажи корректную ставку НДС от 0 до 99,99%.');return}
+    const {error}=await sb.from('salary_config').upsert({id:1,sales_head_id:id,vat_rate:vat,updated_by:currentUser.id,updated_at:new Date().toISOString()},{onConflict:'id'});
     if(error)alert(error.message);else load();
   }
 
