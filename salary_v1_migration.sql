@@ -58,6 +58,15 @@ create table if not exists public.salary_department_months (
   check (month = date_trunc('month', month)::date)
 );
 
+create table if not exists public.salary_config (
+  id smallint primary key default 1 check (id = 1),
+  sales_head_id uuid references public.profiles(id) on delete set null,
+  updated_by uuid references auth.users(id),
+  updated_at timestamptz not null default now()
+);
+
+insert into public.salary_config(id) values(1) on conflict (id) do nothing;
+
 create table if not exists public.salary_audit (
   id uuid primary key default gen_random_uuid(),
   entity_type text not null,
@@ -81,10 +90,11 @@ alter table public.salary_clients enable row level security;
 alter table public.salary_client_products enable row level security;
 alter table public.salary_payments enable row level security;
 alter table public.salary_department_months enable row level security;
+alter table public.salary_config enable row level security;
 alter table public.salary_audit enable row level security;
 
-revoke all on public.salary_clients, public.salary_client_products, public.salary_payments, public.salary_department_months, public.salary_audit from anon, authenticated;
-grant select, insert, update, delete on public.salary_clients, public.salary_client_products, public.salary_payments, public.salary_department_months to authenticated;
+revoke all on public.salary_clients, public.salary_client_products, public.salary_payments, public.salary_department_months, public.salary_config, public.salary_audit from anon, authenticated;
+grant select, insert, update, delete on public.salary_clients, public.salary_client_products, public.salary_payments, public.salary_department_months, public.salary_config to authenticated;
 grant select on public.salary_audit to authenticated;
 
 drop policy if exists "salary_clients_select" on public.salary_clients;
@@ -162,6 +172,16 @@ drop policy if exists "salary_months_manager_delete" on public.salary_department
 create policy "salary_months_manager_delete" on public.salary_department_months for delete to authenticated
 using (public.is_manager());
 
+drop policy if exists "salary_config_select" on public.salary_config;
+create policy "salary_config_select" on public.salary_config for select to authenticated
+using (public.is_active_user());
+drop policy if exists "salary_config_manager_insert" on public.salary_config;
+create policy "salary_config_manager_insert" on public.salary_config for insert to authenticated
+with check (public.is_manager());
+drop policy if exists "salary_config_manager_update" on public.salary_config;
+create policy "salary_config_manager_update" on public.salary_config for update to authenticated
+using (public.is_manager()) with check (public.is_manager());
+
 drop policy if exists "salary_audit_manager_select" on public.salary_audit;
 create policy "salary_audit_manager_select" on public.salary_audit for select to authenticated
 using (public.is_manager());
@@ -187,6 +207,10 @@ begin
   if tg_op = 'DELETE' then return old; else return new; end if;
 end;
 $$;
+
+drop trigger if exists salary_config_audit on public.salary_config;
+create trigger salary_config_audit after insert or update on public.salary_config
+for each row execute procedure public.salary_audit_trigger();
 
 drop trigger if exists salary_clients_audit on public.salary_clients;
 create trigger salary_clients_audit after insert or update or delete on public.salary_clients
