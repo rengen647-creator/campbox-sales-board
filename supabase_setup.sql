@@ -277,11 +277,14 @@ create table if not exists public.salary_department_months (
 create table if not exists public.salary_config (
   id smallint primary key default 1 check (id = 1),
   sales_head_id uuid references public.profiles(id) on delete set null,
+  vat_rate numeric(6,2) not null default 22 check (vat_rate >= 0 and vat_rate < 100),
   updated_by uuid references auth.users(id),
   updated_at timestamptz not null default now()
 );
 
-insert into public.salary_config(id) values(1) on conflict (id) do nothing;
+alter table public.salary_config add column if not exists vat_rate numeric(6,2) not null default 22;
+
+insert into public.salary_config(id,vat_rate) values(1,22) on conflict (id) do nothing;
 
 create table if not exists public.salary_audit (
   id uuid primary key default gen_random_uuid(),
