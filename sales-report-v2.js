@@ -14,8 +14,8 @@
     ['meetings', 'Проведено встреч'], ['offers', 'КП / расчёты'],
     ['follow', 'Повторные контакты']
   ];
-  const integer = '#,##0;[Red](#,##0);—';
-  const percent = '0%;[Red](0%);—';
+  const integer = '#,##0;[Red](#,##0);"-"';
+  const percent = '0%;[Red](0%);"-"';
   const dateFormat = 'dd.mm.yyyy';
   const asNum = v => Number.isFinite(Number(v)) ? Number(v) : 0;
   const shortDate = v => {
@@ -326,9 +326,9 @@
     const activeLateSign=contractRows.reduce((s,r)=>s+asNum(r[12]),0);
     const oldContracts=contractRows.reduce((s,r)=>s+asNum(r[13]),0);
     const blockerCount=noteRows.filter(r=>filled(r[4])).length;
-    block('A19','B20','ПРОСРОЧЕН КОНТАКТ',{formula:"SUM('Контрактинг'!L6:L"+(contractRows.length+5)+")"},activeLateContacts,integer,C.red);
-    block('D19','E20','ПРОСРОЧЕНА ПОДПИСЬ',{formula:"SUM('Контрактинг'!M6:M"+(contractRows.length+5)+")"},activeLateSign,integer,C.red);
-    block('G19','H20','СТАРШЕ 7 ДНЕЙ',{formula:"SUM('Контрактинг'!N6:N"+(contractRows.length+5)+")"},oldContracts,integer,C.amber);
+    block('A19','B20','ПРОСРОЧЕН КОНТАКТ',{formula:"SUM('Контрактинг'!L6:L"+(Math.max(6,contractRows.length+5))+")"},activeLateContacts,integer,C.red);
+    block('D19','E20','ПРОСРОЧЕНА ПОДПИСЬ',{formula:"SUM('Контрактинг'!M6:M"+(Math.max(6,contractRows.length+5))+")"},activeLateSign,integer,C.red);
+    block('G19','H20','СТАРШЕ 7 ДНЕЙ',{formula:"SUM('Контрактинг'!N6:N"+(Math.max(6,contractRows.length+5))+")"},oldContracts,integer,C.amber);
     block('J19','K20','ЗАПИСЕЙ С БЛОКЕРАМИ',blockerCount,blockerCount,integer,C.amber);
     home.mergeCells('A23:L23');
     home.getCell('A23').value='БЫСТРЫЙ ПЕРЕХОД К ДЕТАЛЯМ';
