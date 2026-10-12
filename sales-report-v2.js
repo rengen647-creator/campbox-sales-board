@@ -100,12 +100,14 @@
 
   function buildReport(wb, info) {
     const {rows, members, contracts, activeContracts, min, target, max, dates, cutoff, month} = info;
+    const home=wb.addWorksheet('Главная',{properties:{tabColor:{argb:C.green}}});
     const totals = key => rows.reduce((n,r)=>n+asNum(r[key]),0);
     const connected=totals('connected_fact');
     const activeIDs=new Set(activeContracts.map(c=>String(c.id||'')));
     const inProgress=activeContracts.length;
     const daysInMonth=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate();
-    const nowDay=Math.max(0,Math.min(daysInMonth,cutoff && cutoff.startsWith(month) ? Number(cutoff.slice(8,10)) : (month < todayISO().slice(0,7)?daysInMonth:0)));
+    const currentMonth=todayISO().slice(0,7);
+    const nowDay=month>currentMonth?0:month<currentMonth?daysInMonth:Math.max(0,Math.min(daysInMonth,Number(cutoff.slice(8,10))));
     const remaining=Math.max(daysInMonth-nowDay,0);
     const expected=nowDay?Math.round(target*nowDay/daysInMonth):0;
 
@@ -259,8 +261,6 @@
       ['Дата','Менеджер','Что получилось','Причины','Блокеры','План на завтра','Подключено'],
       noteRows,[16,23,48,30,49,48,17],{dateCols:[1],numCols:[7],tall:true,wrap:true,tab:C.navy2});
 
-    const home=wb.addWorksheet('Главная',{properties:{tabColor:{argb:C.green}}});
-    home.orderNo=0;
     const homeWidths=[24,16,14,23,17,14,25,16,15,24,17,15];
     homeWidths.forEach((w,i)=>home.getColumn(i+1).width=w);
     home.views=[{state:'frozen',ySplit:4,showGridLines:false,zoomScale:90}];
@@ -307,7 +307,7 @@
     block('J7','K8','ОСТАЛОСЬ',{formula:'MAX(B8-E8,0)'},Math.max(target-connected,0),integer,C.red);
     block('A11','B12','ПЛАН МИНИМУМ',min,min,integer);
     block('D11','E12','ПЛАН МАКСИМУМ',max,max,integer);
-    block('G11','H12','НА ПОДПИСАНИИ',{formula:"COUNTIF('Контрактинг'!K6:K"+(contractRows.length+5)+",\"Да\")"},inProgress,integer,C.amber);
+    block('G11','H12','НА ПОДПИСАНИИ',{formula:"COUNTIF('Контрактинг'!K6:K"+Math.max(6,contractRows.length+5)+",\"Да\")"},inProgress,integer,C.amber);
     block('J11','K12','ФАКТ + ПОДПИСАНИЕ',{formula:'E8+H12'},connected+inProgress,integer,C.blue);
     home.mergeCells('A14:L14');
     home.getCell('A14').value='02  /  ТЕМП И РИСКИ';
