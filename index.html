@@ -17,6 +17,8 @@
   <title>CampBox — Sales Board</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="./sales-coach.js?v=20261005b"></script>
   <style>
     :root{
@@ -148,7 +150,7 @@
       <span id="saveStatus" class="status">Все данные актуальны</span>
       <div class="user-chip"><span id="currentUserName">—</span><span id="currentUserRole" class="role-badge">—</span></div>
       <button id="accessBtn" class="btn manager-only" onclick="openAccess()">Сотрудники</button>
-      <button id="excelBtn" class="btn good manager-only" onclick="exportExcel()">Excel</button>
+      <button id="excelBtn" class="btn good manager-only" onclick="exportExcelV2()">Excel · отчёт</button>
       <button class="btn primary" onclick="saveCurrent(true)">Сохранить</button>
       <button class="btn" onclick="window.print()">PDF</button>
       <button class="btn danger" onclick="logout()">Выйти</button>
@@ -872,5 +874,7 @@ initPWA();
 
   <script src="./ui-v13.js?v=20261007s2"></script>
   <script src="./salary-v1.js?v=20261007cycles"></script>
+  <script src="./sales-visual-charts.js?v=20261013a"></script>
+  <script src="./sales-report-v2.js?v=20261013b"></script>
 </body>
 </html>
