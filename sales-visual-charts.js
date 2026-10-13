@@ -17,10 +17,10 @@
     return '<c:cat><c:'+kind+'><c:f>'+esc(ref)+'</c:f>'+(numeric?numCache(vals,'dd.mm'):strCache(vals))+'</c:'+kind+'></c:cat>';
   }
   const values=(ref,vals)=>'<c:val><c:numRef><c:f>'+esc(ref)+'</c:f>'+numCache(vals)+'</c:numRef></c:val>';
-  function aSeries(index,label,catRef,categoriesCache,valRef,valuesCache,color,numericCat=false,showMarkers=false) {
+  function aSeries(index,label,catRef,categoriesCache,valRef,valuesCache,color,numericCat=false,showMarkers=null) {
     return '<c:ser><c:idx val="'+index+'"/><c:order val="'+index+'"/><c:tx><c:v>'+esc(label)+'</c:v></c:tx>'+
-      seriesColor(color)+(showMarkers?'<c:marker><c:symbol val="circle"/><c:size val="5"/></c:marker>':'<c:marker><c:symbol val="none"/></c:marker>')+
-      categories(catRef,categoriesCache,numericCat)+values(valRef,valuesCache)+'</c:ser>';
+      seriesColor(color)+
+      (showMarkers===null?'':(showMarkers?'<c:marker><c:symbol val="circle"/><c:size val="5"/></c:marker>':'<c:marker><c:symbol val="none"/></c:marker>'))+categories(catRef,categoriesCache,numericCat)+values(valRef,valuesCache)+'</c:ser>';
   }
   function axes(xId,yId,catAxis='b',valueAxis='l',catFmt='General') {
     return '<c:catAx><c:axId val="'+xId+'"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="'+catAxis+'"/>'+
