@@ -178,7 +178,11 @@
     screen('report').appendChild(rep);
     document.getElementById('v13BuildReport').addEventListener('click',renderReport);
     document.getElementById('v13PdfReport').addEventListener('click',function(){document.body.classList.add('v13-print-report');window.print();setTimeout(function(){document.body.classList.remove('v13-print-report');},300);});
-    document.getElementById('v13ExcelReport').addEventListener('click',function(){if(typeof exportExcel==='function')exportExcel();});
+    document.getElementById('v13ExcelReport').textContent='Excel · дашборд';
+    document.getElementById('v13ExcelReport').addEventListener('click',function(){
+      if(typeof window.exportExcelV2==='function') return window.exportExcelV2();
+      alert('Новая выгрузка Excel не загрузилась. Обнови страницу и повтори попытку.');
+    });
   }
 
   function safeScope(){
