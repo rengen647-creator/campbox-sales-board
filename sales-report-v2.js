@@ -98,9 +98,180 @@
     ]});
   }
 
+
+  // Первый лист: визуал, а не набор строк. Все числа ссылаются на детальные таблицы.
+  function visualOverview(ws, ctx) {
+    const {month,target,connected,inProgress,expected,lateContacts,lateSignatures,oldContracts,
+      stageData,memberData,dailyData,nowDay,prevRows} = ctx;
+    const navy=C.navy, blue=C.blue;
+    const values=(key)=>prevRows.reduce((s,r)=>s+asNum(r[key+'_fact']),0);
+    const prevVals=['calls','booked','meetings','offers'].map(values);
+    const prevRates=prevVals.map((v,i)=>i===0?null:prevVals[i-1]>0?v/prevVals[i-1]:null);
+    const colWidths=[22,15,15,15,42,17,16,17,17,17,17,16,16,16,17];
+    colWidths.forEach((w,i)=>ws.getColumn(i+1).width=w);
+    ws.views=[{state:'frozen',ySplit:3,showGridLines:false,zoomScale:75}];
+    ws.properties.tabColor={argb:C.green};
+    const band=(area,value,fill,color=C.white,height)=>{
+      ws.mergeCells(area);
+      const cell=ws.getCell(area.split(':')[0]);
+      cell.value=value;
+      cell.fill=paleFill(fill);
+      cell.font={name:'Aptos',color:{argb:color},bold:true,size:12};
+      cell.alignment={vertical:'middle',horizontal:'left',indent:1};
+      if(height)ws.getRow(cell.row).height=height;
+      return cell;
+    };
+    const subtle=(addr,value)=>{
+      const c=ws.getCell(addr); c.value=value;c.font={name:'Aptos',size:10,color:{argb:C.muted}};
+      c.alignment={vertical:'middle',wrapText:true};return c;
+    };
+    band('A1:O2','CAMPBOX  /  ПУЛЬТ РУКОВОДИТЕЛЯ',navy,C.white,40);
+    ws.getCell('A1').font={name:'Aptos Display',size:24,bold:true,color:{argb:C.white}};
+    band('A3:O3','Динамический Excel · '+month+'   |   фактические показатели и графики связаны с детализацией',C.pale,C.muted,33);
+    const kpis=[
+      {title:'ЦЕЛЬ',cols:['A5:C5','A6:C8'],formula:"'Главная'!B8",result:target,color:C.navy},
+      {title:'ПОДКЛЮЧЕНО',cols:['D5:F5','D6:F8'],formula:"'Главная'!E8",result:connected,color:C.green},
+      {title:'ВЫПОЛНЕНИЕ',cols:['G5:I5','G6:I8'],formula:"'Главная'!H8",result:target?connected/target:0,color:C.blue,percent:true},
+      {title:'ОТСТАВАНИЕ ОТ ТЕМПА',cols:['J5:L5','J6:L8'],formula:"'Главная'!H16",result:Math.max(expected-connected,0),color:C.red},
+      {title:'НА ПОДПИСАНИИ',cols:['M5:O5','M6:O8'],formula:"'Главная'!H12",result:inProgress,color:C.amber}
+    ];
+    kpis.forEach(k=>{
+      const head=band(k.cols[0],k.title,C.pale,C.muted,28);
+      head.font={name:'Aptos',size:10,bold:true,color:{argb:C.muted}};
+      const val=band(k.cols[1],null,C.neutral,k.color);
+      val.value={formula:k.formula,result:k.result};
+      val.font={name:'Aptos Display',size:28,bold:true,color:{argb:k.color}};
+      val.alignment={horizontal:'center',vertical:'middle'};
+      val.numFmt=k.percent?percent:integer;
+    });
+    ws.getRow(6).height=24;ws.getRow(7).height=22;ws.getRow(8).height=24;
+    band('A10:O10','01  /  ВОРОНКА ПРОДАЖ · где теряем движение',navy,C.white,34);
+    band('A11:C11','ЭТАП',C.navy2);
+    const labels=[['D11','ФАКТ'],['E11','ОБЪЁМ'],['F11','К ПРЕДЫДУЩЕМУ'],
+      ['G11','ПЛАН'],['H11','ВЫПОЛНЕНИЕ'],['I11','ПРЕД. МЕСЯЦ'],
+      ['J11','РАЗНИЦА'],['K11','СТАТУС'],['L11','ЧТО ПОКАЗЫВАЕТ']];
+    labels.forEach(([pos,value])=>{
+      if(pos==='L11')ws.mergeCells('L11:O11');
+      const cell=ws.getCell(pos);cell.value=value;cell.fill=paleFill(C.navy2);
+      cell.font={name:'Aptos',size:9,bold:true,color:{argb:C.white}};
+      cell.alignment={vertical:'middle',wrapText:true,horizontal:'center'};
+    });
+    ws.getRow(11).height=38;
+    stageData.slice(0,4).forEach((stage,i)=>{
+      const row=12+i;
+      ws.mergeCells('A'+row+':C'+row);
+      const sc=ws.getCell('A'+row);sc.value=stage[0];
+      sc.font={name:'Aptos',bold:true,size:12,color:{argb:C.ink}};
+      sc.fill=paleFill(i%2===0?C.pale:C.neutral);
+      sc.alignment={vertical:'middle',indent:1};
+      const fact=asNum(stage[2]),plan=asNum(stage[1]);
+      setFormula(ws.getCell('D'+row),"'Воронка'!C"+(6+i),fact);
+      setFormula(ws.getCell('E'+row),'D'+row,fact);
+      if(i>0)setFormula(ws.getCell('F'+row),'IFERROR(D'+row+'/D'+(row-1)+',0)',stageData[i-1][2]>0?fact/asNum(stageData[i-1][2]):0,percent);
+      else ws.getCell('F'+row).value='—';
+      setFormula(ws.getCell('G'+row),"'Воронка'!B"+(6+i),plan);
+      setFormula(ws.getCell('H'+row),'IFERROR(D'+row+'/G'+row+',0)',plan?fact/plan:0,percent);
+      const previous=prevRates[i];
+      if(i&&previous!==null){
+        ws.getCell('I'+row).value=previous;
+        ws.getCell('I'+row).numFmt=percent;
+        setFormula(ws.getCell('J'+row),'F'+row+'-I'+row,(stageData[i-1][2]>0?fact/asNum(stageData[i-1][2]):0)-previous,'+0.0%;-0.0%;0.0%');
+        ws.getCell('K'+row).value={formula:'IF(J'+row+'<0,"Просадка","Не хуже")',
+          result:(stageData[i-1][2]>0?fact/asNum(stageData[i-1][2]):0)<previous?'Просадка':'Не хуже'};
+        const cr='J'+row;
+        ws.addConditionalFormatting({ref:cr,rules:[
+          {type:'cellIs',operator:'lessThan',formulae:['0'],style:{fill:paleFill(C.redBg),font:{color:{argb:C.red},bold:true}}},
+          {type:'cellIs',operator:'greaterThanOrEqual',formulae:['0'],style:{fill:paleFill(C.greenBg),font:{color:{argb:C.green},bold:true}}}
+        ]});
+      }else{
+        ws.getCell('I'+row).value='—';ws.getCell('J'+row).value='—';
+        ws.getCell('K'+row).value='Нет базы';
+      }
+      ws.mergeCells('L'+row+':O'+row);
+      const note=ws.getCell('L'+row);
+      note.value=['Начало цепочки: количество звонков','Как назначаем встречи из контактов',
+        'Сколько назначенных встреч состоялось','Сколько КП подготовлено после встреч'][i];
+      note.font={name:'Aptos',size:10,color:{argb:C.muted}};
+      note.alignment={vertical:'middle',wrapText:true,indent:1};
+      ['D','E','F','G','H','I','J','K'].forEach(c=>{
+        const cell=ws.getCell(c+row);
+        cell.fill=cell.fill||paleFill(i%2===0?C.white:C.neutral);
+        cell.alignment={horizontal:'center',vertical:'middle'};
+        cell.font=cell.font||{name:'Aptos',size:11,color:{argb:C.ink}};
+      });
+      ws.getRow(row).height=48;
+    });
+    // Одна общая шкала от max этапа, бар в Excel меняется при правке источника.
+    ws.addConditionalFormatting({ref:'E12:E15',rules:[{
+      type:'dataBar',cfvo:[{type:'num',value:0},{type:'max'}],
+      color:C.blue,showValue:false,gradient:true
+    }]});
+    ws.addConditionalFormatting({ref:'H12:H15',rules:[
+      {type:'cellIs',operator:'lessThan',formulae:['1'],style:{fill:paleFill(C.redBg),font:{color:{argb:C.red},bold:true}}},
+      {type:'cellIs',operator:'greaterThanOrEqual',formulae:['1'],style:{fill:paleFill(C.greenBg),font:{color:{argb:C.green},bold:true}}}
+    ]});
+    ws.addConditionalFormatting({ref:'K12:K15',rules:[
+      {type:'expression',formulae:['K12="Просадка"'],style:{fill:paleFill(C.redBg),font:{color:{argb:C.red},bold:true}}},
+      {type:'expression',formulae:['K12="Не хуже"'],style:{fill:paleFill(C.greenBg),font:{color:{argb:C.green},bold:true}}}
+    ]});
+    band('A17:O17','Подсветка «Просадка» сравнивает переход между этапами с прошлым месяцем. Без данных прошлого месяца оценка не строится.',C.pale,C.muted,36);
+    band('A20:H20','02  /  ТЕМП ПОДКЛЮЧЕНИЙ · ФАКТ И ОРИЕНТИР',C.navy2,C.white,32);
+    band('I20:O20','03  /  СРАВНЕНИЕ МЕНЕДЖЕРОВ',C.navy2,C.white,32);
+    band('A42:O42','04  /  ОБЪЁМ ПО ЭТАПАМ · ДИАГРАММА',C.navy2,C.white,32);
+    ws.getRow(41).height=15;
+    ws.getRow(63).height=13;
+    band('A64:O64','05  /  РИСКИ И СЛЕДУЮЩИЕ ДЕЙСТВИЯ',navy,C.white,34);
+    const risks=[
+      ['A65:C65','A66:C68','ПРОСРОЧЕН КОНТАКТ',"'Главная'!B20",lateContacts,C.red],
+      ['D65:F65','D66:F68','ПРОСРОЧЕНА ПОДПИСЬ',"'Главная'!E20",lateSignatures,C.red],
+      ['G65:I65','G66:I68','ДОГОВОРЫ > 7 ДНЕЙ',"'Главная'!H20",oldContracts,C.amber],
+      ['J65:L65','J66:L68','НУЖНО ПОДКЛЮЧЕНИЙ',"'Главная'!K8",Math.max(target-connected,0),C.blue]
+    ];
+    risks.forEach(([head,area,label,formula,result,color])=>{
+      band(head,label,C.pale,C.muted,29);
+      const c=band(area,null,C.neutral,color,29);
+      c.value={formula,result};c.numFmt=integer;
+      c.font={name:'Aptos Display',size:25,bold:true,color:{argb:color}};
+      c.alignment={horizontal:'center',vertical:'middle'};
+    });
+    band('A70:O70','Отдельные менеджеры и конкретные лагеря → листы «Менеджеры» и «Контрактинг». Это и есть рабочий список для дожима.',C.pale,C.muted,32);
+    band('A72:O72','НАВИГАЦИЯ ПО ПОДРОБНОСТЯМ',navy,C.white,29);
+    const refs=[['A73','Главная'],['D73','Воронка'],['G73','Динамика'],
+      ['J73','Менеджеры'],['M73','Контрактинг'],['A75','Контрольные точки'],['D75','Итоги сотрудников']];
+    refs.forEach(([p,name])=>{
+      const c=ws.getCell(p);c.value=sheetLink(name);
+      c.font={name:'Aptos',size:12,color:{argb:blue},bold:true,underline:true};
+      c.fill=paleFill(C.pale);c.alignment={vertical:'middle',indent:1};
+      ws.getRow(c.row).height=34;
+    });
+    band('A77:O77','Графики — встроенные диаграммы Excel: после правки исходных ячеек они обновляются. Это не изображения. Срез договоров не равен прогнозу гарантированных подключений.',C.neutral,C.muted,36);
+    ws.getCell('A77').alignment={wrapText:true,vertical:'middle',indent:1};
+    ws.pageSetup={orientation:'landscape',paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:3};
+    ws.printArea='A1:O77';
+    return {
+      daily:{
+        serials:dailyData.slice(0,Math.max(1,nowDay)).map(r=>r[0] instanceof Date?
+          Math.round((Date.UTC(r[0].getFullYear(),r[0].getMonth(),r[0].getDate())-Date.UTC(1899,11,30))/86400000):0),
+        labels:dailyData.slice(0,Math.max(1,nowDay)).map((_,i)=>String(i+1).padStart(2,'0')),
+        fact:dailyData.slice(0,Math.max(1,nowDay)).map((r,i)=>dailyData.slice(0,i+1).reduce((s,x)=>s+asNum(x[6]),0)),
+        plan:dailyData.slice(0,Math.max(1,nowDay)).map((_,i)=>nowDay?Math.round(target*(i+1)/dailyData.length):0)
+      },
+      managers:{
+        names:memberData.map(r=>r[0]),
+        fact:memberData.map(r=>r[12]),
+        plan:memberData.map(r=>r[13])
+      },
+      funnel:{
+        labels:stageData.slice(0,4).map(r=>r[0]),
+        fact:stageData.slice(0,4).map(r=>r[2])
+      }
+    };
+  }
+
   function buildReport(wb, info) {
     const {rows, members, contracts, activeContracts, min, target, max, dates, cutoff, month} = info;
-    const home=wb.addWorksheet('Главная',{properties:{tabColor:{argb:C.green}}});
+    const overview=wb.addWorksheet('Обзор',{properties:{tabColor:{argb:C.green}}});
+    const home=wb.addWorksheet('Главная',{properties:{tabColor:{argb:C.blue}}});
     const totals = key => rows.reduce((n,r)=>n+asNum(r[key]),0);
     const connected=totals('connected_fact');
     const activeIDs=new Set(activeContracts.map(c=>String(c.id||'')));
@@ -355,6 +526,9 @@
     home.getRow(30).height=36;
     home.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:1};
     home.printArea='A1:L30';
+    return visualOverview(overview,{month,target,connected,inProgress,expected,
+      lateContacts:activeLateContacts,lateSignatures:activeLateSign,oldContracts,
+      stageData,memberData,dailyData,nowDay,prevRows:info.prevRows||[]});
   }
 
   window.exportExcelV2 = async function () {
@@ -383,14 +557,22 @@
       workbook.created=new Date();
       workbook.calcProperties.fullCalcOnLoad=true;
       const relevant=profiles.filter(p=>rows.some(r=>r.user_id===p.id)||active.some(c=>c.user_id===p.id));
-      buildReport(workbook,{
+      const visuals=buildReport(workbook,{
         month,rows,members:relevant,contracts:entries,activeContracts:active,
         min:asNum(document.getElementById('monthMin').value),
         target:asNum(document.getElementById('monthTarget').value),
         max:asNum(document.getElementById('monthMax').value),
-        cutoff,dates:{contract:contractDate}
+        cutoff,dates:{contract:contractDate},prevRows:prevMonthRows
       });
-      const buf=await workbook.xlsx.writeBuffer();
+      let buf=await workbook.xlsx.writeBuffer();
+      if(typeof window.CampBoxNativeExcelCharts==='function') {
+        try {
+          buf=await window.CampBoxNativeExcelCharts(buf,visuals);
+        } catch(chartError) {
+          console.error('CampBox native charts:',chartError);
+          alert('Диаграммы не удалось встроить. В выгрузке останутся интерактивная воронка и показатели.');
+        }
+      }
       const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
       const a=document.createElement('a');a.href=url;a.download='CampBox_Отчет_руководителя_'+month+'.xlsx';
       document.body.appendChild(a);a.click();a.remove();
