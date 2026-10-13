@@ -533,9 +533,9 @@
 
   window.exportExcelV2 = async function () {
     if (!isManager()) return;
-    if (typeof ExcelJS==='undefined') {
-      alert('Расширенный Excel-модуль не загрузился. Будет скачан прежний отчёт.');
-      return exportExcel();
+    if (typeof ExcelJS==='undefined'||typeof JSZip==='undefined'||typeof window.CampBoxNativeExcelCharts!=='function') {
+      alert('Модуль визуального Excel-отчёта не загрузился. Обнови страницу (Ctrl + F5) и повтори выгрузку. Старый формат автоматически не скачиваем.');
+      return;
     }
     const button=document.getElementById('excelBtn');
     if(button && button.disabled)return;
@@ -565,22 +565,14 @@
         cutoff,dates:{contract:contractDate},prevRows:prevMonthRows
       });
       let buf=await workbook.xlsx.writeBuffer();
-      if(typeof window.CampBoxNativeExcelCharts==='function') {
-        try {
-          buf=await window.CampBoxNativeExcelCharts(buf,visuals);
-        } catch(chartError) {
-          console.error('CampBox native charts:',chartError);
-          alert('Диаграммы не удалось встроить. В выгрузке останутся интерактивная воронка и показатели.');
-        }
-      }
+      buf=await window.CampBoxNativeExcelCharts(buf,visuals);
       const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
       const a=document.createElement('a');a.href=url;a.download='CampBox_Отчет_руководителя_'+month+'.xlsx';
       document.body.appendChild(a);a.click();a.remove();
       setTimeout(()=>URL.revokeObjectURL(url),10000);
     } catch(e) {
       console.error('CampBox Excel v2:',e);
-      alert('Не удалось собрать расширенный отчёт. Скачается прежняя выгрузка.');
-      exportExcel();
+      alert('Не удалось сформировать визуальный Excel-отчёт. Старый файл не скачиваем. Ошибка: '+(e?.message||String(e)));
     } finally {
       if(button){button.disabled=false;button.textContent=before;}
     }
