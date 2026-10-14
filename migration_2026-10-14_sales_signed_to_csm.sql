@@ -92,7 +92,7 @@ begin
         and regexp_replace(lower(client_name),'[^[:alnum:]]','','g')=canon;
       if cid is null then problem:='Изменено имя уже переданного клиента'; end if;
     elsif problem='' then
-      select count(*),min(id) into n,cid from public.salary_clients
+      select count(*),(array_agg(id order by id))[1] into n,cid from public.salary_clients
       where regexp_replace(lower(client_name),'[^[:alnum:]]','','g')=canon;
       if n>1 then
         problem:='Несколько клиентов с похожим названием'; cid:=null;
