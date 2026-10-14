@@ -1,0 +1,21 @@
+name: Signed Sales handoff checks
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'salary-v1.js'
+      - 'migration_2026-10-14_sales_signed_to_csm.sql'
+      - 'tests/signed-handoff.test.cjs'
+      - '.github/workflows/qa-signed-handoff.yml'
+  workflow_dispatch:
+jobs:
+  static-handoff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/signed-handoff.test.cjs
