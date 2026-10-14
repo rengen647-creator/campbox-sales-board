@@ -1,5 +1,5 @@
-const CACHE = 'campbox-sales-excel-action-fix-2026-10-13b';
-const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg','./sales-coach.css?v=20261005b','./sales-coach.js?v=20261005b','./ui-v13.css?v=20261006m','./ui-v13.js?v=20261013excelfix','./salary-v1.css?v=20261007cycles','./salary-v1.js?v=20261007cycles','./sales-visual-charts.js?v=20261013a','./sales-report-v2.js?v=20261013excelcheck'];
+const CACHE = 'campbox-sales-handoff-2026-10-14';
+const SHELL = ['./','./index.html','./manifest.webmanifest','./icon.svg','./sales-coach.css?v=20261005b','./sales-coach.js?v=20261005b','./ui-v13.css?v=20261006m','./ui-v13.js?v=20261013excelfix','./salary-v1.css?v=20261014handoff','./salary-v1.js?v=20261014handoff','./sales-visual-charts.js?v=20261013a','./sales-report-v2.js?v=20261013excelcheck'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));

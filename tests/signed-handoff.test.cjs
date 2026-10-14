@@ -1,0 +1,49 @@
+'use strict';
+// Node 22, no external packages or service credentials.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'index.html'),'utf8');
+const salary = fs.readFileSync(path.join(root, 'salary-v1.js'),'utf8');
+const migration = fs.readFileSync(path.join(root, 'migration_2026-10-14_sales_signed_to_csm.sql'),'utf8');
+const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).filter(s=>s.trim());
+assert(scripts.length > 0);
+scripts.forEach((s,i)=>new vm.Script(s,{filename:'index.html:inline-'+i}));
+new vm.Script(salary,{filename:'salary-v1.js'});
+const begin = html.indexOf('function normalizeContract(c={}){');
+assert(begin>=0);
+const end = html.indexOf('\n}', begin);
+assert(end>begin);
+const normalizeSource = html.slice(begin,end+2);
+const normalize = new Function('selectedDate','todayISO','newId',normalizeSource+'; return normalizeContract;')(
+  '2026-10-14', ()=>'2026-10-14', ()=>'test-id'
+);
+const signed = normalize({id:'existing-id', client:'Солнечный', signed_date:'2026-10-12', status:'signed'});
+assert.equal(signed.id,'existing-id');
+assert.equal(signed.signed_date,'2026-10-12');
+assert.equal(signed.status,'signed');
+assert.equal(normalize({}).status,'signing');
+assert.equal(normalize({status:'invalid'}).status,'signing');
+assert(html.includes('Для подписанного договора укажи фактическую дату подписания'));
+assert(html.includes("sb.from('sales_handoff_statuses').select("));
+assert(html.includes('await loadMonthOnly();return true'));
+assert(migration.includes("doc->>'__type' is distinct from 'daily_reflection'"));
+assert(migration.includes("item->>'status' is distinct from 'signed'"));
+assert(migration.includes('after insert or update of comment on public.daily_sales'));
+assert(!/\binsert\s+into\s+public\.salary_contracts\b/i.test(migration));
+assert(migration.includes('revoke all on function campbox_internal.sync_signed_deal()'));
+assert(migration.includes('alter table public.sales_handoff_statuses enable row level security'));
+assert(migration.includes('create policy sales_handoff_own_status'));
+assert(!migration.includes('create or replace function public.sales_handoff_status('));
+assert(migration.includes('csm_camps_sales_handoff_assignment'));
+assert(salary.includes('let clientId=same?.id'));
+assert(salary.includes("c.client_id===same.id&&c.status!=='terminated'"));
+assert(salary.includes('pendingClients.length'));
+assert(salary.includes('function filteredClientContracts(list)'));
+assert(salary.includes('salClientSearchResults'));
+assert(salary.includes('clientQuery'));
+assert(salary.includes('updateClientSearch()'));
+
+console.log('OK: all staged regression guards / syntax checks. PostgreSQL integration tests remain pending.');
