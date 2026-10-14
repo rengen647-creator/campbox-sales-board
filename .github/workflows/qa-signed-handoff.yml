@@ -6,6 +6,7 @@ on:
       - 'salary-v1.js'
       - 'migration_2026-10-14_sales_signed_to_csm.sql'
       - 'tests/signed-handoff.test.cjs'
+      - 'tests/signed-handoff.pg.sql'
       - '.github/workflows/qa-signed-handoff.yml'
   workflow_dispatch:
 jobs:
@@ -19,3 +20,38 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/signed-handoff.test.cjs
+
+  postgres-handoff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: handoff_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d handoff_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: handoff_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          fi
+      - name: Signed Sales → CSM integration fixtures
+        run: psql -v ON_ERROR_STOP=1 -f tests/signed-handoff.pg.sql
