@@ -604,7 +604,7 @@ function handoffStatusLabel(c){
 }
 async function refreshHandoffStates(userId){
   if(!sb)return;
-  const {data,error}=await sb.rpc('sales_handoff_status',{p_user_id:userId});
+  const {data,error}=await sb.from('sales_handoff_statuses').select('contract_key,state,reason,assigned').eq('sales_user_id',userId);
   if(contractUserId!==userId)return;
   if(error){handoffStatusError=error.message||'Ошибка проверки';handoffStates=new Map();}
   else{handoffStatusError='';handoffStates=new Map((data||[]).map(x=>[x.contract_key,x]));}
