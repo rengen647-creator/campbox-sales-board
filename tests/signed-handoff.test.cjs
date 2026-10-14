@@ -41,4 +41,9 @@ assert(migration.includes('csm_camps_sales_handoff_assignment'));
 assert(salary.includes('let clientId=same?.id'));
 assert(salary.includes("c.client_id===same.id&&c.status!=='terminated'"));
 assert(salary.includes('pendingClients.length'));
+assert(salary.includes('function filteredClientContracts(list)'));
+assert(salary.includes('salClientSearchResults'));
+assert(salary.includes('clientQuery'));
+assert(salary.includes('updateClientSearch()'));
+
 console.log('OK: all staged regression guards / syntax checks. PostgreSQL integration tests remain pending.');
