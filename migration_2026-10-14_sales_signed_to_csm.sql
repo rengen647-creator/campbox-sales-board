@@ -39,14 +39,14 @@ begin
   end if;
   begin doc:=new.comment::jsonb;
   exception when others then return new; end;
-  if doc->>'__type'<>'daily_reflection' or
-     jsonb_typeof(doc->'contracts')<>'array' then return new; end if;
+  if doc->>'__type' is distinct from 'daily_reflection' or
+     jsonb_typeof(doc->'contracts') is distinct from 'array' then return new; end if;
   for item in select value from jsonb_array_elements(doc->'contracts') loop
-    if item->>'status'<>'signed' then continue; end if;
+    if item->>'status' is distinct from 'signed' then continue; end if;
     nm:=btrim(coalesce(item->>'client',''));
     ky:=btrim(coalesce(item->>'id',''));
     if ky='' then continue; end if;
-    if length(ky)>128 then ky:=left(ky,128); end if;
+    if length(ky)>128 then continue; end if;
     problem:=''; cid:=null; dt:=null;
     if nm='' or length(nm)>200 then problem:='Некорректное название лагеря'; end if;
     begin
