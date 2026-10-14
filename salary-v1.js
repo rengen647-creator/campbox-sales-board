@@ -454,6 +454,7 @@
     const box=q('salaryClients');if(!box||!manager())return;
     const active=S.contracts.filter(c=>c.status==='active'),paused=S.contracts.filter(c=>c.status==='paused'),archived=S.contracts.filter(c=>c.status==='terminated');
     const counts={active:active.length,paused:paused.length,archive:archived.length};
+    const pendingClients=S.clients.filter(c=>c.active&&!S.contracts.some(x=>x.client_id===c.id&&x.status!=='terminated'));
     box.innerHTML=
       '<div class="salary-grid2">'+
         '<div class="salary-card"><div class="salary-head"><div><h2>Новый клиент / договор</h2><p>Новый клиент создаёт первый договорный цикл. Повторный клиент восстанавливается из архива.</p></div></div><div class="salary-body"><div class="salary-form-grid">'+
@@ -466,10 +467,21 @@
           (S.contracts.filter(c=>c.status!=='terminated').length?'<div class="salary-form-grid"><div class="salary-field"><label>Клиент / договор</label><select id="salProdContract">'+contractOptions()+'</select></div><div class="salary-field"><label>Направление</label><select id="salProdType">'+productOptions()+'</select></div><div class="salary-field"><label>Первая оплата</label><input id="salProdFirst" type="date"></div><div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="salProdAdd">Добавить направление</button></div></div>':'<div class="salary-empty">Нет активных договоров.</div>')+
         '</div></div>'+
       '</div>'+
+      '<div class="salary-card"><div class="salary-head"><div><h2>Переданы из Sales · оформить договор</h2><p>Клиент есть в общей базе. Договорный цикл зарплаты оформляется отдельно.</p></div><span class="salary-pill blue">'+pendingClients.length+' ждут</span></div><div class="salary-body">'+
+        (pendingClients.length?'<div class="salary-contract-list">'+pendingClients.map(c=>'<div class="salary-contract-card"><div class="salary-contract-top"><div><h3>'+esc(c.client_name)+'</h3><small>Дата подписания '+dateRu(c.signed_date)+'</small></div><button class="btn" data-sal-use-client="'+esc(c.id)+'">Оформить договор</button></div></div>').join('')+'</div>':'<div class="salary-empty">Нет клиентов в ожидании оформления.</div>')+
+      '</div></div>'+
       '<div class="salary-card"><div class="salary-head"><div><h2>База клиентов и договоров</h2><p>Расторгнутые договоры не удаляются: они уходят в архив.</p></div><label class="btn">Импорт Excel<input id="salClientImport" type="file" accept=".xlsx,.xls" hidden></label></div><div class="salary-body">'+
         '<div class="salary-subtabs"><button class="'+(S.clientView==='active'?'active':'')+'" data-client-view="active">Активные · '+counts.active+'</button><button class="'+(S.clientView==='paused'?'active':'')+'" data-client-view="paused">На паузе · '+counts.paused+'</button><button class="'+(S.clientView==='archive'?'active':'')+'" data-client-view="archive">Архив · '+counts.archive+'</button></div>'+
         contractTable(S.clientView==='active'?active:S.clientView==='paused'?paused:archived)+
       '</div></div>';
+    box.querySelectorAll('[data-sal-use-client]').forEach(btn=>btn.addEventListener('click',()=>{
+      const cc=client(btn.dataset.salUseClient);if(!cc)return;
+      const name=q('salClientName'),date=q('salClientSigned'),ctr=q('salClientContractor');
+      if(name)name.value=cc.client_name;
+      if(date)date.value=cc.signed_date||'';
+      if(ctr&&cc.contractor_id)ctr.value=cc.contractor_id;
+      name?.focus();
+    }));
     q('salClientAdd')?.addEventListener('click',addClient);q('salProdAdd')?.addEventListener('click',addProduct);q('salClientImport')?.addEventListener('change',e=>importClients(e.target.files?.[0]));
   }
 
@@ -495,12 +507,27 @@
   async function addClient(){
     const name=q('salClientName')?.value.trim(),contractor=q('salClientContractor')?.value,signed=q('salClientSigned')?.value||null;
     if(!name||!contractor||!signed){alert('Укажи клиента, контрактора и дату подписания.');return}
-    const same=S.clients.find(c=>c.client_name.trim().toLowerCase()===name.toLowerCase());
-    if(same){alert('Такой клиент уже есть в базе. Если прошлый договор расторгнут — открой вкладку «Архив» и нажми «Новый договор».');return}
-    const ins=await sb.from('salary_clients').insert({client_name:name,contractor_id:contractor,signed_date:signed,active:true,created_by:currentUser.id,updated_at:new Date().toISOString()}).select('*').single();
-    if(ins.error){alert(ins.error.message);return}
-    const ci=await sb.from('salary_contracts').insert({client_id:ins.data.id,contractor_id:contractor,signed_date:signed,status:'active',created_by:currentUser.id,updated_at:new Date().toISOString()});
-    if(ci.error){alert(ci.error.message);return}await load();
+    const norm=v=>String(v||'').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]/gu,'');
+    const matches=S.clients.filter(c=>norm(c.client_name)===norm(name));
+    if(matches.length>1){alert('Несколько клиентов с похожим названием: нужна ручная сверка.');return}
+    const same=matches[0]||null;
+    if(same&&S.contracts.some(c=>c.client_id===same.id&&c.status!=='terminated')){
+      alert('У лагеря уже есть действующий договорный цикл.');return;
+    }
+    let clientId=same?.id;
+    if(!clientId){
+      const ins=await sb.from('salary_clients').insert({client_name:name,contractor_id:contractor,signed_date:signed,active:true,created_by:currentUser.id,updated_at:new Date().toISOString()}).select('*').single();
+      if(ins.error){alert(ins.error.message);return}
+      clientId=ins.data.id;
+    }
+    // Отметка Sales создаёт только клиентскую запись; зарплатный договор создаётся здесь.
+    const ci=await sb.from('salary_contracts').insert({client_id:clientId,contractor_id:contractor,signed_date:signed,status:'active',created_by:currentUser.id,updated_at:new Date().toISOString()});
+    if(ci.error){alert('Ошибка создания договора: '+ci.error.message);return}
+    if(same){
+      const {error}=await sb.from('salary_clients').update({active:true,contractor_id:contractor,signed_date:signed,updated_at:new Date().toISOString()}).eq('id',clientId);
+      if(error)alert('Договор создан, но карточка клиента не обновилась: '+error.message);
+    }
+    await load();
   }
 
   async function addProduct(){
