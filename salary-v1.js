@@ -3,7 +3,7 @@
   'use strict';
 
   const S={
-    ready:false,loading:false,schemaReady:true,tab:'mine',clientView:'active',month:'',
+    ready:false,loading:false,schemaReady:true,tab:'mine',clientView:'active',clientQuery:'',month:'',
     clients:[],contracts:[],pauses:[],products:[],payments:[],dept:null,audit:[],config:null,lastError:''
   };
 
@@ -450,6 +450,23 @@
     if(view){S.clientView=view;renderClients();return}
   });
 
+  function filteredClientContracts(list){
+    const term=(S.clientQuery||'').trim().toLocaleLowerCase('ru');
+    if(!term)return list;
+    return list.filter(c=>{
+      const cc=contractClient(c);
+      return [cc?.client_name||'',profileName(c.contractor_id),c.signed_date||'']
+        .some(value=>String(value).toLocaleLowerCase('ru').includes(term));
+    });
+  }
+
+  function updateClientSearch(){
+    const status={active:'active',paused:'paused',archive:'terminated'}[S.clientView]||'active';
+    const matches=filteredClientContracts(S.contracts.filter(c=>c.status===status));
+    if(q('salClientSearchResults'))q('salClientSearchResults').innerHTML=contractTable(matches);
+    if(q('salClientMatches'))q('salClientMatches').textContent='Найдено: '+matches.length;
+  }
+
   function renderClients(){
     const box=q('salaryClients');if(!box||!manager())return;
     const active=S.contracts.filter(c=>c.status==='active'),paused=S.contracts.filter(c=>c.status==='paused'),archived=S.contracts.filter(c=>c.status==='terminated');
@@ -472,7 +489,8 @@
       '</div></div>'+
       '<div class="salary-card"><div class="salary-head"><div><h2>База клиентов и договоров</h2><p>Расторгнутые договоры не удаляются: они уходят в архив.</p></div><label class="btn">Импорт Excel<input id="salClientImport" type="file" accept=".xlsx,.xls" hidden></label></div><div class="salary-body">'+
         '<div class="salary-subtabs"><button class="'+(S.clientView==='active'?'active':'')+'" data-client-view="active">Активные · '+counts.active+'</button><button class="'+(S.clientView==='paused'?'active':'')+'" data-client-view="paused">На паузе · '+counts.paused+'</button><button class="'+(S.clientView==='archive'?'active':'')+'" data-client-view="archive">Архив · '+counts.archive+'</button></div>'+
-        contractTable(S.clientView==='active'?active:S.clientView==='paused'?paused:archived)+
+        '<div class="salary-client-search"><div class="salary-field"><label for="salClientSearch">Поиск по лагерю, менеджеру или дате договора</label><input id="salClientSearch" type="search" placeholder="Начни вводить название лагеря" value="'+esc(S.clientQuery)+'" autocomplete="off" aria-controls="salClientSearchResults"></div><span class="salary-client-search-count" id="salClientMatches"></span><button class="btn" id="salClientClear" type="button">Сбросить</button></div>'+
+        '<div id="salClientSearchResults">'+contractTable(filteredClientContracts(S.clientView==='active'?active:S.clientView==='paused'?paused:archived))+'</div>'+
       '</div></div>';
     box.querySelectorAll('[data-sal-use-client]').forEach(btn=>btn.addEventListener('click',()=>{
       const cc=client(btn.dataset.salUseClient);if(!cc)return;
@@ -483,10 +501,13 @@
       name?.focus();
     }));
     q('salClientAdd')?.addEventListener('click',addClient);q('salProdAdd')?.addEventListener('click',addProduct);q('salClientImport')?.addEventListener('change',e=>importClients(e.target.files?.[0]));
+    q('salClientSearch')?.addEventListener('input',e=>{S.clientQuery=e.target.value;updateClientSearch()});
+    q('salClientClear')?.addEventListener('click',()=>{S.clientQuery='';const input=q('salClientSearch');if(input){input.value='';input.focus()}updateClientSearch()});
+    updateClientSearch();
   }
 
   function contractTable(list){
-    if(!list.length)return '<div class="salary-empty">В этом разделе пока нет договоров.</div>';
+    if(!list.length)return '<div class="salary-empty">'+(S.clientQuery?.trim()?'По запросу ничего не найдено.':'В этом разделе пока нет договоров.')+'</div>';
     return '<div class="salary-contract-list">'+list.map(c=>{
       const cc=contractClient(c),ps=contractProducts(c.id),op=openPause(c.id);
       const period=ps.filter(p=>p.first_payment_date&&PRODUCTS[p.product_type]?.period).map(p=>{
