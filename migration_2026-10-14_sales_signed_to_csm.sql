@@ -14,6 +14,29 @@ create table if not exists campbox_internal.sales_signed_handoffs (
 );
 revoke all on campbox_internal.sales_signed_handoffs from public,anon,authenticated;
 
+-- Public read-only handoff state with RLS, NOT a public SECURITY DEFINER RPC.
+create table if not exists public.sales_handoff_statuses (
+  sales_user_id uuid not null,
+  contract_key text not null,
+  state text not null check (state in ('linked','conflict')),
+  reason text not null default '',
+  assigned boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (sales_user_id,contract_key)
+);
+alter table public.sales_handoff_statuses enable row level security;
+revoke all on public.sales_handoff_statuses from public,anon,authenticated;
+grant select on public.sales_handoff_statuses to authenticated;
+drop policy if exists sales_handoff_own_status on public.sales_handoff_statuses;
+create policy sales_handoff_own_status on public.sales_handoff_statuses
+  for select to authenticated
+  using (
+    auth.uid() is not null
+    and public.is_active_user()
+    and (sales_user_id=auth.uid() or public.is_manager())
+  );
+
+
 create or replace function campbox_internal.sync_signed_deal()
 returns trigger language plpgsql security definer set search_path=''
 as $f$
@@ -100,9 +123,21 @@ begin
       case when problem='' then 'linked' else 'conflict' end,problem)
     on conflict(sales_user_id,contract_key) do update set
       client_name=excluded.client_name,signed_date=excluded.signed_date,
-      salary_client_id=coalesce(campbox_internal.sales_signed_handoffs.salary_client_id,
+      salary_client_id=coalesce(sales_signed_handoffs.salary_client_id,
                                 excluded.salary_client_id),
       state=excluded.state,reason=excluded.reason,changed_at=now();
+    insert into public.sales_handoff_statuses
+      (sales_user_id,contract_key,state,reason,assigned)
+    values(
+      new.user_id,ky,
+      case when problem='' then 'linked' else 'conflict' end,
+      problem,
+      exists(select 1 from public.csm_camps
+             where sales_client_id=cid and responsible_id is not null)
+    )
+    on conflict (sales_user_id,contract_key) do update
+      set state=excluded.state,reason=excluded.reason,
+          assigned=excluded.assigned,updated_at=now();
   end loop;
   return new;
 end;
@@ -114,28 +149,31 @@ create trigger daily_sales_signed_to_csm
 after insert or update of comment on public.daily_sales
 for each row execute function campbox_internal.sync_signed_deal();
 
-create or replace function public.sales_handoff_status(p_user_id uuid)
-returns table(contract_key text,state text,reason text,assigned boolean)
-language plpgsql security definer set search_path=''
+
+-- Keep "assigned" in the Sales status table when the CSM manager changes ownership.
+create or replace function campbox_internal.update_sales_handoff_assignment()
+returns trigger language plpgsql security definer set search_path=''
 as $f$
 begin
-  if auth.uid() is null or not exists(
-    select 1 from public.profiles where id=auth.uid() and active
-      and role in ('employee','manager')
-  ) then raise exception 'Sales access required' using errcode='42501'; end if;
-  if p_user_id<>auth.uid() and not public.is_manager() then
-    raise exception 'No access to colleague data' using errcode='42501'; end if;
-  return query
-    select h.contract_key,h.state,h.reason,
-           coalesce(c.responsible_id is not null,false)
-    from campbox_internal.sales_signed_handoffs h
-    left join public.csm_camps c on c.sales_client_id=h.salary_client_id
-    where h.sales_user_id=p_user_id;
+  if new.sales_client_id is not null then
+    update public.sales_handoff_statuses st
+       set assigned=(new.responsible_id is not null),
+           updated_at=now()
+      from campbox_internal.sales_signed_handoffs h
+     where h.sales_user_id=st.sales_user_id
+       and h.contract_key=st.contract_key
+       and h.salary_client_id=new.sales_client_id;
+  end if;
+  return new;
 end;
 $f$;
-revoke all on function public.sales_handoff_status(uuid)
+revoke all on function campbox_internal.update_sales_handoff_assignment()
  from public,anon,authenticated;
-grant execute on function public.sales_handoff_status(uuid) to authenticated;
+drop trigger if exists csm_camps_sales_handoff_assignment on public.csm_camps;
+create trigger csm_camps_sales_handoff_assignment
+after update of responsible_id on public.csm_camps
+for each row execute function campbox_internal.update_sales_handoff_assignment();
+
 commit;
 -- No existing records are backfilled. Before live use: backup, staging tests,
 -- security advisor, duplicate review, and explicit release approval.
