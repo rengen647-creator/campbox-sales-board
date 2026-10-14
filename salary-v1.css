@@ -74,3 +74,11 @@
   .salary-subtabs{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.salary-subtabs::-webkit-scrollbar{display:none}.salary-subtabs button{flex:0 0 auto}
   .salary-contract-top{display:grid;grid-template-columns:1fr}.salary-contract-actions{display:grid;grid-template-columns:1fr}.salary-contract-actions .btn{width:100%}
 }
+
+/* Sales client contract search: stays in place during live filtering. */
+.salary-client-search{display:grid;grid-template-columns:minmax(260px,1fr) auto auto;align-items:end;gap:10px;margin:10px 0 15px}
+.salary-client-search .salary-field{min-width:0}
+.salary-client-search .salary-field input{min-height:39px}
+.salary-client-search-count{color:var(--sal-muted);font-size:11px;padding-bottom:12px;white-space:nowrap}
+.salary-client-search .btn{min-height:39px}
+@media(max-width:680px){.salary-client-search{grid-template-columns:minmax(0,1fr) auto}.salary-client-search .salary-field{grid-column:1/-1}.salary-client-search-count{padding-bottom:9px}}
