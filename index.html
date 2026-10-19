@@ -83,6 +83,15 @@
   <link rel="stylesheet" href="./salary-v1.css?v=20261014handoff">
 
 <style id="salesNavRecovery">#mainApp>.salesFocusHidden{display:block!important}#mainApp>.salesFocusHidden.grid{display:grid!important}#mainApp.salesFocusMode{margin-left:auto!important;max-width:1720px!important}</style>
+<style id="v13SafeSubsectionStyles">
+.v13-sidebar .v13-safe-subnav{display:none;padding:1px 0 9px 12px;margin:0 6px 0 15px;border-left:1px solid #34466b}
+.v13-sidebar .v13-safe-subnav.open{display:grid;gap:3px}
+.v13-sidebar .v13-safe-subitem{display:block;width:100%;padding:8px 9px;border:0;border-radius:7px;background:transparent;color:#b7c8e6;text-align:left;font:inherit;font-size:11px;line-height:1.35;white-space:normal;cursor:pointer}
+.v13-sidebar .v13-safe-subitem.active{background:#293d62;color:#fff}
+.v13-sidebar .v13-safe-subitem:hover{background:#253655;color:#fff}
+.v13-screen>.v13-safe-hidden{display:none!important}
+@media print{.v13-screen>.v13-safe-hidden{display:block!important}}
+</style>
 </head>
 <body>
 
@@ -953,7 +962,7 @@ initPWA();
 })();
 </script>
 
-  <script src="./ui-v13.js?v=20261019rollback-v1"></script>
+  <script src="./ui-v13.js?v=20261019safe-subnav1"></script>
   <script src="./salary-v1.js?v=20261019contractledger"></script>
   <script src="./sales-visual-charts.js?v=20261013a"></script>
   <script src="./sales-report-v2.js?v=20261013excelcheck"></script>
