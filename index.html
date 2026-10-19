@@ -178,11 +178,11 @@
     <div class="card kpi tone-min"><div class="kpi-label">План минимум</div><div class="kpi-value" id="minPlanView">0</div><div class="kpi-sub">подключённых лагерей за месяц</div></div>
     <div class="card kpi tone-target"><div class="kpi-label">Цель</div><div class="kpi-value" id="targetPlanView">0</div><div class="kpi-sub">основной месячный ориентир</div></div>
     <div class="card kpi tone-max"><div class="kpi-label">План максимум</div><div class="kpi-value" id="maxPlanView">0</div><div class="kpi-sub">верхняя цель месяца</div></div>
-    <div class="card kpi tone-fact"><div class="kpi-label">Факт месяца</div><div class="kpi-value" id="monthFactView">0</div><div class="kpi-sub"><span id="monthPercent">0%</span> от основной цели</div><div class="progress"><span id="monthProgress"></span></div></div>
+    <div class="card kpi tone-fact"><div class="kpi-label">Подписано за месяц</div><div class="kpi-value" id="monthFactView">0</div><div class="kpi-sub"><span id="monthPercent">0%</span> от основной цели</div><div class="progress"><span id="monthProgress"></span></div></div>
     <div class="card kpi tone-signing"><div class="kpi-label">На подписании сейчас</div><div class="kpi-value" id="signingNowView">0</div><div class="kpi-sub">активных договоров в контрактинге</div></div>
     <div class="card kpi tone-forecast"><div class="kpi-label">Потенциал результата</div><div class="kpi-value" id="forecastView">0</div><div class="kpi-sub">факт + текущие договоры на подписании</div></div>
     <div class="card kpi tone-gap"><div class="kpi-label">Осталось до цели</div><div class="kpi-value" id="gapView">0</div><div class="kpi-sub">нужно подключить лагерей</div></div>
-    <div class="card kpi tone-today"><div class="kpi-label">Факт сегодня</div><div class="kpi-value" id="todayFactView">0</div><div class="kpi-sub">подключено лагерей за день</div></div>
+    <div class="card kpi tone-today"><div class="kpi-label">Факт сегодня</div><div class="kpi-value" id="todayFactView">0</div><div class="kpi-sub">подписано договоров за день</div></div>
   </section>
 
   <div class="card pad" style="margin-bottom:14px">
@@ -375,7 +375,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_x1zCcIIgf7fmAEFocColrA_wEtxB4hc';
 const metricKeys=['calls','booked','meetings','offers','follow','connected'];
 const activityKeys=['calls','booked','meetings','offers','follow'];
 const metricLabels={calls:'Звонки',booked:'Назначено встреч',meetings:'Проведено встреч',offers:'КП / расчёты',follow:'Повторные контакты',connected:'Подключено лагерей'};
-let sb=null,currentUser=null,currentProfile=null,selectedMonth='',selectedDate='',profiles=[],dayRows=[],monthRows=[],prevMonthRows=[],checkpoints=[],monthSettings={},daySettings={};
+let sb=null,currentUser=null,currentProfile=null,selectedMonth='',selectedDate='',profiles=[],dayRows=[],monthRows=[],monthSignedContracts=[],prevMonthRows=[],checkpoints=[],monthSettings={},daySettings={};
 let saveTimer=null,isLoading=false,reflectionUserId=null,reflectionReasons=[],activeActivityMetric='calls',contractUserId=null,contractDraft=[],handoffStates=new Map(),handoffStatusError='',coachUserId='team';
 const PERSONAL_MONTH_TARGET=5;
 const reasonOptions=['Нет блокеров','Не дозвонился','Перенесли','Нет ЛПР','Ждём решение','Цена','Тех. вопрос','Договор у юристов','Нет времени / ресурса','Другое'];
@@ -485,17 +485,18 @@ async function loadAll(){
   isLoading=true;setStatus('Загрузка…');
   try{
     const prevStart=previousMonthStart(selectedMonth);
-    const [{data:p,error:pe},{data:ms,error:mse},{data:ds,error:dse},{data:dr,error:dre},{data:mr,error:mre},{data:pmr,error:pmre},{data:cp,error:cpe}]=await Promise.all([
+    const [{data:p,error:pe},{data:ms,error:mse},{data:ds,error:dse},{data:dr,error:dre},{data:mr,error:mre},{data:pmr,error:pmre},{data:cp,error:cpe},{data:signed,error:se}]=await Promise.all([
       sb.from('profiles').select('id,full_name,email,role,active').eq('active',true).order('full_name'),
       sb.from('month_settings').select('*').eq('month',monthStart(selectedMonth)).maybeSingle(),
       sb.from('day_settings').select('*').eq('report_date',selectedDate).maybeSingle(),
       sb.from('daily_sales').select('*').eq('report_date',selectedDate),
       sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),
       sb.from('daily_sales').select('*').gte('report_date',prevStart).lt('report_date',monthStart(selectedMonth)),
-      sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date')
+      sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),
+      sb.from('salary_contracts').select('id,signed_date,contractor_id,status').gte('signed_date',monthStart(selectedMonth)).lt('signed_date',nextMonthStart(selectedMonth)).neq('status','terminated')
     ]);
-    const err=pe||mse||dse||dre||mre||pmre||cpe;if(err)throw err;
-    profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];prevMonthRows=pmr||[];checkpoints=cp||[];
+    const err=pe||mse||dse||dre||mre||pmre||cpe||se;if(err)throw err;
+    profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];monthSignedContracts=signed||[];prevMonthRows=pmr||[];checkpoints=cp||[];
     const byUser=Object.fromEntries((dr||[]).map(r=>[r.user_id,r]));
     dayRows=profiles.map(pr=>byUser[pr.id]||blankSales(pr.id,selectedDate,carryForwardContracts(pr.id,selectedDate)));
     if(!isManager())coachUserId=currentUser.id;else if(coachUserId!=='team'&&!profiles.some(p=>p.id===coachUserId))coachUserId='team';
@@ -821,7 +822,7 @@ async function saveCurrent(manual=false){
 }
 function normalizeSales(r){const o={report_date:selectedDate,user_id:r.user_id,comment:r.comment||''};metricKeys.forEach(k=>{o[k+'_plan']=num(r[k+'_plan']);o[k+'_fact']=num(r[k+'_fact'])});return o}
 async function loadMonthOnly(){
-  const [{data:mr},{data:cp}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date')]);monthRows=mr||monthRows;checkpoints=cp||checkpoints;recalc();renderCheckpoints();
+  const [{data:mr,error:me},{data:cp,error:ce},{data:signed,error:se}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),sb.from('salary_contracts').select('id,signed_date,contractor_id,status').gte('signed_date',monthStart(selectedMonth)).lt('signed_date',nextMonthStart(selectedMonth)).neq('status','terminated')]);if(me||ce||se){setStatus('Ошибка обновления факта','bad');return;}monthRows=mr||monthRows;monthSignedContracts=signed||[];checkpoints=cp||checkpoints;recalc();renderCheckpoints();
 }
 function sum(rows,key){return rows.reduce((s,r)=>s+num(r[key]),0)}
 function renderSalesForecastScenarios(){
@@ -855,7 +856,7 @@ function recalc(){
   const ids={calls:'totCalls',booked:'totBooked',meetings:'totMeetings',offers:'totOffers',follow:'totFollow'};Object.entries(ids).forEach(([k,id])=>$(id).textContent=`${totals[k+'P']} / ${totals[k+'F']}`);
   renderSalesPriorities();renderSalesForecastScenarios();
   const activeSigning=activeContractEntries().length,monthSigning=monthlySigningCount();$('totSigning').textContent=String(activeSigning);$('totConnected').textContent=String(totals.connectedF);
-  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=sum(monthRows,'connected_fact');$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=totals.connectedF;
+  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=monthSignedContracts.length;$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=monthSignedContracts.filter(c=>c.signed_date===selectedDate).length;
   $('miniCalls').textContent=pct(totals.callsF,totals.callsP)+'%';$('miniMeetings').textContent=pct(totals.meetingsF,totals.meetingsP)+'%';$('miniFollow').textContent=pct(totals.followF,totals.followP)+'%';$('convCallMeet').textContent=pct(totals.bookedF,totals.callsF)+'%';$('convMeetOffer').textContent=pct(totals.offersF,totals.meetingsF)+'%';$('convOfferConnect').textContent=pct(sum(monthRows,'connected_fact'),monthSigning)+'%';
   const scores=activityKeys.filter(k=>totals[k+'P']>0).map(k=>Math.min(100,pct(totals[k+'F'],totals[k+'P'])));const overall=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;const day=$('dayStatus'),ts=$('teamStatus');if(!scores.length){day.className='pill warn';day.textContent='План активностей не заполнен';ts.className='pill warn';ts.textContent='Нет плана'}else{day.className='pill '+statusClass(overall);day.textContent=`Активности выполнены на ${overall}%`;ts.className='pill '+statusClass(overall);ts.textContent=`Активности: ${overall}%`}
   const reflectionDone=dayRows.filter(r=>reflectionState(r.comment).state==='done').length,reflectionAny=dayRows.filter(r=>reflectionState(r.comment).state!=='empty').length,reflectionEl=$('reflectionStatus');
