@@ -82,7 +82,15 @@
   <link rel="stylesheet" href="./ui-v13.css?v=20261006m">
   <link rel="stylesheet" href="./salary-v1.css?v=20261014handoff">
 
-<style id="salesNavRecovery">#mainApp>.salesFocusHidden{display:block!important}#mainApp>.salesFocusHidden.grid{display:grid!important}#mainApp.salesFocusMode{margin-left:auto!important;max-width:1720px!important}</style></head>
+<style id="salesNavRecovery">#mainApp>.salesFocusHidden{display:block!important}#mainApp>.salesFocusHidden.grid{display:grid!important}#mainApp.salesFocusMode{margin-left:auto!important;max-width:1720px!important}</style><style id="v13SubNavFix">
+.v13-sidebar .v13-subnav{display:none;margin:0 6px 8px 19px;padding-left:8px;border-left:2px solid #34486f}
+.v13-sidebar .v13-subnav.open{display:grid;gap:3px}
+.v13-sidebar .v13-subnav .v13-subnav-item{display:block;width:100%;text-align:left;padding:8px 9px;background:transparent;color:#afc2df;border:0;border-radius:7px;font-size:11px;cursor:pointer}
+.v13-sidebar .v13-subnav .v13-subnav-item.active,.v13-sidebar .v13-subnav .v13-subnav-item:hover{background:#253b61;color:#fff}
+.v13-screen>.v13-sub-hidden{display:none!important}
+@media print{.v13-screen>.v13-sub-hidden{display:block!important}}
+</style>
+</head>
 <body>
 
 <div id="configScreen" class="screen hidden">
@@ -952,7 +960,7 @@ initPWA();
 })();
 </script>
 
-  <script src="./ui-v13.js?v=20261013excelfix"></script>
+  <script src="./ui-v13.js?v=20261019nested-v2"></script>
   <script src="./salary-v1.js?v=20261019contractledger"></script>
   <script src="./sales-visual-charts.js?v=20261013a"></script>
   <script src="./sales-report-v2.js?v=20261013excelcheck"></script>
