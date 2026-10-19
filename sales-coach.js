@@ -150,28 +150,31 @@ function coachFunnelRatios(userId){
     offerConnect:pick('connected','offers')
   };
 }
+// Stable baseline: use a low early-month reference instead of the feedback-inflated average.
 function coachDailyBase(userId,key){
-  function avgDaily(rows){
-    if(userId!=='team'){
-      var own=rows.filter(function(r){return num(r[key+'_plan'])>0;});
-      return own.length?sum(own,key+'_plan')/own.length:0;
-    }
-    var byDate={};
-    rows.forEach(function(r){if(num(r[key+'_plan'])>0)byDate[r.report_date]=(byDate[r.report_date]||0)+num(r[key+'_plan']);});
-    var vals=Object.values(byDate);
-    return vals.length?vals.reduce(function(a,b){return a+b;},0)/vals.length:0;
+  function earliest(rows){
+    var dates={};
+    rows.forEach(function(r){
+      var value=num(r[key+'_plan']);
+      if(value>0){
+        var d=String(r.report_date);
+        if(!dates[d])dates[d]=[];
+        dates[d].push(value);
+      }
+    });
+    var keys=Object.keys(dates).sort().slice(0,3);
+    if(!keys.length)return 0;
+    var values=keys.map(function(d){return dates[d].reduce(function(a,b){return a+b;},0);});
+    return Math.max(1,Math.round(values.reduce(function(a,b){return a+b;},0)/values.length));
   }
-  var before=coachScopeRows(monthRows,userId,true).filter(function(r){return String(r.report_date)<selectedDate;});
-  var beforeAvg=avgDaily(before);
-  if(beforeAvg>0)return {v:beforeAvg,src:'средний план этого месяца'};
-  var prev=coachScopeRows(prevMonthRows,userId,false);
-  var prevAvg=avgDaily(prev);
-  if(prevAvg>0)return {v:prevAvg,src:'средний план прошлого месяца'};
-  if(userId!=='team'){
-    var row=dayRows.find(function(r){return r.user_id===userId;});
-    if(row&&num(row[key+'_plan'])>0)return {v:num(row[key+'_plan']),src:'последний заданный план'};
-  }
-  return {v:0,src:'нет базы'};
+  var earlier=coachScopeRows(monthRows,userId,true).filter(function(r){return String(r.report_date)<selectedDate;});
+  var baseline=earliest(earlier);
+  if(baseline>0)return {v:baseline,src:'первые три плановых дня текущего месяца'};
+  baseline=earliest(coachScopeRows(prevMonthRows,userId,false));
+  if(baseline>0)return {v:baseline,src:'первые три плановых дня прошлого месяца'};
+  var today=coachScopeRows(dayRows,userId,true);
+  baseline=earliest(today);
+  return {v:baseline,src:baseline?'дневной норматив':'нет дневного норматива'};
 }
 function coachAutoPlan(userId){
   var target=coachTarget(userId);
@@ -180,44 +183,25 @@ function coachAutoPlan(userId){
   var day=Number(selectedDate.slice(8,10));
   var wdBefore=Math.max(0,workdaysThrough(selectedMonth,day)-(isWorkdayISO(selectedDate)?1:0));
   var remaining=Math.max(1,wdTotal-wdBefore);
-  var ratios=coachFunnelRatios(userId);
-  var required={};
-  var source='';
-  if(ratios.callBook&&ratios.bookMeet&&ratios.meetOffer&&ratios.offerConnect){
-    required.connected=target;
-    required.offers=Math.ceil(required.connected/ratios.offerConnect.v);
-    required.meetings=Math.ceil(required.offers/ratios.meetOffer.v);
-    required.booked=Math.ceil(required.meetings/ratios.bookMeet.v);
-    required.calls=Math.ceil(required.booked/ratios.callBook.v);
-    var followBase=coachDailyBase(userId,'follow');
-    required.follow=Math.max(0,Math.ceil(followBase.v*wdTotal));
-    source='от цели месяца и реальной конверсии';
-  }else{
-    activityKeys.forEach(function(k){
-      var base=coachDailyBase(userId,k);
-      required[k]=Math.ceil(base.v*wdTotal);
-    });
-    source='от рабочего темпа прошлых планов';
-  }
-  var metrics={};
+  var ratios=coachFunnelRatios(userId),metrics={};
   activityKeys.forEach(function(k){
-    var factBefore=sum(beforeRows,k+'_fact');
-    var plannedBefore=sum(beforeRows,k+'_plan');
-    var needMonth=Math.max(0,num(required[k]));
-    var remainingNeed=Math.max(0,needMonth-factBefore);
     var base=coachDailyBase(userId,k);
-    var baseline=Math.ceil(base.v);
+    var baseline=Math.max(0,Math.ceil(base.v));
+    var factBefore=sum(beforeRows,k+'_fact');
+    // Avoid feeding historical auto-inflated targets back into today's target.
+    var plannedBefore=baseline*wdBefore;
     var backlog=Math.max(0,plannedBefore-factBefore);
-    var backlogAdd=backlog>0?Math.ceil(backlog/remaining):0;
+    var backlogAdd=Math.ceil(backlog/remaining);
+    var remainingNeed=Math.max(0,baseline*wdTotal-factBefore);
     var goalRate=Math.ceil(remainingNeed/remaining);
-    var plan=Math.max(baseline+backlogAdd,goalRate);
-    var uplift=Math.max(0,plan-baseline);
-    var pressure=baseline>0?plan/baseline:(plan>0?1:0);
-    var shortReason=uplift>0?('база '+baseline+' · долг '+backlog+' → +'+uplift):('база '+baseline+' · темп достаточен');
-    var reason='Базовый дневной план: '+baseline+'. Накопленный план к сегодняшнему дню: '+plannedBefore+', факт: '+factBefore+(backlog>0?', отставание: '+backlog:'. Отставания по накопленному плану нет')+'. Для закрытия этого отставания нужно добавить '+backlogAdd+' в день. По месячной цели нужно ещё '+remainingNeed+' на '+remaining+' рабочих дней, то есть минимум '+goalRate+' в день. Поэтому план на сегодня '+plan+(uplift>0?' (повышен на '+uplift+')':' (базовый темп достаточен)')+'. Основа месячного расчёта: '+source+'.';
-    metrics[k]={plan:plan,requiredMonth:needMonth,factBefore:factBefore,plannedBefore:plannedBefore,backlog:backlog,remainingNeed:remainingNeed,remainingDays:remaining,baseline:baseline,uplift:uplift,pressure:pressure,shortReason:shortReason,reason:reason};
+    // Operational daily target remains stable. Recovery is guidance, never a mandate.
+    var plan=baseline;
+    var uplift=0,pressure=baseline?1:0;
+    var shortReason='база '+baseline+(backlog?', отставание '+backlog+' отдельно':'');
+    var reason='Рабочий дневной план: '+baseline+' ('+base.src+'). За прошедшие рабочие дни по стабильной базе '+plannedBefore+', факт '+factBefore+', отставание '+backlog+'. Рекомендуемый темп восстановления '+goalRate+' в день и дополнительно '+backlogAdd+' в день для компенсации долга показываются справочно, но не увеличивают обязательный план. Месячная цель подключений '+target+' учитывается отдельно.';
+    metrics[k]={plan:plan,requiredMonth:baseline*wdTotal,factBefore:factBefore,plannedBefore:plannedBefore,backlog:backlog,remainingNeed:remainingNeed,remainingDays:remaining,baseline:baseline,uplift:uplift,pressure:pressure,shortReason:shortReason,reason:reason,advisoryRate:goalRate};
   });
-  return {userId:userId,target:target,remainingDays:remaining,source:source,ratios:ratios,metrics:metrics};
+  return {userId:userId,target:target,remainingDays:remaining,source:'стабильный дневной норматив (без переноса долга в план)',ratios:ratios,metrics:metrics};
 }
 function applyAutoDailyPlans(){
   if(selectedDate!==todayISO())return;
