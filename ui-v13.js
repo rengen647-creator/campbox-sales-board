@@ -33,6 +33,7 @@
     closeMore();
     if(id!=='team')V.managerOpen=false;
     V.view=id;
+    if(typeof window.v13ExpandNested==='function')window.v13ExpandNested(id);
     document.querySelectorAll('.v13-screen').forEach(function(x){x.classList.toggle('active',x.id==='v13-'+id);});
     document.querySelectorAll('[data-v13-view]').forEach(function(x){x.classList.toggle('active',x.getAttribute('data-v13-view')===id);});
     var m=titleMeta(id),t=document.getElementById('v13PageTitle'),d=document.getElementById('v13PageDesc');
@@ -143,6 +144,7 @@
     if(miniGrid){miniGrid.classList.add('v13-analytics-legacy');screen('analytics').appendChild(miniGrid);}
 
     createLiveBlocks();
+    installNestedNavigation(sidebar);
 
     var oldMobile=document.getElementById('mobileBar');if(oldMobile)oldMobile.style.display='none';
     var manualFocus=document.getElementById('daySummary');if(manualFocus&&manualFocus.parentElement)manualFocus.parentElement.style.display='none';
@@ -150,6 +152,41 @@
     patchLiveFunctions();
     go('today');
     setTimeout(refresh,100);setTimeout(refresh,700);setTimeout(refresh,1800);
+  }
+
+  function installNestedNavigation(sidebar){
+    var groups={
+      today:[['kpis','Показатели'],['context','Параметры дня'],['plan','Мой план'],['focus','Фокус дня']],
+      month:[['pace','Темп месяца'],['plan','План месяца'],['recovery','Восстановление']],
+      funnel:[['funnel','Воронка и этапы'],['coach','Разбор Sales Coach']],
+      contracts:[['contracts','Договоры и приоритеты']],
+      team:[['team','Показатели команды'],['daily','Ежедневный отчёт']],
+      analytics:[['coach','Разбор показателей'],['charts','Графики'],['calendar','Календарь'],['summary','Сводка KPI']],
+      summary:[['checkpoints','Контрольные точки'],['result','Итог руководителя']]
+    };
+    var nav=sidebar.querySelector('.v13-nav');if(!nav)return;
+    Object.keys(groups).forEach(function(id){
+      var b=nav.querySelector('[data-v13-view="'+id+'"]');if(!b)return;
+      var sub=document.createElement('div');sub.className='v13-subnav';sub.dataset.section=id;
+      groups[id].forEach(function(item,i){var btn=document.createElement('button');btn.type='button';btn.className='v13-subnav-item';btn.dataset.subindex=String(i);btn.textContent=item[1];sub.appendChild(btn);});
+      b.insertAdjacentElement('afterend',sub);
+      sub.addEventListener('click',function(e){var t=e.target.closest('[data-subindex]');if(!t)return;e.stopPropagation();activateNested(id,Number(t.dataset.subindex));});
+    });
+    function activateNested(id,index){
+      var sc=screen(id);if(!sc)return;
+      var nodes=Array.from(sc.children).filter(function(x){return !x.classList.contains('v13-subnav-content');});
+      // Keep all underlying dynamic DOM mounted; only change presentation of direct screen blocks.
+      var selected=Math.min(Math.max(index,0),Math.max(0,nodes.length-1));
+      nodes.forEach(function(x,i){x.classList.toggle('v13-sub-hidden',i!==selected);});
+      var sub=nav.querySelector('.v13-subnav[data-section="'+id+'"]');
+      if(sub)sub.querySelectorAll('[data-subindex]').forEach(function(b,i){b.classList.toggle('active',i===selected);});
+      V.subsection=V.subsection||{};V.subsection[id]=selected;
+    }
+    window.v13ActivateNested=activateNested;
+    window.v13ExpandNested=function(id){
+      nav.querySelectorAll('.v13-subnav').forEach(function(x){x.classList.toggle('open',x.dataset.section===id);});
+      if(groups[id])activateNested(id,(V.subsection||{})[id]||0);
+    };
   }
 
   function createLiveBlocks(){
