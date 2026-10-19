@@ -185,6 +185,10 @@
     <div class="card kpi tone-today"><div class="kpi-label">Факт сегодня</div><div class="kpi-value" id="todayFactView">0</div><div class="kpi-sub">подключено лагерей за день</div></div>
   </section>
 
+  <div class="card pad" style="margin-bottom:14px">
+    <div class="section-head" style="padding:0 0 12px"><div class="section-title"><h2>Приоритеты контрактинга</h2><p>Сделки без следующего шага, просроченные контакты и плановые даты подписания. Только факты из карточек.</p></div></div>
+    <div id="salesPriorityList" class="focus-list"><span class="hint">Загрузка договоров…</span></div>
+  </div>
   <section class="grid two-col">
     <div class="card"><div class="section-head"><div class="section-title"><h2>Фокус дня</h2><p>Ставится автоматически из командного отставания и слабых мест воронки</p></div></div><div class="section-body focus-list">
       <div class="focus-item"><div class="focus-num">1</div><textarea id="focus1" readonly></textarea></div>
@@ -816,9 +820,23 @@ async function loadMonthOnly(){
   const [{data:mr},{data:cp}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date')]);monthRows=mr||monthRows;checkpoints=cp||checkpoints;recalc();renderCheckpoints();
 }
 function sum(rows,key){return rows.reduce((s,r)=>s+num(r[key]),0)}
+function renderSalesPriorities(){
+  const el=$('salesPriorityList');if(!el)return;
+  const rows=monthlyContractEntries().filter(c=>c.status==='signing');
+  const prioritized=rows.map(c=>{
+    const issues=[];
+    if(!c.next_action||!String(c.next_action).trim())issues.push('Нет следующего действия');
+    if(!c.next_contact)issues.push('Не назначен следующий контакт');
+    else if(c.next_contact<selectedDate)issues.push('Просрочен следующий контакт');
+    if(c.target_date&&c.target_date<selectedDate)issues.push('Просрочен план подписания');
+    return {c,issues};
+  }).filter(x=>x.issues.length).sort((a,b)=>b.issues.length-a.issues.length).slice(0,12);
+  el.innerHTML=prioritized.length?prioritized.map(x=>'<div class="focus-item"><div class="focus-num">!</div><div><b>'+esc(x.c.client||'Без названия')+'</b><div class="sub">'+esc(x.issues.join(' · '))+'</div><small>'+esc(x.c.next_action||'Запланировать следующий шаг')+'</small></div></div>').join(''):'<div class="hint">По открытым сделкам срочных отклонений не обнаружено.</div>';
+}
 function recalc(){
   const totals={};metricKeys.forEach(k=>{totals[k+'P']=sum(dayRows,k+'_plan');totals[k+'F']=sum(dayRows,k+'_fact')});
   const ids={calls:'totCalls',booked:'totBooked',meetings:'totMeetings',offers:'totOffers',follow:'totFollow'};Object.entries(ids).forEach(([k,id])=>$(id).textContent=`${totals[k+'P']} / ${totals[k+'F']}`);
+  renderSalesPriorities();
   const activeSigning=activeContractEntries().length,monthSigning=monthlySigningCount();$('totSigning').textContent=String(activeSigning);$('totConnected').textContent=String(totals.connectedF);
   const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=sum(monthRows,'connected_fact');$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=totals.connectedF;
   $('miniCalls').textContent=pct(totals.callsF,totals.callsP)+'%';$('miniMeetings').textContent=pct(totals.meetingsF,totals.meetingsP)+'%';$('miniFollow').textContent=pct(totals.followF,totals.followP)+'%';$('convCallMeet').textContent=pct(totals.bookedF,totals.callsF)+'%';$('convMeetOffer').textContent=pct(totals.offersF,totals.meetingsF)+'%';$('convOfferConnect').textContent=pct(sum(monthRows,'connected_fact'),monthSigning)+'%';
