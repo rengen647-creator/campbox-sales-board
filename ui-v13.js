@@ -40,6 +40,7 @@
     if(t)t.textContent=m[0];if(d)d.textContent=m[1];
     refresh();
     if(id==='salary'&&typeof window.salaryOpen==='function')window.salaryOpen();
+    if(id==='contracts')loadMissingContractNumbers();
     window.scrollTo({top:0,behavior:'smooth'});
   }
   window.v13Go=go;
@@ -214,6 +215,8 @@
 
     var cont=el('section','card v13-block','<div class="v13-section-title"><div><h2>Контрактинг</h2><p>Только договоры, способные повлиять на результат текущего месяца.</p></div><span id="v13ContractBadge"></span></div><div class="v13-body"><div class="v13-contract-grid" id="v13ContractsGrid"></div></div>');
     screen('contracts').appendChild(cont);
+    var missing=el('section','card v13-block','<div class="v13-section-title"><div><h2>Нужно заполнить номер договора</h2><p>Ранее подписанные договоры без номера. Сохраняй номер непосредственно здесь.</p></div></div><div class="v13-body" id="v13MissingContractNumbers"><span>Загрузка…</span></div>');
+    screen('contracts').appendChild(missing);
 
     var ag=el('section','card v13-block','<div class="v13-section-title"><div><h2>Как читать аналитику</h2><p>Откуда цифра взялась, что она означает и куда идти дальше.</p></div>'+pill('good','COACH MODE')+'</div><div class="v13-body"><div class="v13-analytics-tabs" id="v13AnalyticsTabs"></div><div class="v13-analytics-panel" id="v13AnalyticsPanel"></div><button type="button" class="v13-mobile-only v13-analytics-toggle" id="v13AnalyticsToggle">Показать динамику ↓</button></div>');
     screen('analytics').insertBefore(ag,screen('analytics').firstChild);
@@ -343,6 +346,53 @@
       return '<article class="v13-contract"><div class="v13-contract-head"><div><h3>'+h(c.client||'Без названия')+'</h3><small>'+h(c.manager||'')+'</small></div>'+pill(tone,c.age+' дн.')+'</div><div class="v13-contract-meta"><span class="v13-pill '+tone+'">'+(c.ball==='us'?'мяч у нас':'мяч у клиента')+'</span>'+(c.blocker?'<span class="v13-pill warn">'+h(c.blocker)+'</span>':'')+'</div><p>'+(c.age>7?'Высокий риск для месячного результата.':c.age>=4?'Требует контроля срока.':'Срок пока в норме.')+'</p><div class="v13-contract-next">'+h(next)+(c.next_contact?' · '+h(c.next_contact):'')+'</div><button type="button" class="btn" style="margin-top:8px" data-open-contract="'+h(c.user_id)+'">Открыть контрактинг</button></article>';
     }).join('');
     grid.querySelectorAll('[data-open-contract]').forEach(function(b){b.addEventListener('click',function(){if(typeof openContracts==='function')openContracts(this.getAttribute('data-open-contract'));});});
+  }
+
+  async function loadMissingContractNumbers(){
+    var root=document.getElementById('v13MissingContractNumbers');
+    if(!root||typeof sb==='undefined'||!sb)return;
+    if(V.missingBusy)return;
+    V.missingBusy=true;
+    try{
+      var response=await sb.from('daily_sales').select('report_date,user_id,comment').not('comment','is',null).order('report_date',{ascending:false}).limit(1000);
+      if(response.error)throw response.error;
+      var list=[];
+      (response.data||[]).forEach(function(row){
+        var obj;
+        try{obj=JSON.parse(row.comment||'{}')}catch(e){return}
+        if(obj.__type!=='daily_reflection'||!Array.isArray(obj.contracts))return;
+        obj.contracts.forEach(function(c){
+          if(c.status==='signed'&&!String(c.contract_number||'').trim()){
+            if(typeof isManager==='function'&&!isManager()&&row.user_id!==currentSelf())return;
+            list.push({date:row.report_date,user_id:row.user_id,key:String(c.id||''),client:String(c.client||'Без названия'),signed:String(c.signed_date||'')});
+          }
+        });
+      });
+      root.innerHTML=list.length?'<div style="display:grid;gap:10px">'+list.map(function(c,i){
+        return '<div class="v13-contract" data-missing-index="'+i+'"><strong>'+h(c.client)+'</strong><div style="font-size:12px;color:#9aafd4;margin:5px 0">Подписан '+h(c.signed||'дата не заполнена')+'</div>'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap"><input aria-label="Номер договора" placeholder="Введите номер договора" data-missing-number style="min-width:190px;flex:1;background:#0b1931;border:1px solid #344b70;color:#fff;border-radius:8px;padding:9px"/>'+
+          '<button class="btn primary" type="button" data-missing-save="'+i+'">Сохранить номер</button></div><small data-missing-result></small></div>';
+      }).join('')+'</div>':'<div class="v13-empty">Среди доступных записей подписанных договоров без номера не найдено.</div>';
+      root.querySelectorAll('[data-missing-save]').forEach(function(btn){btn.addEventListener('click',async function(){
+        var item=list[Number(btn.dataset.missingSave)],card=btn.closest('[data-missing-index]'),number=card.querySelector('[data-missing-number]').value.trim(),status=card.querySelector('[data-missing-result]');
+        if(!number){status.textContent='Укажи номер договора.';return}
+        btn.disabled=true;status.textContent='Сохраняем…';
+        try{
+          var q=await sb.from('daily_sales').select('comment').eq('report_date',item.date).eq('user_id',item.user_id).single();
+          if(q.error)throw q.error;
+          var data=JSON.parse(q.data.comment||'{}'),contract=(data.contracts||[]).find(function(c){return String(c.id||'')===item.key&&c.status==='signed';});
+          if(!contract)throw Error('Договор изменился. Обнови список.');
+          if(String(contract.contract_number||'').trim())throw Error('Номер уже заполнен. Обнови список.');
+          contract.contract_number=number;
+          var changed=JSON.stringify(data);
+          var save=await sb.from('daily_sales').update({comment:changed}).eq('report_date',item.date).eq('user_id',item.user_id).eq('comment',q.data.comment).select('report_date');
+          if(save.error)throw save.error;
+          if(!save.data||!save.data.length)throw Error('Карточка была изменена другим пользователем. Повтори после обновления.');
+          status.textContent='Номер сохранён';await loadMissingContractNumbers();
+        }catch(err){status.textContent=err.message||'Ошибка сохранения';btn.disabled=false}
+      })});
+    }catch(err){root.textContent='Не удалось получить список: '+(err.message||err)}
+    finally{V.missingBusy=false}
   }
 
   var stageInfo={
