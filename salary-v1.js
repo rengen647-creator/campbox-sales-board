@@ -309,6 +309,22 @@
       '</tbody></table></div>';
   }
 
+  function contractingSummary(userId){
+    const contracts=S.contracts.filter(c=>c.contractor_id===userId&&c.signed_date&&c.signed_date.slice(0,7)===S.month);
+    const rate=Number(S.dept?.contractor_rate||0);
+    const items=contracts.map(c=>({c,name:contractClient(c)?.client_name||'Клиент не найден',rate,amount:rate}));
+    return {items,count:items.length,rate,total:items.reduce((n,x)=>n+x.amount,0)};
+  }
+  function contractingPanel(userId){
+    const x=contractingSummary(userId);
+    return '<div class="salary-card"><div class="salary-head"><div><h2>Контрактинг · подписанные договоры</h2><p>Кто законтрактован за выбранный месяц и сколько начислено за каждый договор. Ставка зависит от выполнения плана отдела.</p></div><span class="salary-pill blue">'+x.count+' договоров</span></div>'+
+      '<div class="salary-body"><div class="salary-report-preview"><div><span>Законтрактовано</span><b>'+x.count+'</b></div><div><span>Ставка за договор</span><b>'+money(x.rate)+'</b></div><div><span>Начислено за контрактинг</span><b>'+money(x.total)+'</b></div></div>'+
+      (x.items.length?'<div class="salary-table-wrap"><table class="salary-table"><thead><tr><th>Лагерь</th><th>Номер договора</th><th>Дата подписания</th><th>Ставка</th><th>Начислено</th></tr></thead><tbody>'+
+       x.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.c.contract_number||'Не указан')+'</td><td>'+dateRu(x.c.signed_date)+'</td><td>'+money(x.rate)+'</td><td><b>'+money(x.amount)+'</b></td></tr>').join('')+
+       '</tbody></table></div>':'<div class="salary-empty">В этом месяце подписанных договоров нет. Начислено 0 ₽.</div>')+
+      '</div></div>';
+  }
+
   function renderMine(){
     const box=q('salaryMine');if(!box)return;if(!S.schemaReady){box.innerHTML='';return}
     const rows=mineRows(),t=totals(rows),status=S.month<currentMonth()?'Закрытый период':'Предварительно';
@@ -338,6 +354,7 @@
           (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),end=commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
         '</div></div></div>'+
       '</div>'+
+      contractingPanel(currentUser.id)+
       '<div class="salary-card"><div class="salary-head"><div><h2>Начисления за '+esc(monthName(S.month))+'</h2><p>Договорный цикл указан отдельно, поэтому повторное подключение не смешивается со старой историей.</p></div></div><div class="salary-body">'+accrualTable(rows)+'</div></div>';
 
     bindMonth('salaryMineMonth');q('salaryExcelBtn')?.addEventListener('click',exportMineExcel);
@@ -631,6 +648,7 @@
     const all=rows.reduce((a,x)=>a+totals(x.rows).total,0),contractSum=rows.reduce((a,x)=>a+totals(x.rows).contract,0),comm=rows.reduce((a,x)=>a+totals(x.rows).campbox,0),head=rows.reduce((a,x)=>a+totals(x.rows).head,0);
     box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Команда · '+esc(monthName(S.month))+'</h2><p>ФОТ и расчёты с учётом пауз и повторных договоров.</p></div>'+monthControl('salaryTeamMonth')+'</div><div class="salary-body">'+
       '<div class="salary-kpis"><div class="salary-kpi good"><span>ФОТ продаж</span><b>'+money(all)+'</b></div><div class="salary-kpi"><span>Контракторство</span><b>'+money(contractSum)+'</b></div><div class="salary-kpi good"><span>CampBox</span><b>'+money(comm)+'</b></div><div class="salary-kpi"><span>Сотрудников</span><b>'+rows.length+'</b></div><div class="salary-kpi warn"><span>1% руководителю</span><b>'+money(head)+'</b></div></div>'+
+      '<div class="salary-card"><div class="salary-head"><div><h2>Контрактинг по сотрудникам</h2><p>Количество договоров и фиксированное начисление по каждому менеджеру.</p></div></div><div class="salary-body"><div class="salary-team-cards">'+rows.map(x=>{const k=contractingSummary(x.p.id);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+k.count+' договоров · '+money(k.total)+'</div><small>Ставка '+money(k.rate)+'</small>'+k.items.map(z=>'<div class="salary-breakdown"><div><span>'+esc(z.name)+'</span><b>'+money(z.amount)+'</b></div></div>').join('')+'</div>'}).join('')+'</div></div></div>'+ 
       '<div class="salary-team-cards">'+rows.map(x=>{const t=totals(x.rows);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+money(t.total)+'</div><small>'+x.rows.length+' начислений</small><div class="salary-breakdown"><div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Остальное</span><b>'+money(t.products+t.site+t.head)+'</b></div></div></div>'}).join('')+'</div>'+
     '</div></div>';bindMonth('salaryTeamMonth');
   }
