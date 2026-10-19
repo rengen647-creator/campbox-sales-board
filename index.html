@@ -186,6 +186,10 @@
   </section>
 
   <div class="card pad" style="margin-bottom:14px">
+    <div class="section-head" style="padding:0 0 12px"><div class="section-title"><h2>Сценарный прогноз подписаний</h2><p>Подтверждённые договоры, ближайший потенциал и возможный максимум. Без неподтверждённых вероятностей.</p></div></div>
+    <div id="salesForecastScenarios" class="month-bar"><span class="hint">Загрузка прогноза…</span></div>
+  </div>
+  <div class="card pad" style="margin-bottom:14px">
     <div class="section-head" style="padding:0 0 12px"><div class="section-title"><h2>Приоритеты контрактинга</h2><p>Сделки без следующего шага, просроченные контакты и плановые даты подписания. Только факты из карточек.</p></div></div>
     <div id="salesPriorityList" class="focus-list"><span class="hint">Загрузка договоров…</span></div>
   </div>
@@ -820,6 +824,19 @@ async function loadMonthOnly(){
   const [{data:mr},{data:cp}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date')]);monthRows=mr||monthRows;checkpoints=cp||checkpoints;recalc();renderCheckpoints();
 }
 function sum(rows,key){return rows.reduce((s,r)=>s+num(r[key]),0)}
+function renderSalesForecastScenarios(){
+  const el=$('salesForecastScenarios');if(!el)return;
+  const entries=monthlyContractEntries();
+  const signed=entries.filter(c=>c.status==='signed'&&String(c.signed_date||'').startsWith(selectedMonth));
+  const open=entries.filter(c=>c.status==='signing');
+  const near=open.filter(c=>c.next_contact&&c.next_contact>=selectedDate&&c.next_action&&(!c.target_date||String(c.target_date).startsWith(selectedMonth)));
+  const labels=[
+    ['Подписано в месяце',signed.length,'Подтверждённый договор'],
+    ['Ближайший потенциал',signed.length+near.length,'Подписано + сделки с действующим следующим шагом'],
+    ['Максимальный сценарий',signed.length+open.length,'Если подпишутся все открытые договоры']
+  ];
+  el.innerHTML=labels.map(([n,v,desc])=>'<div class="month-target"><small>'+esc(n)+'</small><b style="font-size:25px">'+v+'</b><div class="sub">'+esc(desc)+'</div></div>').join('');
+}
 function renderSalesPriorities(){
   const el=$('salesPriorityList');if(!el)return;
   const rows=monthlyContractEntries().filter(c=>c.status==='signing');
@@ -836,7 +853,7 @@ function renderSalesPriorities(){
 function recalc(){
   const totals={};metricKeys.forEach(k=>{totals[k+'P']=sum(dayRows,k+'_plan');totals[k+'F']=sum(dayRows,k+'_fact')});
   const ids={calls:'totCalls',booked:'totBooked',meetings:'totMeetings',offers:'totOffers',follow:'totFollow'};Object.entries(ids).forEach(([k,id])=>$(id).textContent=`${totals[k+'P']} / ${totals[k+'F']}`);
-  renderSalesPriorities();
+  renderSalesPriorities();renderSalesForecastScenarios();
   const activeSigning=activeContractEntries().length,monthSigning=monthlySigningCount();$('totSigning').textContent=String(activeSigning);$('totConnected').textContent=String(totals.connectedF);
   const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=sum(monthRows,'connected_fact');$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=totals.connectedF;
   $('miniCalls').textContent=pct(totals.callsF,totals.callsP)+'%';$('miniMeetings').textContent=pct(totals.meetingsF,totals.meetingsP)+'%';$('miniFollow').textContent=pct(totals.followF,totals.followP)+'%';$('convCallMeet').textContent=pct(totals.bookedF,totals.callsF)+'%';$('convMeetOffer').textContent=pct(totals.offersF,totals.meetingsF)+'%';$('convOfferConnect').textContent=pct(sum(monthRows,'connected_fact'),monthSigning)+'%';
