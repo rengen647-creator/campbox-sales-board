@@ -393,7 +393,7 @@ function isManager(){return currentProfile?.role==='manager'}
 function statusClass(p){return p>=100?'good':p>=70?'warn':'bad'}
 function newId(){return globalThis.crypto?.randomUUID?crypto.randomUUID():'c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9)}
 function normalizeContract(c={}){
-  return {id:c.id||newId(),client:String(c.client||''),sent_date:c.sent_date||selectedDate||todayISO(),target_date:c.target_date||'',ball:c.ball==='us'?'us':'client',blocker:String(c.blocker||''),next_action:String(c.next_action||''),next_contact:c.next_contact||'',signed_date:c.signed_date||'',status:['signing','signed','lost'].includes(c.status)?c.status:'signing'};
+  return {id:c.id||newId(),client:String(c.client||''),contract_number:String(c.contract_number||''),sent_date:c.sent_date||selectedDate||todayISO(),target_date:c.target_date||'',ball:c.ball==='us'?'us':'client',blocker:String(c.blocker||''),next_action:String(c.next_action||''),next_contact:c.next_contact||'',signed_date:c.signed_date||'',status:['signing','signed','lost'].includes(c.status)?c.status:'signing'};
 }
 function parseReflection(raw){
   const empty={result:'',blockers:'',tomorrow:'',reasons:[],contracts:[]};
@@ -626,6 +626,7 @@ function renderContractDraft(canEdit=true){
     <div class="contract-fields">
       <div><label>Договор отправлен</label><input type="date" value="${esc(c.sent_date)}" onchange="updateContractDraft(${i},'sent_date',this.value)" ${canEdit?'':'disabled'}></div>
       <div><label>Плановая подпись</label><input type="date" value="${esc(c.target_date)}" onchange="updateContractDraft(${i},'target_date',this.value)" ${canEdit?'':'disabled'}></div>
+      <div><label>Номер договора ${c.status==='signed'?'* ':''}</label><input value="${esc(c.contract_number||'')}" oninput="updateContractDraft(${i},'contract_number',this.value)" placeholder="Номер из подписанного договора" ${canEdit?'':'disabled'} ${c.status==='signed'?'required':'' }></div>
       <div><label>Фактически подписан</label><input type="date" value="${esc(c.signed_date||'')}" onchange="updateContractDraft(${i},'signed_date',this.value)" ${canEdit?'':'disabled'} ${c.status==='signed'?'required':''}></div>
       <div><label>У кого мяч</label><select onchange="updateContractDraft(${i},'ball',this.value)" ${canEdit?'':'disabled'}><option value="client" ${c.ball==='client'?'selected':''}>У клиента</option><option value="us" ${c.ball==='us'?'selected':''}>У нас</option></select></div>
       <div><label>Что блокирует</label><input value="${esc(c.blocker)}" oninput="updateContractDraft(${i},'blocker',this.value)" ${canEdit?'':'disabled'} placeholder="Юристы / цена / реквизиты"></div>
@@ -642,6 +643,9 @@ async function saveContracts(){
   if(clean.some(c=>c.status==='signed'&&!/^\d{4}-\d{2}-\d{2}$/.test(c.signed_date))){
     alert('Для подписанного договора укажи фактическую дату подписания.');return;
   }
+  if(clean.some(c=>c.status==='signed'&&!String(c.contract_number||'').trim())){alert('Укажи номер подписанного договора.');return;}
+  const numbers=clean.filter(c=>c.status==='signed').map(c=>c.contract_number.trim().toUpperCase().replace(/\s+/g,''));
+  if(new Set(numbers).size!==numbers.length){alert('Номер договора повторяется в текущем списке.');return;}
   const previousComment=r.comment,prev=parseReflection(r.comment);
   r.comment=packReflection({...prev,contracts:clean});renderTeam();recalc();
   const ok=await saveCurrent(true);
