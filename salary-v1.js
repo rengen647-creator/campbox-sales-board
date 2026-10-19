@@ -642,15 +642,33 @@
     S.clientView='active';alert('Новый договор создан. История старого договора сохранена в архиве. Первые оплаты направлений сброшены и начнут новый 12-месячный период.');await load();
   }
 
+  async function loadQualityDashboard(){
+    const el=q('salaryQualityDashboard');
+    if(!el||!manager())return;
+    const {data,error}=await sb.rpc('campbox_quality_counts');
+    if(!el.isConnected)return;
+    if(error||!data){el.textContent='Контроль данных временно недоступен: '+(error?.message||'Нет данных');return;}
+    const fields=[
+      ['Договоры без номера',data.missing_contract_numbers],
+      ['Лагеря КСМ без номера',data.missing_csm_numbers],
+      ['КСМ не назначен',data.unassigned_csm],
+      ['Конфликты передачи',data.handoff_conflicts]
+    ];
+    el.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Контроль данных Sales ↔ КСМ</h2><p>Проблемы учёта в реальном времени. Проверка доступна только руководителю.</p></div><button class="btn" type="button" id="salaryQualityRefresh">Перепроверить</button></div><div class="salary-body"><div class="salary-kpis">'+
+      fields.map(([name,count])=>'<div class="salary-kpi"><span>'+esc(name)+'</span><b>'+Number(count||0)+'</b></div>').join('')+
+      '</div><p class="sub">Количество карточек и договоров не должно автоматически выравниваться: несколько договорных циклов у одного клиента допустимы. Дубли не удаляются автоматически.</p></div></div>';
+    q('salaryQualityRefresh')?.addEventListener('click',loadQualityDashboard);
+  }
+
   function renderTeam(){
     const box=q('salaryTeam');if(!box||!manager())return;
     const active=(typeof profiles!=='undefined'?profiles:[]).filter(p=>p.active!==false),rows=active.map(p=>({p,rows:salaryFor(p.id)}));
     const all=rows.reduce((a,x)=>a+totals(x.rows).total,0),contractSum=rows.reduce((a,x)=>a+totals(x.rows).contract,0),comm=rows.reduce((a,x)=>a+totals(x.rows).campbox,0),head=rows.reduce((a,x)=>a+totals(x.rows).head,0);
-    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Команда · '+esc(monthName(S.month))+'</h2><p>ФОТ и расчёты с учётом пауз и повторных договоров.</p></div>'+monthControl('salaryTeamMonth')+'</div><div class="salary-body">'+
+    box.innerHTML='<div id="salaryQualityDashboard">Загрузка контроля данных…</div>'+ '<div class="salary-card"><div class="salary-head"><div><h2>Команда · '+esc(monthName(S.month))+'</h2><p>ФОТ и расчёты с учётом пауз и повторных договоров.</p></div>'+monthControl('salaryTeamMonth')+'</div><div class="salary-body">'+
       '<div class="salary-kpis"><div class="salary-kpi good"><span>ФОТ продаж</span><b>'+money(all)+'</b></div><div class="salary-kpi"><span>Контракторство</span><b>'+money(contractSum)+'</b></div><div class="salary-kpi good"><span>CampBox</span><b>'+money(comm)+'</b></div><div class="salary-kpi"><span>Сотрудников</span><b>'+rows.length+'</b></div><div class="salary-kpi warn"><span>1% руководителю</span><b>'+money(head)+'</b></div></div>'+
       '<div class="salary-card"><div class="salary-head"><div><h2>Контрактинг по сотрудникам</h2><p>Количество договоров и фиксированное начисление по каждому менеджеру.</p></div></div><div class="salary-body"><div class="salary-team-cards">'+rows.map(x=>{const k=contractingSummary(x.p.id);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+k.count+' договоров · '+money(k.total)+'</div><small>Ставка '+money(k.rate)+'</small>'+k.items.map(z=>'<div class="salary-breakdown"><div><span>'+esc(z.name)+'</span><b>'+money(z.amount)+'</b></div></div>').join('')+'</div>'}).join('')+'</div></div></div>'+ 
       '<div class="salary-team-cards">'+rows.map(x=>{const t=totals(x.rows);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+money(t.total)+'</div><small>'+x.rows.length+' начислений</small><div class="salary-breakdown"><div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Остальное</span><b>'+money(t.products+t.site+t.head)+'</b></div></div></div>'}).join('')+'</div>'+
-    '</div></div>';bindMonth('salaryTeamMonth');
+    '</div></div>';bindMonth('salaryTeamMonth');loadQualityDashboard();
   }
 
   function rule(name,desc,formula,badge){return '<div class="salary-rule"><div><b>'+esc(name)+'</b><small>'+esc(desc)+'</small></div><code>'+esc(formula)+'</code><span class="salary-pill blue">'+esc(badge)+'</span></div>'}
