@@ -662,7 +662,7 @@
       ...camps.filter(c=>!c.responsible_id).map(c=>({kind:'КСМ не назначен',name:c.name,detail:'Назначить ответственного'})),
       ...handoffs.map(c=>({kind:'Конфликт передачи',name:c.contract_key,detail:c.reason||'Требуется сверка'}))
     ];
-    const fields=[['Договоры без номера',d.missing_contract_numbers],['КСМ без номера',d.missing_csm_numbers],['КСМ не назначен',d.unassigned_csm],['Конфликты передачи',d.handoff_conflicts]];
+    const fields=[['Договоры без номера',d.missing_contract_numbers],['КСМ без номера',d.missing_csm_numbers],['КСМ не назначен',d.unassigned_csm],['Конфликты передачи',d.handoff_conflicts],['Переданы, но нет зарплатного договора',d.handoff_without_salary],['В зарплате, но не в КСМ',d.salary_without_csm],['Не совпали даты подписания',d.signed_date_disagreements],['Возможные дубли клиентов',d.duplicate_client_name_groups],['Дубли номеров договоров',d.duplicate_contract_number_groups],['Нет задачи подключения',d.onboarding_tasks_missing]];
     el.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Контроль данных Sales ↔ КСМ</h2><p>Список отклонений; без автоматического удаления и объединения клиентов.</p></div><button class="btn" type="button" id="salaryQualityRefresh">Перепроверить</button></div><div class="salary-body"><div class="salary-kpis">'+
       fields.map(([name,n])=>'<div class="salary-kpi"><span>'+esc(name)+'</span><b>'+Number(n||0)+'</b></div>').join('')+'</div>'+
       '<details><summary>Показать проблемные карточки ('+problems.length+')</summary><div class="salary-table-wrap"><table class="salary-table"><thead><tr><th>Проблема</th><th>Лагерь / договор</th><th>Следующее действие</th></tr></thead><tbody>'+
