@@ -81,6 +81,19 @@
   </style>
   <link rel="stylesheet" href="./ui-v13.css?v=20261006m">
   <link rel="stylesheet" href="./salary-v1.css?v=20261014handoff">
+<style id="salesFocusNavStyle">
+#salesFocusNav{position:fixed;left:12px;top:100px;bottom:18px;width:218px;overflow:auto;background:#111d32;border:1px solid #33476a;border-radius:16px;padding:12px;z-index:60;box-shadow:0 14px 35px #0005}
+#salesFocusNav strong{display:block;margin:3px 6px 14px;font-size:14px;color:#f3f6ff}
+#salesFocusNav button{display:block;width:100%;background:transparent;border:0;border-radius:8px;text-align:left;padding:10px 12px;color:#b8c6e3;cursor:pointer;font-size:13px}
+#salesFocusNav button:hover,#salesFocusNav button.active{background:#253858;color:#fff}
+#salesFocusNav .salesNavChildren{display:none;padding:0 0 8px 12px}
+#salesFocusNav .salesNavGroup.open .salesNavChildren{display:block}
+#salesFocusNav .salesNavChildren button{font-size:12px;padding:8px}
+#mainApp.salesFocusMode{margin-left:242px;max-width:calc(100% - 255px)}
+#mainApp.salesFocusMode>.salesFocusHidden{display:none!important}
+@media(max-width:980px){#salesFocusNav{position:sticky;top:0;left:auto;bottom:auto;width:100%;max-height:230px;margin:0 0 12px;z-index:30}#mainApp.salesFocusMode{margin-left:auto;max-width:100%}#salesFocusNav .salesNavChildren{display:flex!important;flex-wrap:wrap;padding:0}#salesFocusNav .salesNavChildren button{width:auto}.salesNavGroup:not(.open){display:none}}
+@media print{#salesFocusNav{display:none!important}#mainApp.salesFocusMode{margin-left:auto;max-width:100%}#mainApp.salesFocusMode>.salesFocusHidden{display:block!important}}
+</style>
 </head>
 <body>
 
@@ -954,5 +967,38 @@ initPWA();
   <script src="./salary-v1.js?v=20261019contractledger"></script>
   <script src="./sales-visual-charts.js?v=20261013a"></script>
   <script src="./sales-report-v2.js?v=20261013excelcheck"></script>
+<script id="salesFocusNavScript">
+(function(){
+const groups=[
+ {id:'overview',label:'Обзор',items:[['metrics','Показатели',[2]],['forecast','Прогноз подписаний',[3]],['priority','Приоритеты контрактинга',[4]]]},
+ {id:'work',label:'Рабочий день',items:[['focus','Фокус и план дня',[5]],['daily','Отчёт команды',[8]]]},
+ {id:'analysis',label:'Аналитика',items:[['coach','Sales Coach',[6]],['tempo','Темп месяца',[7]],['funnel','Воронка',[9]],['charts','Динамика',[10]],['calendar','Календарь',[11]],['checkpoints','Контрольные точки',[12]],['summary','Сводка KPI',[13]]]}
+];
+function start(){
+const app=document.getElementById('mainApp');if(!app)return;
+const children=[...app.children];const targets=children.slice(2,14);
+if(targets.length!==12)return;
+const nav=document.createElement('aside');nav.id='salesFocusNav';nav.setAttribute('aria-label','Навигация по разделам Sales Board');
+nav.innerHTML='<strong>Разделы Sales Board</strong>'+groups.map(g=>'<div class="salesNavGroup" data-group="'+g.id+'"><button type="button" data-open="'+g.id+'" aria-expanded="false">'+g.label+' ▾</button><div class="salesNavChildren">'+g.items.map(i=>'<button type="button" data-focus="'+i[0]+'">'+i[1]+'</button>').join('')+'</div></div>').join('')+'<button type="button" data-focus="all">Показать все разделы</button>';
+app.insertAdjacentElement('beforebegin',nav);
+let current='metrics';const allItems=groups.flatMap(g=>g.items);
+function show(id){
+const group=groups.find(g=>g.items.some(i=>i[0]===id));
+if(id!=='all'&&!group)return;
+current=id;app.classList.toggle('salesFocusMode',id!=='all');
+const visible=new Set((allItems.find(i=>i[0]===id)||[])[2]||[]);
+children.forEach((el,index)=>{if(index>=2&&index<=13)el.classList.toggle('salesFocusHidden',id!=='all'&&!visible.has(index));});
+nav.querySelectorAll('[data-group]').forEach(g=>{const open=id==='all'||g.dataset.group===group?.id;g.classList.toggle('open',open);g.querySelector('[data-open]').setAttribute('aria-expanded',String(open))});
+nav.querySelectorAll('[data-focus]').forEach(b=>b.classList.toggle('active',b.dataset.focus===id));
+try{sessionStorage.setItem('campboxSalesFocus',id)}catch(e){}
+window.scrollTo({top:0,behavior:'instant'});
+}
+nav.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.focus)show(b.dataset.focus);else if(b.dataset.open){const g=groups.find(x=>x.id===b.dataset.open);show(g.items[0][0])}});
+let saved='metrics';try{saved=sessionStorage.getItem('campboxSalesFocus')||saved}catch(e){}
+show(saved==='all'||allItems.some(i=>i[0]===saved)?saved:'metrics');
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
 </body>
 </html>
