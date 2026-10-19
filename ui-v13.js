@@ -33,7 +33,6 @@
     closeMore();
     if(id!=='team')V.managerOpen=false;
     V.view=id;
-    if(typeof window.v13ExpandNested==='function')window.v13ExpandNested(id);
     document.querySelectorAll('.v13-screen').forEach(function(x){x.classList.toggle('active',x.id==='v13-'+id);});
     document.querySelectorAll('[data-v13-view]').forEach(function(x){x.classList.toggle('active',x.getAttribute('data-v13-view')===id);});
     var m=titleMeta(id),t=document.getElementById('v13PageTitle'),d=document.getElementById('v13PageDesc');
@@ -144,7 +143,6 @@
     if(miniGrid){miniGrid.classList.add('v13-analytics-legacy');screen('analytics').appendChild(miniGrid);}
 
     createLiveBlocks();
-    installNestedNavigation(sidebar);
 
     var oldMobile=document.getElementById('mobileBar');if(oldMobile)oldMobile.style.display='none';
     var manualFocus=document.getElementById('daySummary');if(manualFocus&&manualFocus.parentElement)manualFocus.parentElement.style.display='none';
@@ -152,39 +150,6 @@
     patchLiveFunctions();
     go('today');
     setTimeout(refresh,100);setTimeout(refresh,700);setTimeout(refresh,1800);
-  }
-
-  function installNestedNavigation(sidebar){
-    var nav=sidebar.querySelector('.v13-nav');if(!nav)return;
-    var tracked={};
-    ['today','month','funnel','contracts','team','analytics','summary','report','salary'].forEach(function(id){
-      var b=nav.querySelector('[data-v13-view="'+id+'"]'),sc=screen(id);
-      if(!b||!sc)return;
-      // Leave data-only nodes and unrecognised wrappers visible; only group actual visible sections.
-      var nodes=Array.from(sc.children).filter(function(x){return !x.classList.contains('v13-data-only')&&!x.classList.contains('hidden');});
-      if(nodes.length<2)return;
-      tracked[id]=nodes;
-      var sub=document.createElement('div');sub.className='v13-subnav';sub.dataset.section=id;
-      var all=document.createElement('button');all.type='button';all.className='v13-subnav-item active';all.textContent='Все блоки';all.dataset.subindex='all';sub.appendChild(all);
-      nodes.forEach(function(node,i){
-        var heading=node.querySelector('h2,h3'),label=heading?heading.textContent.trim():('Блок '+(i+1));
-        var btn=document.createElement('button');btn.type='button';btn.className='v13-subnav-item';
-        btn.dataset.subindex=String(i);btn.textContent=label;sub.appendChild(btn);
-      });
-      b.insertAdjacentElement('afterend',sub);
-      sub.addEventListener('click',function(e){var btn=e.target.closest('[data-subindex]');if(!btn)return;e.stopPropagation();select(id,btn.dataset.subindex);});
-    });
-    function select(id,key){
-      var nodes=tracked[id]||[],all=key==='all';
-      nodes.forEach(function(node,i){node.classList.toggle('v13-sub-hidden',!all&&i!==Number(key));});
-      var sub=nav.querySelector('.v13-subnav[data-section="'+id+'"]');
-      if(sub)sub.querySelectorAll('[data-subindex]').forEach(function(b){b.classList.toggle('active',b.dataset.subindex===key);});
-      V.subsection=V.subsection||{};V.subsection[id]=key;
-    }
-    window.v13ExpandNested=function(id){
-      nav.querySelectorAll('.v13-subnav').forEach(function(x){x.classList.toggle('open',x.dataset.section===id);});
-      if(tracked[id])select(id,(V.subsection||{})[id]||'all');
-    };
   }
 
   function createLiveBlocks(){
