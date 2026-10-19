@@ -388,7 +388,7 @@
           var save=await sb.from('daily_sales').update({comment:changed}).eq('report_date',item.date).eq('user_id',item.user_id).eq('comment',q.data.comment).select('report_date');
           if(save.error)throw save.error;
           if(!save.data||!save.data.length)throw Error('Карточка была изменена другим пользователем. Повтори после обновления.');
-          status.textContent='Номер сохранён';await loadMissingContractNumbers();
+          status.textContent='Номер сохранён';card.remove();
         }catch(err){status.textContent=err.message||'Ошибка сохранения';btn.disabled=false}
       })});
     }catch(err){root.textContent='Не удалось получить список: '+(err.message||err)}
