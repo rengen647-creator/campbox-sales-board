@@ -190,10 +190,10 @@
     if(existing.data?.finalized){S.dept=existing.data;return}
     const [ms,ds]=await Promise.all([
       sb.from('month_settings').select('min_plan').eq('month',first).maybeSingle(),
-      sb.from('daily_sales').select('connected_fact').gte('report_date',first).lt('report_date',next)
+      sb.from('salary_contracts').select('id').gte('signed_date',first).lt('signed_date',next).neq('status','terminated')
     ]);
     if(ms.error||ds.error)return;
-    const target=Number(ms.data?.min_plan||0),actual=(ds.data||[]).reduce((a,r)=>a+Number(r.connected_fact||0),0);
+    const target=Number(ms.data?.min_plan||0),actual=(ds.data||[]).length;
     const pct=target?Math.round(actual/target*10000)/100:0,rate=contractorRate(pct),finalized=S.month<currentMonth();
     const row={month:first,target_plan:target,actual_sales:actual,completion_pct:pct,contractor_rate:rate,finalized,updated_by:currentUser?.id||null,updated_at:new Date().toISOString()};
     const old=existing.data;
