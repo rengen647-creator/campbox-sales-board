@@ -976,11 +976,11 @@ const groups=[
 ];
 function start(){
 const app=document.getElementById('mainApp');if(!app)return;
-const children=[...app.children];const targets=children.slice(2,14);
-if(targets.length!==12)return;
+const children=[...app.children];
+if(children.length<14)return;
 const nav=document.createElement('aside');nav.id='salesFocusNav';nav.setAttribute('aria-label','Навигация по разделам Sales Board');
 nav.innerHTML='<strong>Разделы Sales Board</strong>'+groups.map(g=>'<div class="salesNavGroup" data-group="'+g.id+'"><button type="button" data-open="'+g.id+'" aria-expanded="false">'+g.label+' ▾</button><div class="salesNavChildren">'+g.items.map(i=>'<button type="button" data-focus="'+i[0]+'">'+i[1]+'</button>').join('')+'</div></div>').join('')+'<button type="button" data-focus="all">Показать все разделы</button>';
-app.insertAdjacentElement('beforebegin',nav);
+app.children[0].insertAdjacentElement('afterend',nav);
 let current='metrics';const allItems=groups.flatMap(g=>g.items);
 function show(id){
 const group=groups.find(g=>g.items.some(i=>i[0]===id));
@@ -991,7 +991,7 @@ children.forEach((el,index)=>{if(index>=2&&index<=13)el.classList.toggle('salesF
 nav.querySelectorAll('[data-group]').forEach(g=>{const open=id==='all'||g.dataset.group===group?.id;g.classList.toggle('open',open);g.querySelector('[data-open]').setAttribute('aria-expanded',String(open))});
 nav.querySelectorAll('[data-focus]').forEach(b=>b.classList.toggle('active',b.dataset.focus===id));
 try{sessionStorage.setItem('campboxSalesFocus',id)}catch(e){}
-window.scrollTo({top:0,behavior:'instant'});
+if(!app.classList.contains('hidden'))app.scrollIntoView({block:'start'});
 }
 nav.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.focus)show(b.dataset.focus);else if(b.dataset.open){const g=groups.find(x=>x.id===b.dataset.open);show(g.items[0][0])}});
 let saved='metrics';try{saved=sessionStorage.getItem('campboxSalesFocus')||saved}catch(e){}
