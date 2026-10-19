@@ -642,6 +642,26 @@
     S.clientView='active';alert('Новый договор создан. История старого договора сохранена в архиве. Первые оплаты направлений сброшены и начнут новый 12-месячный период.');await load();
   }
 
+  async function loadExecutiveSummary(){
+    const el=q('salaryExecutiveSummary');if(!el||!manager())return;
+    const month=S.month+'-01';
+    const {data,error}=await sb.rpc('campbox_executive_summary',{p_month:month});
+    if(!el.isConnected)return;
+    if(error||!data){el.textContent='Межкомандная сводка недоступна: '+(error?.message||'Нет доступа или данных');return;}
+    const tiles=[
+      ['Подписано договоров',data.signed_contracts,'Договоры с фактической датой в месяце'],
+      ['Запущено лагерей',data.launched_camps,'Уникальные лагеря со статусом «Запущена» и датой в месяце'],
+      ['Подтверждённых платежей',data.confirmed_payment_count,'Зарегистрированные подтверждённые поступления'],
+      ['Сумма подтверждённых поступлений',money(Number(data.confirmed_payment_amount||0)),'По данным зарплатного модуля'],
+      ['Задач внедрения в работе',data.open_onboarding_tasks,'Все открытые задачи, независимо от месяца'],
+      ['Лагерей без назначенного КСМ',data.csm_clients_at_risk,'Организационный риск, не оценка здоровья клиента']
+    ];
+    el.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>CampBox · единая управленческая сводка</h2><p>Подписание ≠ запуск ≠ подтверждённое поступление. Все показатели независимы.</p></div><button class="btn" type="button" id="salaryExecRefresh">Обновить</button></div><div class="salary-body"><div class="salary-kpis">'+
+      tiles.map(([label,value,note])=>'<div class="salary-kpi"><span>'+esc(label)+'</span><b>'+esc(String(value??0))+'</b><small>'+esc(note)+'</small></div>').join('')+
+      '</div></div></div>';
+    q('salaryExecRefresh')?.addEventListener('click',loadExecutiveSummary);
+  }
+
   async function loadQualityDashboard(){
     const el=q('salaryQualityDashboard');if(!el||!manager())return;
     const results=await Promise.all([
@@ -675,11 +695,11 @@
     const box=q('salaryTeam');if(!box||!manager())return;
     const active=(typeof profiles!=='undefined'?profiles:[]).filter(p=>p.active!==false),rows=active.map(p=>({p,rows:salaryFor(p.id)}));
     const all=rows.reduce((a,x)=>a+totals(x.rows).total,0),contractSum=rows.reduce((a,x)=>a+totals(x.rows).contract,0),comm=rows.reduce((a,x)=>a+totals(x.rows).campbox,0),head=rows.reduce((a,x)=>a+totals(x.rows).head,0);
-    box.innerHTML='<div id="salaryQualityDashboard">Загрузка контроля данных…</div>'+ '<div class="salary-card"><div class="salary-head"><div><h2>Команда · '+esc(monthName(S.month))+'</h2><p>ФОТ и расчёты с учётом пауз и повторных договоров.</p></div>'+monthControl('salaryTeamMonth')+'</div><div class="salary-body">'+
+    box.innerHTML='<div id="salaryExecutiveSummary">Загрузка межкомандной сводки…</div>'+ '<div id="salaryQualityDashboard">Загрузка контроля данных…</div>'+ '<div class="salary-card"><div class="salary-head"><div><h2>Команда · '+esc(monthName(S.month))+'</h2><p>ФОТ и расчёты с учётом пауз и повторных договоров.</p></div>'+monthControl('salaryTeamMonth')+'</div><div class="salary-body">'+
       '<div class="salary-kpis"><div class="salary-kpi good"><span>ФОТ продаж</span><b>'+money(all)+'</b></div><div class="salary-kpi"><span>Контракторство</span><b>'+money(contractSum)+'</b></div><div class="salary-kpi good"><span>CampBox</span><b>'+money(comm)+'</b></div><div class="salary-kpi"><span>Сотрудников</span><b>'+rows.length+'</b></div><div class="salary-kpi warn"><span>1% руководителю</span><b>'+money(head)+'</b></div></div>'+
       '<div class="salary-card"><div class="salary-head"><div><h2>Контрактинг по сотрудникам</h2><p>Количество договоров и фиксированное начисление по каждому менеджеру.</p></div></div><div class="salary-body"><div class="salary-team-cards">'+rows.map(x=>{const k=contractingSummary(x.p.id);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+k.count+' договоров · '+money(k.total)+'</div><small>Ставка '+money(k.rate)+'</small>'+k.items.map(z=>'<div class="salary-breakdown"><div><span>'+esc(z.name)+'</span><b>'+money(z.amount)+'</b></div></div>').join('')+'</div>'}).join('')+'</div></div></div>'+ 
       '<div class="salary-team-cards">'+rows.map(x=>{const t=totals(x.rows);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+money(t.total)+'</div><small>'+x.rows.length+' начислений</small><div class="salary-breakdown"><div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Остальное</span><b>'+money(t.products+t.site+t.head)+'</b></div></div></div>'}).join('')+'</div>'+
-    '</div></div>';bindMonth('salaryTeamMonth');loadQualityDashboard();
+    '</div></div>';bindMonth('salaryTeamMonth');loadQualityDashboard();loadExecutiveSummary();
   }
 
   function rule(name,desc,formula,badge){return '<div class="salary-rule"><div><b>'+esc(name)+'</b><small>'+esc(desc)+'</small></div><code>'+esc(formula)+'</code><span class="salary-pill blue">'+esc(badge)+'</span></div>'}
