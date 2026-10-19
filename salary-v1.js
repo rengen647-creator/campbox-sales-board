@@ -643,20 +643,31 @@
   }
 
   async function loadQualityDashboard(){
-    const el=q('salaryQualityDashboard');
-    if(!el||!manager())return;
-    const {data,error}=await sb.rpc('campbox_quality_counts');
+    const el=q('salaryQualityDashboard');if(!el||!manager())return;
+    const results=await Promise.all([
+      sb.rpc('campbox_quality_counts'),
+      sb.from('salary_contracts').select('id,client_id,contract_number,signed_date,status').eq('status','active'),
+      sb.from('salary_clients').select('id,client_name'),
+      sb.from('csm_camps').select('id,name,contract_number,responsible_id,active').eq('active',true),
+      sb.from('sales_handoff_statuses').select('contract_key,state,reason').eq('state','conflict')
+    ]);
     if(!el.isConnected)return;
-    if(error||!data){el.textContent='Контроль данных временно недоступен: '+(error?.message||'Нет данных');return;}
-    const fields=[
-      ['Договоры без номера',data.missing_contract_numbers],
-      ['Лагеря КСМ без номера',data.missing_csm_numbers],
-      ['КСМ не назначен',data.unassigned_csm],
-      ['Конфликты передачи',data.handoff_conflicts]
+    const bad=results.find(x=>x.error);
+    if(bad){el.textContent='Диагностика недоступна: '+bad.error.message;return}
+    const d=results[0].data||{},contracts=results[1].data||[],clients=results[2].data||[],camps=results[3].data||[],handoffs=results[4].data||[];
+    const names=new Map(clients.map(c=>[c.id,c.client_name]));
+    const problems=[
+      ...contracts.filter(c=>!String(c.contract_number||'').trim()).map(c=>({kind:'Договор без номера',name:names.get(c.client_id)||c.client_id,detail:c.signed_date||'Дата не указана'})),
+      ...camps.filter(c=>!String(c.contract_number||'').trim()).map(c=>({kind:'КСМ без номера договора',name:c.name,detail:'Заполнить в карточке КСМ'})),
+      ...camps.filter(c=>!c.responsible_id).map(c=>({kind:'КСМ не назначен',name:c.name,detail:'Назначить ответственного'})),
+      ...handoffs.map(c=>({kind:'Конфликт передачи',name:c.contract_key,detail:c.reason||'Требуется сверка'}))
     ];
-    el.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Контроль данных Sales ↔ КСМ</h2><p>Проблемы учёта в реальном времени. Проверка доступна только руководителю.</p></div><button class="btn" type="button" id="salaryQualityRefresh">Перепроверить</button></div><div class="salary-body"><div class="salary-kpis">'+
-      fields.map(([name,count])=>'<div class="salary-kpi"><span>'+esc(name)+'</span><b>'+Number(count||0)+'</b></div>').join('')+
-      '</div><p class="sub">Количество карточек и договоров не должно автоматически выравниваться: несколько договорных циклов у одного клиента допустимы. Дубли не удаляются автоматически.</p></div></div>';
+    const fields=[['Договоры без номера',d.missing_contract_numbers],['КСМ без номера',d.missing_csm_numbers],['КСМ не назначен',d.unassigned_csm],['Конфликты передачи',d.handoff_conflicts]];
+    el.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Контроль данных Sales ↔ КСМ</h2><p>Список отклонений; без автоматического удаления и объединения клиентов.</p></div><button class="btn" type="button" id="salaryQualityRefresh">Перепроверить</button></div><div class="salary-body"><div class="salary-kpis">'+
+      fields.map(([name,n])=>'<div class="salary-kpi"><span>'+esc(name)+'</span><b>'+Number(n||0)+'</b></div>').join('')+'</div>'+
+      '<details><summary>Показать проблемные карточки ('+problems.length+')</summary><div class="salary-table-wrap"><table class="salary-table"><thead><tr><th>Проблема</th><th>Лагерь / договор</th><th>Следующее действие</th></tr></thead><tbody>'+
+      problems.slice(0,500).map(p=>'<tr><td>'+esc(p.kind)+'</td><td>'+esc(p.name)+'</td><td>'+esc(p.detail)+'</td></tr>').join('')+
+      '</tbody></table></div></details></div></div>';
     q('salaryQualityRefresh')?.addEventListener('click',loadQualityDashboard);
   }
 
