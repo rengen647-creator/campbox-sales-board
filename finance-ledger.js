@@ -46,7 +46,7 @@ async function load(){
  var selected=$('finManager').value;
  $('finManager').innerHTML='<option value="all">Все менеджеры</option>'+[...new Set(state.contracts.map(c=>c.contractor_id).filter(Boolean))].map(id=>'<option value="'+esc(id)+'">'+esc(managerName(id))+'</option>').join('');
  $('finManager').value=[...$('finManager').options].some(o=>o.value===selected)?selected:'all';
- note('Данные обновлены. Начисление — план, поступление — подтверждённый факт.');
+ note('Начисление — план, поступление — подтверждённый факт. Разница справочная: без распределения оплаты по начислениям это НЕ бухгалтерская задолженность.');
  render();
  }catch(e){note('Не удалось открыть финансы: '+(e.message||e)+'. Если таблица начислений отсутствует, сначала нужна миграция базы.',true)}
  finally{state.busy=false;}
@@ -59,8 +59,8 @@ function render(){
  if(!$('finRows'))return;
  var rows=filtered(),planned=rows.reduce((s,x)=>s+n(x.amount),0),paid=rows.reduce((s,x)=>s+receipts(x.contract_id),0);
  // Receipt totals are month-based, while remaining represents the due month's unpaid portion.
- var outstanding=Math.max(0,planned-paid);
- var stats=[['Начислено',planned],['Получено по этим договорам',paid],['Остаток за месяц',outstanding]];
+ var outstanding=Math.max(0,planned-paid); // Справочная разница: поступления этого месяца могут относиться к предыдущим начислениям.
+ var stats=[['Начислено за месяц',planned],['Поступило за месяц',paid],['Разница (справочно)',outstanding]];
  $('finStats').innerHTML=stats.map(x=>'<div class="card pad"><div class="kpi-label">'+x[0]+'</div><div class="kpi-value" style="font-size:24px">'+money(x[1])+'</div></div>').join('')+'<div class="card pad"><div class="kpi-label">Собираемость</div><div class="kpi-value" style="font-size:24px">'+(planned?Math.round(paid/planned*100):0)+'%</div></div>';
  $('finRows').innerHTML=rows.map(c=>{var sc=contract(c.contract_id),got=receipts(c.contract_id),rem=Math.max(0,n(c.amount)-got);
  return '<tr><td><b>'+esc(client(sc?.client_id))+'</b><div style="font-size:11px;color:var(--muted)">'+esc(sc?.contract_number||sc?.signed_date||'Договор')+'</div></td><td>'+esc(managerName(sc?.contractor_id))+'</td><td>'+money(c.amount)+'</td><td>'+money(got)+'</td><td style="color:'+(rem?'#ffc880':'#8be6bb')+'">'+money(rem)+'</td><td>'+esc(c.due_date||'—')+'</td><td><button class="btn" data-charge="'+esc(c.id)+'">Изменить</button></td></tr>';
@@ -99,7 +99,7 @@ async function editPayment(){
  };
 }
 function exportCsv(){
- var lines=[['Месяц','Лагерь','Менеджер','Начислено','Получено','Остаток','Дата оплаты','Комментарий']];
+ var lines=[['Месяц','Лагерь','Менеджер','Начислено','Поступило за месяц','Разница справочно','Дата оплаты','Комментарий']];
  filtered().forEach(x=>{var sc=contract(x.contract_id),got=receipts(x.contract_id);lines.push([state.month,client(sc?.client_id),managerName(sc?.contractor_id),x.amount,got,Math.max(0,n(x.amount)-got),x.due_date||'',x.note||''])});
  var csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
  var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=url;a.download='CampBox_Финансы_'+state.month+'.csv';a.click();URL.revokeObjectURL(url);
