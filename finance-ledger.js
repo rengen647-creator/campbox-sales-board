@@ -34,14 +34,15 @@ async function load(){
  if(state.busy)return;section();state.busy=true;note('Загрузка…');
  try{
  var m=$('finMonth').value||month(),begin=first(m),end=next(m);
+ async function allPayments(){var out=[],offset=0,limit=1000;for(;;){var page=await sb.from('salary_payments').select('id,contract_id,client_id,payment_date,product_type,amount,status,event_type,comment').lt('payment_date',end).order('id',{ascending:true}).range(offset,offset+limit-1);if(page.error)throw page.error;out.push(...(page.data||[]));if((page.data||[]).length<limit)break;offset+=limit;}return out;}
  var queries=await Promise.all([
   sb.from('salary_clients').select('id,client_name'),
   sb.from('salary_contracts').select('id,client_id,contractor_id,signed_date,status'),
   sb.from('sales_finance_charges').select('*').eq('month',begin),
-  sb.from('salary_payments').select('id,contract_id,client_id,payment_date,product_type,amount,status,event_type,comment').lte('payment_date',end)
+  allPayments()
  ]);
- for(var r of queries)if(r.error)throw r.error;
- state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.payments=(queries[3].data||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
+ for(var r of queries)if(r&&r.error)throw r.error;
+ state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.payments=(queries[3]||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
  state.month=m;
  var selected=$('finManager').value;
  $('finManager').innerHTML='<option value="all">Все менеджеры</option>'+[...new Set(state.contracts.map(c=>c.contractor_id).filter(Boolean))].map(id=>'<option value="'+esc(id)+'">'+esc(managerName(id))+'</option>').join('');
