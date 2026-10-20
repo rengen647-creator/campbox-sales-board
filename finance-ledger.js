@@ -1,7 +1,10 @@
 /* CampBox Finance: managerial commission ledger linked to Salary contracts / receipts. */
 (function(){
 'use strict';
-var state={clients:[],contracts:[],charges:[],payments:[],busy:false,month:''};
+var state={clients:[],contracts:[],charges:[],payments:[],busy:false,month:'',tab:'summary'};
+var productNames={campbox:'Комиссия CampBox',order_management:'МУЗ',comfort_booking:'КБ',site:'Сайт',maps:'Карты',site_support:'Поддержка сайта'};
+var productOptions=()=>[['campbox','Комиссия CampBox'],['order_management','МУЗ'],['comfort_booking','КБ'],['site','Сайт']].map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
+function switchTab(tab){state.tab=tab;var rank=$('finPanel-summary-ranking');if(rank)rank.hidden=tab!=='summary';['summary','charges','payments'].forEach(id=>{var el=$('finPanel-'+id),b=$('finTab-'+id);if(el)el.hidden=id!==tab;if(b){b.classList.toggle('primary',id===tab);b.setAttribute('aria-selected',String(id===tab));}})}
 var $=id=>document.getElementById(id);
 var esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 var money=v=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(Number(v)||0);
@@ -15,11 +18,13 @@ function section(){
  var root=$('v13-finance');if(!root)return null;
  if(root.dataset.ready)return root;root.dataset.ready='1';
  root.innerHTML='<section class="card pad" style="margin-bottom:14px"><h2>Финансы лагерей · комиссии CampBox</h2><p style="color:var(--muted)">Начисления за выбранный месяц и все подтверждённые поступления клиента с начала учёта.</p><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div><label>Месяц</label><input type="month" id="finMonth"></div><div><label>Менеджер</label><select id="finManager"><option value="all">Все менеджеры</option></select></div><button class="btn" id="finReload">Обновить</button><button class="btn" id="finExport">Excel / CSV</button></div><div id="finMessage" style="margin-top:12px" role="status"></div></section>'+
- '<div id="finStats" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px"></div>'+
- '<section class="card pad"><div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><h2>Комиссии по лагерям</h2><p style="color:var(--muted)">Каждый лагерь показывает текущий месяц и накопленный итог.</p></div><button class="btn primary" id="finAdd">+ Начисление</button></div><div class="table-wrap" style="margin-top:12px"><table style="min-width:900px"><thead><tr><th>Лагерь / договор</th><th>Менеджер</th><th>Начислено за месяц</th><th>Оплачено за месяц</th><th>Принёс всего</th><th>Оплатить до</th><th></th></tr></thead><tbody id="finRows"></tbody></table></div></section>'+
- '<section class="card pad" style="margin-top:14px"><h2>Эффективность продаж по деньгам</h2><p style="color:var(--muted)">Рейтинг по начисленной комиссии, без смешения качества продажи со сроками оплаты.</p><div id="finRanking"></div></section>'+
- '<section class="card pad" style="margin-top:14px"><h2>Фактические платежи</h2><p style="color:var(--muted)">Новая оплата появится также в зарплатном модуле. Указывай продукт и договор, чтобы исключить двойной учёт.</p><button class="btn" id="finPayAdd">+ Зафиксировать поступление</button><div id="finPayments" style="margin-top:12px"></div></section>';
+ '<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px" role="tablist" aria-label="Разделы финансов"><button class="btn" id="finTab-summary" role="tab">Сводка</button><button class="btn" id="finTab-charges" role="tab">Начисления</button><button class="btn" id="finTab-payments" role="tab">Поступления</button></div><div id="finPanel-summary"><div id="finStats" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px"></div>'+
+ '</div><div id="finPanel-charges" hidden><section class="card pad"><div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><h2>Начисления по лагерям</h2><p style="color:var(--muted)">Каждый лагерь показывает текущий месяц и накопленный итог.</p></div><button class="btn primary" id="finAdd">+ Начисление</button></div><div class="table-wrap" style="margin-top:12px"><table style="min-width:900px"><thead><tr><th>Лагерь / договор</th><th>Менеджер</th><th>Направление</th><th>Начислено</th><th>Оплачено за месяц</th><th>Оплатить до</th><th></th></tr></thead><tbody id="finRows"></tbody></table></div></section>'+
+ '</div><div id="finPanel-summary-ranking"><section class="card pad" style="margin-top:14px"><h2>Эффективность продаж по деньгам</h2><p style="color:var(--muted)">Рейтинг по начисленной комиссии, без смешения качества продажи со сроками оплаты.</p><div id="finRanking"></div></section>'+
+ '</div><div id="finPanel-payments" hidden><section class="card pad"><h2>Фактические поступления</h2><p style="color:var(--muted)">Новая оплата появится также в зарплатном модуле. Указывай продукт и договор, чтобы исключить двойной учёт.</p><button class="btn" id="finPayAdd">+ Зафиксировать поступление</button><div id="finPayments" style="margin-top:12px"></div></section>';
  $('finMonth').value=month();
+ ['summary','charges','payments'].forEach(x=>{$('finTab-'+x).onclick=()=>switchTab(x)});
+ switchTab(state.tab);
  $('finMonth').onchange=load;
  $('finManager').onchange=render;
  $('finReload').onclick=load;
@@ -66,17 +71,18 @@ function render(){
  var allPaid=state.payments.filter(p=>contractSet.has(p.contract_id)).reduce((s,p)=>s+n(p.amount),0);
  var stats=[['Начислено в месяце',planned],['Поступило в месяце',monthPaid],['Получено всего',allPaid]];
  $('finStats').innerHTML=stats.map(x=>'<div class="card pad"><div class="kpi-label">'+x[0]+'</div><div class="kpi-value" style="font-size:24px">'+money(x[1])+'</div></div>').join('');
- var chargeMap=new Map(rows.map(c=>[c.contract_id,c]));
+ var chargeMap=new Map();rows.forEach(c=>{var key=c.contract_id+'|'+c.product_type;chargeMap.set(key,c)});
  var contractRows=state.contracts.filter(c=>contractSet.has(c.id));
- $('finRows').innerHTML=contractRows.map(sc=>{
- var c=chargeMap.get(sc.id),got=receipts(sc.id),lifetime=allClientReceipts(sc.client_id);
- return '<tr><td><b>'+esc(client(sc.client_id))+'</b><div style="font-size:11px;color:var(--muted)">'+esc(sc.contract_number||sc.signed_date||'Договор')+'</div></td><td>'+esc(managerName(sc.contractor_id))+'</td><td>'+money(c?.amount||0)+'</td><td>'+money(got)+'</td><td><b>'+money(lifetime)+'</b></td><td>'+esc(c?.due_date||'—')+'</td><td><button class="btn" data-charge="'+esc(c?.id||'')+'" data-contract="'+esc(sc.id)+'">'+(c?'Изменить':'Начислить')+'</button></td></tr>';
+ $('finRows').innerHTML=contractRows.flatMap(sc=>{
+ var own=rows.filter(c=>c.contract_id===sc.id);
+ if(!own.length)return ['<tr><td><b>'+esc(client(sc.client_id))+'</b></td><td>'+esc(managerName(sc.contractor_id))+'</td><td colspan="4">Начислений нет</td><td><button class="btn" data-contract="'+esc(sc.id)+'">+ Начислить</button></td></tr>'];
+ return own.map(c=>'<tr><td><b>'+esc(client(sc.client_id))+'</b></td><td>'+esc(managerName(sc.contractor_id))+'</td><td>'+esc(productNames[c.product_type]||c.product_type)+'</td><td>'+money(c.amount)+'</td><td>'+money(state.payments.filter(p=>p.contract_id===sc.id&&p.product_type===c.product_type&&p.payment_date>=first(state.month)).reduce((z,p)=>z+n(p.amount),0))+'</td><td>'+esc(c.due_date||'—')+'</td><td><button class="btn" data-charge="'+esc(c.id)+'" data-contract="'+esc(sc.id)+'">Изменить</button></td></tr>');
  }).join('')||'<tr><td colspan="7">Нет договоров. Добавь лагерь в разделе «Зарплата».</td></tr>';
  $('finRows').querySelectorAll('[data-contract]').forEach(b=>b.onclick=()=>editCharge(state.charges.find(x=>x.id===b.dataset.charge),b.dataset.contract));
- var groups=new Map();contractRows.forEach(c=>{var id=c.contractor_id||'none';var g=groups.get(id)||{amount:0,paid:0,clients:new Set()};g.amount+=n(chargeMap.get(c.id)?.amount);g.paid+=receipts(c.id);g.clients.add(c.client_id);groups.set(id,g)});
+ var groups=new Map();contractRows.forEach(c=>{var id=c.contractor_id||'none';var g=groups.get(id)||{amount:0,paid:0,clients:new Set()};g.amount+=rows.filter(ch=>ch.contract_id===c.id).reduce((sum,ch)=>sum+n(ch.amount),0);g.paid+=receipts(c.id);g.clients.add(c.client_id);groups.set(id,g)});
  $('finRanking').innerHTML='<div class="table-wrap"><table style="min-width:540px"><thead><tr><th>Менеджер</th><th>Лагерей</th><th>Начислено за месяц</th><th>Получено за месяц</th><th>Средняя комиссия</th></tr></thead><tbody>'+[...groups].sort((a,b)=>b[1].amount-a[1].amount).map(([id,g])=>'<tr><td>'+esc(managerName(id))+'</td><td>'+g.clients.size+'</td><td>'+money(g.amount)+'</td><td>'+money(g.paid)+'</td><td>'+money(g.clients.size?g.amount/g.clients.size:0)+'</td></tr>').join('')+'</tbody></table></div>';
  var pay=state.payments.filter(p=>p.payment_date>=first(state.month)&&p.payment_date<next(state.month)&&contractSet.has(p.contract_id));
- $('finPayments').innerHTML=pay.map(p=>'<div style="padding:8px 0;border-bottom:1px solid var(--line)">'+esc(p.payment_date)+' · '+esc(client(p.client_id))+' · '+money(p.amount)+' · '+esc(p.product_type)+'</div>').join('')||'Подтверждённых поступлений за месяц нет.';
+ $('finPayments').innerHTML=pay.map(p=>'<div style="padding:8px 0;border-bottom:1px solid var(--line)">'+esc(p.payment_date)+' · '+esc(client(p.client_id))+' · '+money(p.amount)+' · '+esc(productNames[p.product_type]||p.product_type)+'</div>').join('')||'Подтверждённых поступлений за месяц нет.';
 }
 function picker(existing){
  var options=state.contracts.map(c=>'<option value="'+esc(c.id)+'" '+(existing?.contract_id===c.id?'selected':'')+'>'+esc(client(c.client_id))+' · '+esc(managerName(c.contractor_id))+' · '+esc(c.signed_date||'без даты')+'</option>').join('');
@@ -84,18 +90,19 @@ function picker(existing){
 }
 async function editCharge(item,preferredContract){
  if(!state.contracts.length){alert('Сначала добавь клиента и договор в разделе «Зарплата».');return;}
- var form=document.createElement('div');form.className='modal-backdrop';form.innerHTML='<div class="modal" style="max-width:560px"><h3>'+(item?'Изменить начисление':'Новое начисление')+'</h3><label>Договор</label><select id="fcContract" '+(item?'disabled':'')+'>'+picker(item)+'</select><label>Комиссия, ₽</label><input type="number" id="fcAmount" min="0" step=".01" value="'+esc(item?.amount||0)+'"><label>Оплатить до</label><input type="date" id="fcDue" value="'+esc(item?.due_date||'')+'"><label>Примечание</label><input id="fcNote" value="'+esc(item?.note||'')+'"><div class="modal-actions"><button class="btn" id="fcClose">Отмена</button><button class="btn primary" id="fcSave">Сохранить</button></div><div id="fcError" role="alert"></div></div>';document.body.appendChild(form);
+ var form=document.createElement('div');form.className='modal-backdrop';form.innerHTML='<div class="modal" style="max-width:560px"><h3>'+(item?'Изменить начисление':'Новое начисление')+'</h3><label>Договор</label><select id="fcContract" '+(item?'disabled':'')+'>'+picker(item||{contract_id:preferredContract})+'</select><label>За что начисление</label><select id="fcProduct">'+productOptions()+'</select><label>Сумма начисления, ₽</label><input type="number" id="fcAmount" min="0" step=".01" value="'+esc(item?.amount||0)+'"><label>Оплатить до</label><input type="date" id="fcDue" value="'+esc(item?.due_date||'')+'"><label>Примечание</label><input id="fcNote" value="'+esc(item?.note||'')+'"><div class="modal-actions"><button class="btn" id="fcClose">Отмена</button><button class="btn primary" id="fcSave">Сохранить</button></div><div id="fcError" role="alert"></div></div>';document.body.appendChild(form);
+ form.querySelector('#fcProduct').value=item?.product_type||'campbox';
  form.querySelector('#fcClose').onclick=()=>form.remove();
  form.querySelector('#fcSave').onclick=async()=>{
  var val=Number(form.querySelector('#fcAmount').value);if(!Number.isFinite(val)||val<0){form.querySelector('#fcError').textContent='Укажи корректную сумму';return}
- var payload={contract_id:item?.contract_id||form.querySelector('#fcContract').value,month:first(state.month),amount:val,due_date:form.querySelector('#fcDue').value||null,note:form.querySelector('#fcNote').value,updated_at:new Date().toISOString()};
+ var payload={contract_id:item?.contract_id||form.querySelector('#fcContract').value,product_type:form.querySelector('#fcProduct').value,month:first(state.month),amount:val,due_date:form.querySelector('#fcDue').value||null,note:form.querySelector('#fcNote').value,updated_at:new Date().toISOString()};
  var result=item?await sb.from('sales_finance_charges').update(payload).eq('id',item.id):await sb.from('sales_finance_charges').insert({...payload,created_by:currentUser.id});
  if(result.error){form.querySelector('#fcError').textContent=result.error.message;return;}form.remove();await load();
  };
 }
 async function editPayment(){
  if(!state.contracts.length){alert('Нет договоров для привязки оплаты.');return;}
- var form=document.createElement('div');form.className='modal-backdrop';form.innerHTML='<div class="modal" style="max-width:560px"><h3>Зафиксировать оплату</h3><p style="color:var(--muted)">Запись попадёт в реестр поступлений и в расчёт зарплаты.</p><label>Договор</label><select id="fpContract">'+picker()+'</select><label>Продукт</label><select id="fpProduct"><option value="campbox">CampBox</option><option value="order_management">Управление заказами</option><option value="comfort_booking">Комфортное бронирование</option><option value="maps">Карты</option><option value="site">Сайт</option><option value="site_support">Поддержка сайта</option></select><label>Дата оплаты</label><input type="date" id="fpDate" value="'+new Date().toISOString().slice(0,10)+'"><label>Сумма, ₽</label><input type="number" id="fpAmount" min="0.01" step=".01"><label>Комментарий / платёжный идентификатор</label><input id="fpNote" placeholder="Для проверки дублей"><div class="modal-actions"><button class="btn" id="fpCancel">Отмена</button><button class="btn primary" id="fpSave">Записать поступление</button></div><div id="fpError" role="alert"></div></div>';document.body.appendChild(form);
+ var form=document.createElement('div');form.className='modal-backdrop';form.innerHTML='<div class="modal" style="max-width:560px"><h3>Зафиксировать оплату</h3><p style="color:var(--muted)">Запись попадёт в реестр поступлений и в расчёт зарплаты.</p><label>Договор</label><select id="fpContract">'+picker()+'</select><label>Продукт</label><select id="fpProduct"><option value="campbox">Комиссия CampBox</option><option value="order_management">МУЗ</option><option value="comfort_booking">КБ</option><option value="site">Сайт</option></select><label>Дата оплаты</label><input type="date" id="fpDate" value="'+new Date().toISOString().slice(0,10)+'"><label>Сумма, ₽</label><input type="number" id="fpAmount" min="0.01" step=".01"><label>Комментарий / платёжный идентификатор</label><input id="fpNote" placeholder="Для проверки дублей"><div class="modal-actions"><button class="btn" id="fpCancel">Отмена</button><button class="btn primary" id="fpSave">Записать поступление</button></div><div id="fpError" role="alert"></div></div>';document.body.appendChild(form);
  form.querySelector('#fpCancel').onclick=()=>form.remove();
  form.querySelector('#fpSave').onclick=async()=>{
  var id=form.querySelector('#fpContract').value,sc=contract(id),amount=Number(form.querySelector('#fpAmount').value),date=form.querySelector('#fpDate').value;
@@ -106,8 +113,8 @@ async function editPayment(){
  };
 }
 function exportCsv(){
- var lines=[['Месяц','Лагерь','Менеджер','Начислено','Оплачено в месяце','Получено всего','Дата оплаты','Комментарий']];
- filtered().forEach(x=>{var sc=contract(x.contract_id),got=receipts(x.contract_id);lines.push([state.month,client(sc?.client_id),managerName(sc?.contractor_id),x.amount,got,allClientReceipts(sc?.client_id),x.due_date||'',x.note||''])});
+ var lines=[['Месяц','Лагерь','Менеджер','Направление','Начислено','Оплачено в месяце','Получено всего','Дата оплаты','Комментарий']];
+ filtered().forEach(x=>{var sc=contract(x.contract_id),got=receipts(x.contract_id);lines.push([state.month,client(sc?.client_id),managerName(sc?.contractor_id),productNames[x.product_type]||x.product_type,x.amount,got,allClientReceipts(sc?.client_id),x.due_date||'',x.note||''])});
  var csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
  var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=url;a.download='CampBox_Финансы_'+state.month+'.csv';a.click();URL.revokeObjectURL(url);
 }
