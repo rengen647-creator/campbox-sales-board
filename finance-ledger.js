@@ -36,7 +36,7 @@ async function load(){
  var m=$('finMonth').value||month(),begin=first(m),end=next(m);
  var queries=await Promise.all([
   sb.from('salary_clients').select('id,client_name'),
-  sb.from('salary_contracts').select('id,client_id,contractor_id,contract_number,signed_date,status'),
+  sb.from('salary_contracts').select('id,client_id,contractor_id,signed_date,status'),
   sb.from('sales_finance_charges').select('*').eq('month',begin),
   sb.from('salary_payments').select('id,contract_id,client_id,payment_date,product_type,amount,status,event_type,comment').gte('payment_date',begin).lt('payment_date',end)
  ]);
