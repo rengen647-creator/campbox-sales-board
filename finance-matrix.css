@@ -1,0 +1,45 @@
+/* CampBox finance / client receipts matrix, scoped to avoid changing other boards. */
+.fin-matrix-card{margin-top:14px;min-width:0;overflow:hidden}
+.fin-matrix-intro{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.fin-matrix-intro h2{margin:0 0 6px;font-size:17px}
+.fin-matrix-intro p,.fin-matrix-note{font-size:12px;line-height:1.55;color:var(--muted);margin:0}
+.fin-matrix-controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:14px 0 10px}
+.fin-matrix-controls label{width:min(290px,100%);margin:0}
+.fin-matrix-controls label:nth-child(2){width:min(310px,100%)}
+.fin-matrix-controls input,.fin-matrix-controls select{margin-top:5px;min-height:42px}
+#finMatrixStatus{color:var(--muted);font-size:12px;padding-bottom:11px}
+.fin-matrix-scroll{overflow:auto;max-height:530px;min-width:0;border:1px solid var(--line);border-radius:12px;background:#0e192e;scrollbar-width:thin;scrollbar-color:#435979 #0e192e}
+.fin-matrix-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fin-matrix-table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
+.fin-matrix-table th,.fin-matrix-table td{white-space:nowrap;border-bottom:1px solid rgba(85,110,155,.17);border-right:1px solid rgba(85,110,155,.12);padding:9px 10px;text-align:right;min-width:107px;font-variant-numeric:tabular-nums}
+.fin-matrix-table thead th{position:sticky;top:0;z-index:3;background:#20314e;color:#d2e2fa;font-weight:750;font-size:11px}
+.fin-matrix-table tbody tr:hover td,.fin-matrix-table tbody tr:hover th{background-color:#1c2b46}
+.fin-matrix-table .fin-col-name{position:sticky;left:0;min-width:225px;width:225px;max-width:225px;text-align:left;z-index:2;background:#15243e;overflow:hidden;text-overflow:ellipsis}
+.fin-matrix-table .fin-col-total{position:sticky;left:225px;min-width:144px;width:144px;background:#172a43;font-weight:800;color:#d8edff;z-index:2}
+.fin-matrix-table .fin-col-period{min-width:116px;background:rgba(71,200,255,.035);font-weight:700}
+.fin-matrix-table thead .fin-col-name,.fin-matrix-table thead .fin-col-total{z-index:5;background:#20314e}
+.fin-matrix-table tfoot th,.fin-matrix-table tfoot td{font-weight:800;color:#e3ecff;background:#223453;border-top:1px solid #4d658d}
+.fin-matrix-table tfoot .fin-col-name,.fin-matrix-table tfoot .fin-col-total{background:#223453;z-index:3}
+.fin-matrix-table .fin-col-selected{color:#a9e9ff}
+.fin-matrix-table .fin-matrix-value{padding:0}
+.fin-matrix-table .fin-matrix-value button{display:block;background:transparent;color:inherit;border:0;padding:10px 9px;width:100%;text-align:right;min-height:37px;border-radius:0;font-weight:600;font-variant-numeric:tabular-nums}
+.fin-matrix-table .fin-matrix-value button:hover,.fin-matrix-table .fin-matrix-value button:focus-visible{background:rgba(111,124,255,.24);outline:2px solid #7c96dd;outline-offset:-2px}
+.fin-matrix-table .fin-cell-drop{background:rgba(255,107,126,.19);color:#ffc5cc}
+.fin-matrix-table .fin-cell-down{background:rgba(246,189,87,.11);color:#ffdf9e}
+.fin-matrix-table .fin-cell-rise{background:rgba(53,211,154,.08);color:#a2f5da}
+.fin-matrix-table .fin-cell-peak button{box-shadow:inset 0 0 0 1px rgba(71,200,255,.52)}
+.fin-matrix-table .fin-matrix-empty{text-align:left;white-space:normal;color:var(--muted);padding:18px}
+.fin-alert{display:inline-block;margin-left:7px;color:#ffc4ce;font-weight:900}
+.fin-matrix-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
+.fin-matrix-legend span{display:inline-flex;align-items:center;gap:5px}
+.fin-matrix-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.fin-mark-rise{background:rgba(53,211,154,.55)}
+.fin-mark-drop{background:rgba(255,107,126,.65)}
+.fin-matrix-note{margin-top:9px}
+@media(max-width:760px){
+ .fin-matrix-intro .btn{width:100%}
+ .fin-matrix-controls label,.fin-matrix-controls label:nth-child(2){width:100%}
+ .fin-matrix-table .fin-col-name{min-width:134px;width:134px;max-width:134px}
+ .fin-matrix-table .fin-col-total{left:134px;min-width:102px;width:102px;font-size:11px;padding:8px 5px}
+ .fin-matrix-scroll{max-height:460px}
+}

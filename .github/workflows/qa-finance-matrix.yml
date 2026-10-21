@@ -1,0 +1,26 @@
+name: Finance client-month matrix checks
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'finance-ledger.js'
+      - 'finance-matrix.css'
+      - 'tests/finance-matrix.test.cjs'
+      - '.github/workflows/qa-finance-matrix.yml'
+  workflow_dispatch:
+jobs:
+  finance-matrix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify JavaScript syntax
+        run: |
+          node --check finance-ledger.js
+          node --check tests/finance-matrix.test.cjs
+      - name: Test cumulative client receipts and monthly trends
+        run: node tests/finance-matrix.test.cjs
