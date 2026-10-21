@@ -13,13 +13,105 @@ var month=()=>($('reportMonth')?.value||selectedMonth||new Date().toISOString().
 var first=m=>m+'-01';
 var next=m=>{var [y,mm]=m.split('-').map(Number);return new Date(Date.UTC(y,mm,1)).toISOString().slice(0,10)};
 var stamp=s=>String(s||'').slice(0,10);
+
+/* Pure, read-only monthly matrix: no changes to salary or finance ledger records. */
+function matrixMonths(chosen){
+ var base=String(chosen||'').split('-').map(Number),y=base[0],m=base[1];
+ return Array.from({length:12},(_,i)=>new Date(Date.UTC(y,m-12+i,1)).toISOString().slice(0,7));
+}
+function matrixModel(clients,contracts,payments,chosen,manager,today){
+ var months=matrixMonths(chosen),windowSet=new Set(months),monthEnd=String(chosen||'');
+ var managerContracts=contracts.filter(c=>manager==='all'||c.contractor_id===manager);
+ var allowedContracts=new Set(managerContracts.map(c=>c.id));
+ var contractOwners=new Map(contracts.map(c=>[c.id,c.client_id]));
+ var allowedClients=new Set(managerContracts.map(c=>c.client_id));
+ var rows=new Map();
+ (clients||[]).forEach(c=>{if(manager==='all'||allowedClients.has(c.id))rows.set(c.id,{id:c.id,name:c.client_name||'Без названия',total:0,period:0,byMonth:Object.create(null),drop:false,quiet:false,peak:0});});
+ (payments||[]).forEach(p=>{
+  if(p.event_type!=='payment'||!['paid','confirmed'].includes(p.status))return;
+  var mk=String(p.payment_date||'').slice(0,7);
+  if(!mk||mk>monthEnd||(manager!=='all'&&!allowedContracts.has(p.contract_id)))return;
+  var id=p.client_id||contractOwners.get(p.contract_id),row=rows.get(id);
+  if(!row)return;
+  var amount=Number(p.amount);
+  if(!Number.isFinite(amount))return;
+  row.total+=amount;
+  if(windowSet.has(mk)){row.byMonth[mk]=(row.byMonth[mk]||0)+amount;row.period+=amount;}
+ });
+ var pastMonths=months.filter(m=>m<today);
+ var last=pastMonths[pastMonths.length-1],prev=pastMonths[pastMonths.length-2];
+ var result=[...rows.values()];
+ result.forEach(row=>{
+  row.peak=pastMonths.reduce((best,m)=>Math.max(best,row.byMonth[m]||0),0);
+  var previous=prev?(row.byMonth[prev]||0):0,current=last?(row.byMonth[last]||0):0;
+  row.drop=!!(prev&&previous>0&&current<previous*.7);
+  row.quiet=!!(last&&current===0&&row.total>0);
+ });
+ result.sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'ru'));
+ return {months:months,rows:result,lastClosed:last||'',previousClosed:prev||''};
+}
+window.CampBoxFinanceMatrixModel=matrixModel;
+var matrixMonthLabel=m=>{var parts=m.split('-');return ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][Number(parts[1])-1]+' '+parts[0].slice(2)};
+var matrixShortMoney=v=>v===0?'—':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1,notation:'compact'}).format(v);
+function renderMatrix(){
+ if(!$('finMatrixRows')||!state.month)return;
+ var manager=$('finManager').value,now=new Date(),today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+ var model=matrixModel(state.clients,state.contracts,state.payments,state.month,manager,today);
+ state.matrix=model;
+ var query=($('finMatrixSearch').value||'').toLocaleLowerCase('ru').trim(),mode=$('finMatrixFilter').value;
+ var rows=model.rows.filter(r=>(!query||r.name.toLocaleLowerCase('ru').includes(query))&&(mode==='all'||(mode==='drop'&&r.drop)||(mode==='quiet'&&r.quiet)));
+ state.matrixVisible=rows;
+ $('finMatrixStatus').textContent='Показано '+rows.length+' из '+model.rows.length+' лагерей · спад ≥30%: '+model.rows.filter(r=>r.drop).length;
+ var head='<tr><th scope="col" class="fin-col-name">Лагерь</th><th scope="col" class="fin-col-total">ИТОГО за всё время</th><th scope="col" class="fin-col-period">За 12 мес.</th>';
+ model.months.forEach(m=>{head+='<th scope="col"'+(m===state.month?' class="fin-col-selected"':'')+'>'+matrixMonthLabel(m)+(m===today?' *':'')+'</th>'});
+ $('finMatrixHead').innerHTML=head+'</tr>';
+ if(!rows.length){$('finMatrixRows').innerHTML='<tr><td colspan="15" class="fin-matrix-empty">Лагеря не найдены. Измени поиск или фильтр.</td></tr>';}else{
+  $('finMatrixRows').innerHTML=rows.map(r=>{
+   var html='<tr><th scope="row" class="fin-col-name" title="'+esc(r.name)+'">'+esc(r.name)+(r.drop?'<span class="fin-alert" title="Спад более 30% между двумя последними закрытыми месяцами">↓</span>':'')+'</th><td class="fin-col-total">'+money(r.total)+'</td><td class="fin-col-period">'+money(r.period)+'</td>';
+   model.months.forEach((m,i)=>{
+    var value=r.byMonth[m]||0,previous=i?Number(r.byMonth[model.months[i-1]]||0):0;
+    var full=m<today,change=full&&previous>0?(value-previous)/previous:null;
+    var style=change!==null&&change<=-.3?' fin-cell-drop':change!==null&&change<0?' fin-cell-down':change!==null&&change>0?' fin-cell-rise':'';
+    if(full&&value>0&&r.peak===value)style+=' fin-cell-peak';
+    var desc=value===0?'Нет поступлений':money(value);
+    html+='<td class="fin-matrix-value'+style+'"><button type="button" data-fin-month="'+esc(m)+'" title="'+esc(matrixMonthLabel(m)+': '+desc+'. Открыть поступления')+'">'+matrixShortMoney(value)+'</button></td>';
+   });
+   return html+'</tr>';
+  }).join('');
+ }
+ var totals={all:0,period:0,byMonth:Object.create(null)};
+ rows.forEach(r=>{totals.all+=r.total;totals.period+=r.period;model.months.forEach(m=>{totals.byMonth[m]=(totals.byMonth[m]||0)+(r.byMonth[m]||0)})});
+ $('finMatrixFoot').innerHTML='<tr><th class="fin-col-name">Итого по списку</th><td class="fin-col-total">'+money(totals.all)+'</td><td class="fin-col-period">'+money(totals.period)+'</td>'+model.months.map(m=>'<td title="'+esc(money(totals.byMonth[m]||0))+'">'+matrixShortMoney(totals.byMonth[m]||0)+'</td>').join('')+'</tr>';
+ $('finMatrixRows').querySelectorAll('[data-fin-month]').forEach(btn=>btn.onclick=async()=>{
+  $('finMonth').value=btn.dataset.finMonth;await load();switchTab('payments');
+ });
+}
+function exportMatrixCsv(){
+ if(!state.matrix)return;
+ var model=state.matrix,rows=state.matrixVisible||[],headers=['Лагерь','ИТОГО за всё время до '+state.month,'За 12 месяцев',...model.months.map(matrixMonthLabel)];
+ var all=[headers,...rows.map(r=>[r.name,r.total.toFixed(2),r.period.toFixed(2),...model.months.map(m=>(r.byMonth[m]||0).toFixed(2))])];
+ var csv='\uFEFF'+all.map(row=>row.map(v=>{
+  var s=String(v??'');
+  if(/^[\s]*[=+@-]/.test(s)&&!(/^-?\d+(\.\d+)?$/.test(s)))s="'"+s;
+  return '"'+s.replace(/"/g,'""')+'"';
+ }).join(';')).join('\r\n');
+ var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');
+ a.href=url;a.download='CampBox_Поступления_Лагеря_12м_'+state.month+'.csv';a.click();URL.revokeObjectURL(url);
+}
+
 var managerName=id=>{var p=(window.profiles||profiles||[]).find(x=>x.id===id);return p?(p.full_name||p.email||'Менеджер'):'Не назначен';};
 function section(){
  var root=$('v13-finance');if(!root)return null;
  if(root.dataset.ready)return root;root.dataset.ready='1';
+
+ var matrixHtml='<section class="card pad fin-matrix-card" aria-label="Помесячные поступления по лагерям"><div class="fin-matrix-intro"><div><h2>Поступления по лагерям · 12 месяцев</h2><p>Фактические оплаты по дате поступления. ИТОГО — накопленная сумма за всё время до конца выбранного месяца.</p></div><button type="button" class="btn" id="finMatrixCsv">Скачать CSV</button></div>'+
+ '<div class="fin-matrix-controls"><label>Поиск лагеря<input id="finMatrixSearch" type="search" placeholder="Название лагеря"></label><label>Показать<select id="finMatrixFilter"><option value="all">Все лагеря</option><option value="drop">Спад ≥30%</option><option value="quiet">Без оплат в последнем закрытом месяце</option></select></label><span id="finMatrixStatus" role="status"></span></div>'+
+ '<div class="fin-matrix-scroll" tabindex="0" aria-label="Таблица поступлений по месяцам с прокруткой"><table class="fin-matrix-table"><thead id="finMatrixHead"></thead><tbody id="finMatrixRows"></tbody><tfoot id="finMatrixFoot"></tfoot></table></div>'+
+ '<div class="fin-matrix-legend"><span><i class="fin-mark-rise"></i> Рост</span><span><i class="fin-mark-drop"></i> Спад ≥30%</span><span>Пик отмечен рамкой · * текущий месяц неполный · нажми сумму, чтобы увидеть платежи</span></div><p class="fin-matrix-note">Падение поступлений — повод проверить клиента, но не доказательство проблемы: учитывай сезонность, условия оплаты и график смен.</p></section>';
+
  root.innerHTML='<section class="card pad" style="margin-bottom:14px"><h2>Финансы лагерей · комиссии CampBox</h2><p style="color:var(--muted)">Начисления за выбранный месяц и все подтверждённые поступления клиента с начала учёта.</p><div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><div><label>Месяц</label><input type="month" id="finMonth"></div><div><label>Менеджер</label><select id="finManager"><option value="all">Все менеджеры</option></select></div><button class="btn" id="finReload">Обновить</button><button class="btn" id="finExport">Excel / CSV</button></div><div id="finMessage" style="margin-top:12px" role="status"></div></section>'+
  '<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px" role="tablist" aria-label="Разделы финансов"><button class="btn" id="finTab-summary" role="tab">Сводка</button><button class="btn" id="finTab-charges" role="tab">Начисления</button><button class="btn" id="finTab-payments" role="tab">Поступления</button></div><div id="finPanel-summary"><div id="finStats" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px"></div>'+
- '</div><div id="finPanel-charges" hidden><section class="card pad"><div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><h2>Начисления по лагерям</h2><p style="color:var(--muted)">Каждый лагерь показывает текущий месяц и накопленный итог.</p></div><button class="btn primary" id="finAdd">+ Начисление</button></div><div class="table-wrap" style="margin-top:12px"><table style="min-width:900px"><thead><tr><th>Лагерь / договор</th><th>Менеджер</th><th>Направление</th><th>Начислено</th><th>Оплачено за месяц</th><th>Оплатить до</th><th></th></tr></thead><tbody id="finRows"></tbody></table></div></section>'+
+ matrixHtml+'</div><div id="finPanel-charges" hidden><section class="card pad"><div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><h2>Начисления по лагерям</h2><p style="color:var(--muted)">Каждый лагерь показывает текущий месяц и накопленный итог.</p></div><button class="btn primary" id="finAdd">+ Начисление</button></div><div class="table-wrap" style="margin-top:12px"><table style="min-width:900px"><thead><tr><th>Лагерь / договор</th><th>Менеджер</th><th>Направление</th><th>Начислено</th><th>Оплачено за месяц</th><th>Оплатить до</th><th></th></tr></thead><tbody id="finRows"></tbody></table></div></section>'+
  '</div><div id="finPanel-summary-ranking"><section class="card pad" style="margin-top:14px"><h2>Эффективность продаж по деньгам</h2><p style="color:var(--muted)">Рейтинг по начисленной комиссии, без смешения качества продажи со сроками оплаты.</p><div id="finRanking"></div></section>'+
  '</div><div id="finPanel-payments" hidden><section class="card pad"><h2>Фактические поступления</h2><p style="color:var(--muted)">Новая оплата появится также в зарплатном модуле. Указывай продукт и договор, чтобы исключить двойной учёт.</p><button class="btn" id="finPayAdd">+ Зафиксировать поступление</button><div id="finPayments" style="margin-top:12px"></div></section>';
  $('finMonth').value=month();
@@ -29,6 +121,9 @@ function section(){
  $('finManager').onchange=render;
  $('finReload').onclick=load;
  $('finExport').onclick=exportCsv;
+ $('finMatrixCsv').onclick=exportMatrixCsv;
+ $('finMatrixSearch').oninput=renderMatrix;
+ $('finMatrixFilter').onchange=renderMatrix;
  $('finAdd').onclick=()=>editCharge();
  $('finPayAdd').onclick=()=>editPayment();
  return root;
@@ -82,6 +177,7 @@ function render(){
  var groups=new Map();contractRows.forEach(c=>{var id=c.contractor_id||'none';var g=groups.get(id)||{amount:0,paid:0,clients:new Set()};g.amount+=rows.filter(ch=>ch.contract_id===c.id).reduce((sum,ch)=>sum+n(ch.amount),0);g.paid+=receipts(c.id);g.clients.add(c.client_id);groups.set(id,g)});
  $('finRanking').innerHTML='<div class="table-wrap"><table style="min-width:540px"><thead><tr><th>Менеджер</th><th>Лагерей</th><th>Начислено за месяц</th><th>Получено за месяц</th><th>Средняя комиссия</th></tr></thead><tbody>'+[...groups].sort((a,b)=>b[1].amount-a[1].amount).map(([id,g])=>'<tr><td>'+esc(managerName(id))+'</td><td>'+g.clients.size+'</td><td>'+money(g.amount)+'</td><td>'+money(g.paid)+'</td><td>'+money(g.clients.size?g.amount/g.clients.size:0)+'</td></tr>').join('')+'</tbody></table></div>';
  var pay=state.payments.filter(p=>p.payment_date>=first(state.month)&&p.payment_date<next(state.month)&&contractSet.has(p.contract_id));
+ renderMatrix();
  $('finPayments').innerHTML=pay.map(p=>'<div style="padding:8px 0;border-bottom:1px solid var(--line)">'+esc(p.payment_date)+' · '+esc(client(p.client_id))+' · '+money(p.amount)+' · '+esc(productNames[p.product_type]||p.product_type)+'</div>').join('')||'Подтверждённых поступлений за месяц нет.';
 }
 function picker(existing){
