@@ -39,7 +39,7 @@
 @media(max-width:760px){
  .fin-matrix-intro .btn{width:100%}
  .fin-matrix-controls label,.fin-matrix-controls label:nth-child(2){width:100%}
- .fin-matrix-table .fin-col-name{min-width:175px;width:175px;max-width:175px}
- .fin-matrix-table .fin-col-total{left:175px;min-width:116px;width:116px}
+ .fin-matrix-table .fin-col-name{min-width:134px;width:134px;max-width:134px}
+ .fin-matrix-table .fin-col-total{left:134px;min-width:102px;width:102px;font-size:11px;padding:8px 5px}
  .fin-matrix-scroll{max-height:460px}
 }
