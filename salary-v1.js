@@ -144,7 +144,7 @@
       '<div class="salary-tabs" id="salaryTabs">'+
         '<button data-salary-tab="mine" class="active">Моя зарплата</button>'+
         '<button data-salary-tab="payments" class="salary-manager-only">Поступления</button>'+
-        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button>'+
+        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button><button data-salary-tab="retention" class="salary-manager-only">Удержание</button>'+
         '<button data-salary-tab="team" class="salary-manager-only">Команда</button>'+
         '<button data-salary-tab="rules" class="salary-manager-only">Настройки мотивации</button>'+
         '<button data-salary-tab="history" class="salary-manager-only">История изменений</button>'+
@@ -153,6 +153,7 @@
       '<div id="salaryMine" class="salary-panel active"></div>'+
       '<div id="salaryPayments" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryClients" class="salary-panel salary-manager-only"></div>'+
+      '<div id="salaryRetention" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryTeam" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryRules" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryHistory" class="salary-panel salary-manager-only"></div>';
@@ -170,11 +171,12 @@
   function renderTabs(){
     applyRoles();
     document.querySelectorAll('[data-salary-tab]').forEach(b=>b.classList.toggle('active',b.dataset.salaryTab===S.tab));
-    const map={mine:'salaryMine',payments:'salaryPayments',clients:'salaryClients',team:'salaryTeam',rules:'salaryRules',history:'salaryHistory'};
+    const map={mine:'salaryMine',payments:'salaryPayments',clients:'salaryClients',retention:'salaryRetention',team:'salaryTeam',rules:'salaryRules',history:'salaryHistory'};
     Object.entries(map).forEach(([k,id])=>q(id)?.classList.toggle('active',k===S.tab));
     if(S.tab==='mine')renderMine();
     if(S.tab==='payments')renderPayments();
     if(S.tab==='clients')renderClients();
+    if(S.tab==='retention')renderRetention();
     if(S.tab==='team')renderTeam();
     if(S.tab==='rules')renderRules();
     if(S.tab==='history')renderHistory();
@@ -234,6 +236,11 @@
       if(manager())tasks.push(sb.from('salary_audit').select('*').order('created_at',{ascending:false}).limit(150));
       const res=await Promise.all(tasks);for(const r of res){if(r.error)throw r.error}
       S.clients=res[0].data||[];S.contracts=res[1].data||[];S.pauses=res[2].data||[];S.products=res[3].data||[];S.payments=res[4].data||[];S.dept=res[5].data||S.dept;S.config=res[6].data||null;S.audit=manager()?(res[7]?.data||[]):[];
+      // Optional until the separate retention migration is applied.
+      const retentionResult=await sb.from('salary_retentions').select('*').order('created_at',{ascending:false}).limit(2000);
+      S.retentionReady=!retentionResult.error;S.retentionError=retentionResult.error?.message||'';
+      S.retentions=retentionResult.data||[];
+
       renderAll();
     }catch(e){
       console.error('Salary cycles load',e);S.lastError=e?.message||String(e);
@@ -495,6 +502,60 @@
     const matches=filteredClientContracts(S.contracts.filter(c=>c.status===status));
     if(q('salClientSearchResults'))q('salClientSearchResults').innerHTML=contractTable(matches);
     if(q('salClientMatches'))q('salClientMatches').textContent='Найдено: '+matches.length;
+  }
+
+  function renderRetention(){
+    const box=q('salaryRetention');if(!box||!manager())return;
+    if(!S.retentionReady){box.innerHTML='<div class="salary-card"><div class="salary-body"><h2>Удержание пока не подключено</h2><p>Требуется отдельная миграция salary_retention_v1_migration.sql. Остальные разделы зарплаты продолжают работать.</p><small>'+esc(S.retentionError)+'</small></div></div>';return}
+    const active=S.contracts.filter(c=>c.status==='active');
+    const opened=S.retentions.filter(r=>r.status==='in_progress'),successful=S.retentions.filter(r=>r.status==='successful');
+    const current=successful.filter(r=>retentionEnd(r)>todayIso());
+    const rowName=r=>esc(contractClient(contract(r.contract_id))?.client_name||'Лагерь не найден');
+    const label=r=>r.status==='in_progress'?'В работе':r.status==='successful'?'Удержан':'Не удержан';
+    box.innerHTML=
+      '<div class="salary-card"><div class="salary-head"><div><h2>Удержание лагерей</h2><p>Успех даёт исходному контрактору право на переменную мотивацию за платежи в течение 6 календарных месяцев с даты удержания, если обычный 12-месячный срок уже завершён. Новый договор или фикс за контрактинг не создаются.</p></div></div>'+
+      '<div class="salary-body"><div class="salary-kpis">'+
+      '<div class="salary-kpi"><span>В удержании</span><b>'+opened.length+'</b></div>'+
+      '<div class="salary-kpi good"><span>Успешных удержаний</span><b>'+successful.length+'</b></div>'+
+      '<div class="salary-kpi good"><span>Активных 6-месячных окон</span><b>'+current.length+'</b></div></div>'+
+      (active.length?'<div class="salary-form-grid" style="margin-top:12px"><div class="salary-field"><label>Лагерь / действующий договор</label><select id="retContract">'+active.map(c=>'<option value="'+esc(c.id)+'">'+esc(contractClient(c)?.client_name||'—')+' · '+esc(profileName(c.contractor_id))+'</option>').join('')+'</select></div>'+
+      '<div class="salary-field"><label>Дата начала удержания</label><input id="retOpened" type="date" value="'+todayIso()+'"></div>'+
+      '<div class="salary-field"><label>Причина риска</label><input id="retReason" placeholder="Например: отказ продлевать работу"></div>'+
+      '<div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="retAdd" type="button">+ Взять в удержание</button></div></div>':'<div class="salary-empty">Нет активных договоров.</div>')+
+      '</div></div>'+
+      '<div class="salary-card"><div class="salary-head"><div><h2>Реестр удержаний</h2><p>Успех фиксируется руководителем с датой и сохраняется в истории изменений. Окна от разных случаев не суммируются дважды.</p></div></div>'+
+      '<div class="salary-body">'+(S.retentions.length?'<div class="salary-table-wrap"><table class="salary-table"><thead><tr><th>Лагерь</th><th>Ответственный</th><th>Начало</th><th>Статус</th><th>Дата результата</th><th>Мотивация до</th><th>Причина</th><th>Действие</th></tr></thead><tbody>'+
+      S.retentions.map(r=>{const c=contract(r.contract_id);return '<tr><td>'+rowName(r)+'</td><td>'+esc(profileName(c?.contractor_id))+'</td><td>'+dateRu(r.opened_at)+'</td><td>'+label(r)+'</td><td>'+dateRu(r.resolved_at)+'</td><td>'+(r.status==='successful'?dateRu(retentionEnd(r)):'—')+'</td><td>'+esc(r.reason||'—')+'</td><td>'+(r.status==='in_progress'?'<button class="btn good" type="button" data-ret-success="'+esc(r.id)+'">Удержан</button> <button class="btn" type="button" data-ret-fail="'+esc(r.id)+'">Не удержан</button>':'<span class="salary-pill '+(r.status==='successful'?'good':'warn')+'">Завершено</span>')+'</td></tr>'}).join('')+
+      '</tbody></table></div>':'<div class="salary-empty">Случаев удержания пока нет.</div>')+'</div></div>';
+    q('retAdd')?.addEventListener('click',addRetention);
+    box.querySelectorAll('[data-ret-success]').forEach(b=>b.addEventListener('click',()=>resolveRetention(b.dataset.retSuccess,true)));
+    box.querySelectorAll('[data-ret-fail]').forEach(b=>b.addEventListener('click',()=>resolveRetention(b.dataset.retFail,false)));
+  }
+  async function addRetention(){
+    if(!manager()||!S.retentionReady)return;
+    const contractId=q('retContract')?.value,opened=q('retOpened')?.value,reason=q('retReason')?.value.trim(),cnt=contract(contractId);
+    if(!cnt||cnt.status!=='active'||!opened||!reason){alert('Выбери активный договор, дату и причину риска.');return}
+    if(S.retentions.some(r=>r.contract_id===contractId&&r.status==='in_progress')){alert('Этот лагерь уже находится в удержании.');return}
+    const {error}=await sb.from('salary_retentions').insert({contract_id:contractId,status:'in_progress',opened_at:opened,reason,created_by:currentUser.id});
+    if(error)alert('Не удалось создать удержание: '+error.message);else await load();
+  }
+  async function resolveRetention(id,success){
+    if(!manager()||!S.retentionReady)return;
+    const r=S.retentions.find(x=>x.id===id),cnt=contract(r?.contract_id);
+    if(!r||r.status!=='in_progress'||!cnt)return;
+    if(success&&cnt.status!=='active'){alert('Для успешного удержания договор должен быть активным.');return}
+    const done=prompt('Дата '+(success?'успешного удержания':'неуспешного завершения')+' (ГГГГ-ММ-ДД):',todayIso());
+    if(!done)return;
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(done)||Number.isNaN(Date.parse(done))||done<r.opened_at||done>todayIso()){alert('Укажи корректную дату не раньше начала удержания и не позже сегодняшней.');return}
+    if(success){
+      const nextEnd=addMonthsClampedIso(done,6);
+      const overlaps=S.retentions.some(x=>x.id!==r.id&&x.contract_id===r.contract_id&&x.status==='successful'&&x.resolved_at&&done<retentionEnd(x)&&x.resolved_at<nextEnd);
+      if(overlaps){alert('На эту дату уже действует 6-месячное окно удержания. Повторное начисление не создаём.');return}
+    }
+    if(!confirm(success?'Подтвердить успешное удержание и период мотивации на 6 месяцев с '+dateRu(done)+'? Это может изменить расчёт прошлых месяцев.':'Закрыть удержание как неуспешное?'))return;
+    const payload={status:success?'successful':'unsuccessful',resolved_at:done,retained_by:success?cnt.contractor_id:null,updated_at:new Date().toISOString()};
+    const {error}=await sb.from('salary_retentions').update(payload).eq('id',id).eq('status','in_progress');
+    if(error)alert('Не удалось сохранить результат: '+error.message);else await load();
   }
 
   function renderClients(){
