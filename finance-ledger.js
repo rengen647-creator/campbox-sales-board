@@ -6,6 +6,8 @@ var productNames={campbox:'Комиссия CampBox',order_management:'МУЗ',c
 var paymentTabs=[{id:'all',label:'Все'},{id:'campbox',label:'Комиссия CampBox'},{id:'order_management',label:'МУЗ'},{id:'comfort_booking',label:'КБ'},{id:'site',label:'Сайт'},{id:'site_support',label:'Поддержка сайта'},{id:'maps',label:'Карты'}];
 function paymentGroup(p){return typeof p==='string'?p:p?.product_type}
 function paymentMatches(p,tab){return tab==='all'||paymentGroup(p)===tab}
+function receiptCount(n){var mod=n%100,unit=n%10;return n+' '+(mod>=11&&mod<=14?'поступлений':unit===1?'поступление':unit>=2&&unit<=4?'поступления':'поступлений')}
+
 var productOptions=()=>[['campbox','Комиссия CampBox'],['order_management','МУЗ'],['comfort_booking','КБ'],['site','Сайт']].map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
 function switchTab(tab){state.tab=tab;var rank=$('finPanel-summary-ranking');if(rank)rank.hidden=tab!=='summary';['summary','charges','payments'].forEach(id=>{var el=$('finPanel-'+id),b=$('finTab-'+id);if(el)el.hidden=id!==tab;if(b){b.classList.toggle('primary',id===tab);b.setAttribute('aria-selected',String(id===tab));}})}
 var $=id=>document.getElementById(id);
@@ -218,7 +220,7 @@ function renderPayments(){
  });
  var rows=all.filter(p=>paymentMatches(p,tab)).sort((a,b)=>String(b.payment_date).localeCompare(String(a.payment_date))||String(b.id).localeCompare(String(a.id)));
  var amount=rows.reduce((sum,p)=>sum+n(p.amount),0),label=paymentTabs.find(t=>t.id===tab)?.label||'Все';
- $('finPaymentSummary').innerHTML='<strong>'+esc(label)+'</strong><span>За '+esc(state.month)+': '+rows.length+' поступлений · <b>'+money(amount)+'</b></span>';
+ $('finPaymentSummary').innerHTML='<strong>'+esc(label)+'</strong><span>За '+esc(state.month)+': '+receiptCount(rows.length)+' · <b>'+money(amount)+'</b></span>';
  el.innerHTML=rows.map(p=>'<div class="fin-payment-row"><span>'+esc(p.payment_date)+' · '+esc(client(p.client_id))+'</span><b>'+money(p.amount)+'</b><small>'+esc(productNames[p.product_type]||p.product_type)+'</small></div>').join('')||'<div class="hint">Подтверждённых поступлений по направлению за этот месяц нет.</div>';
  renderRecent();
 }
