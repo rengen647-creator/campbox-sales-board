@@ -3,8 +3,8 @@
 'use strict';
 var state={clients:[],contracts:[],charges:[],payments:[],recentByTab:{},busy:false,month:'',tab:'summary',paymentTab:'all'};
 var productNames={campbox:'Комиссия CampBox',order_management:'МУЗ',comfort_booking:'КБ',site:'Сайт',maps:'Карты',site_support:'Поддержка сайта'};
-var paymentTabs=[{id:'all',label:'Все'},{id:'campbox',label:'Комиссия CampBox'},{id:'order_management',label:'МУЗ'},{id:'comfort_booking',label:'КБ'},{id:'site',label:'Сайты'},{id:'other',label:'Прочее'}];
-function paymentGroup(p){var type=typeof p==='string'?p:p?.product_type;return type==='campbox'?'campbox':type==='order_management'?'order_management':type==='comfort_booking'?'comfort_booking':['site','site_support'].includes(type)?'site':'other'}
+var paymentTabs=[{id:'all',label:'Все'},{id:'campbox',label:'Комиссия CampBox'},{id:'order_management',label:'МУЗ'},{id:'comfort_booking',label:'КБ'},{id:'site',label:'Сайт'},{id:'site_support',label:'Поддержка сайта'},{id:'maps',label:'Карты'}];
+function paymentGroup(p){return typeof p==='string'?p:p?.product_type}
 function paymentMatches(p,tab){return tab==='all'||paymentGroup(p)===tab}
 var productOptions=()=>[['campbox','Комиссия CampBox'],['order_management','МУЗ'],['comfort_booking','КБ'],['site','Сайт']].map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
 function switchTab(tab){state.tab=tab;var rank=$('finPanel-summary-ranking');if(rank)rank.hidden=tab!=='summary';['summary','charges','payments'].forEach(id=>{var el=$('finPanel-'+id),b=$('finTab-'+id);if(el)el.hidden=id!==tab;if(b){b.classList.toggle('primary',id===tab);b.setAttribute('aria-selected',String(id===tab));}})}
@@ -134,6 +134,13 @@ function section(){
   var b=e.target.closest('[data-fin-payment-tab]');if(!b)return;
   if(paymentTabs.some(t=>t.id===b.dataset.finPaymentTab)){state.paymentTab=b.dataset.finPaymentTab;renderPayments();}
  });
+ $('finPaymentTabs').addEventListener('keydown',e=>{
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+  var idx=paymentTabs.findIndex(t=>t.id===state.paymentTab);
+  var target=e.key==='Home'?0:e.key==='End'?paymentTabs.length-1:e.key==='ArrowRight'?(idx+1)%paymentTabs.length:(idx-1+paymentTabs.length)%paymentTabs.length;
+  state.paymentTab=paymentTabs[target].id;renderPayments();
+  $('finPaymentTabs').querySelector('[data-fin-payment-tab="'+state.paymentTab+'"]')?.focus();e.preventDefault();
+ });
  return root;
 }
 function note(t,error){var e=$('finMessage');if(e){e.textContent=t||'';e.style.color=error?'#ff9dad':'var(--muted)';}}
@@ -146,9 +153,7 @@ async function load(){
   var cols='id,contract_id,client_id,payment_date,product_type,amount,status,event_type,comment,created_at,created_by';
   var pages=await Promise.all(paymentTabs.map(t=>{
    var q=sb.from('salary_payments').select(cols).eq('event_type','payment');
-   if(t.id==='site')q=q.in('product_type',['site','site_support']);
-   else if(t.id==='other')q=q.eq('product_type','maps');
-   else if(t.id!=='all')q=q.eq('product_type',t.id);
+   if(t.id!=='all')q=q.eq('product_type',t.id);
    return q.order('created_at',{ascending:false}).limit(50);
   }));
   var result={};pages.forEach((p,i)=>{if(p.error)throw p.error;result[paymentTabs[i].id]=p.data||[]});return result;
