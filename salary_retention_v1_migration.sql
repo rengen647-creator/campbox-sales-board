@@ -42,9 +42,31 @@ declare
   v_contractor uuid;
   v_contract_status text;
 begin
+  -- Successful and unsuccessful results are immutable; corrections require a
+  -- deliberate audited administrative process, not an ordinary row update.
+  if tg_op='INSERT' and new.status<>'in_progress' then
+    raise exception 'A retention case must start in progress';
+  end if;
+  if tg_op='UPDATE' then
+    if old.status<>'in_progress' then
+      raise exception 'Completed retention cases cannot be modified';
+    end if;
+    if new.contract_id is distinct from old.contract_id then
+      raise exception 'Cannot change contract of an existing retention case';
+    end if;
+  end if;
+
+  if new.opened_at>current_date or
+     (new.resolved_at is not null and new.resolved_at>current_date) then
+    raise exception 'Retention dates cannot be in the future';
+  end if;
+
+  -- Lock the parent contract to serialize parallel retention confirmations.
+  -- Prevents two simultaneous requests from creating overlapping windows.
   select contractor_id, status into v_contractor,v_contract_status
-  from public.salary_contracts where id=new.contract_id;
+  from public.salary_contracts where id=new.contract_id for update;
   if not found then raise exception 'Contract not found'; end if;
+
   if new.status='successful' then
     if v_contract_status<>'active' then
       raise exception 'Retention can be confirmed only for an active contract';
@@ -52,8 +74,14 @@ begin
     if new.retained_by is distinct from v_contractor then
       raise exception 'Retention manager must match the contract contractor';
     end if;
-    if new.resolved_at>current_date then
-      raise exception 'Successful retention cannot be future dated';
+    if exists(
+      select 1 from public.salary_retentions r
+      where r.contract_id=new.contract_id and r.status='successful'
+        and r.id<>new.id
+        and daterange(r.resolved_at,(r.resolved_at+interval '6 months')::date,'[)')
+          && daterange(new.resolved_at,(new.resolved_at+interval '6 months')::date,'[)')
+    ) then
+      raise exception 'Successful retention window overlaps an existing one';
     end if;
   end if;
   return new;
@@ -67,7 +95,8 @@ for each row execute procedure public.salary_retention_validate();
 
 alter table public.salary_retentions enable row level security;
 revoke all on public.salary_retentions from anon;
-grant select,insert,update,delete on public.salary_retentions to authenticated;
+revoke delete on public.salary_retentions from authenticated;
+grant select,insert,update on public.salary_retentions to authenticated;
 
 drop policy if exists salary_retentions_select on public.salary_retentions;
 create policy salary_retentions_select on public.salary_retentions
@@ -94,9 +123,8 @@ create policy salary_retentions_update on public.salary_retentions
 for update to authenticated
 using (public.is_manager()) with check (public.is_manager());
 
+-- Completed events are retained for audit; no client-side DELETE policy.
 drop policy if exists salary_retentions_delete on public.salary_retentions;
-create policy salary_retentions_delete on public.salary_retentions
-for delete to authenticated using (public.is_manager());
 
 drop trigger if exists salary_retentions_audit on public.salary_retentions;
 create trigger salary_retentions_audit
