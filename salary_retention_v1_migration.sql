@@ -52,8 +52,8 @@ begin
     if new.retained_by is distinct from v_contractor then
       raise exception 'Retention manager must match the contract contractor';
     end if;
-    if new.resolved_at<current_date-interval '12 months' then
-      raise exception 'Backdated retention over 12 months requires manual review';
+    if new.resolved_at>current_date then
+      raise exception 'Successful retention cannot be future dated';
     end if;
   end if;
   return new;
