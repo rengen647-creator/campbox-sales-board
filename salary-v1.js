@@ -362,12 +362,12 @@
       '<div class="salary-kpis">'+
         '<div class="salary-kpi good"><span>Итого начислено</span><b>'+money(t.total)+'</b><small>за выбранный месяц</small></div>'+
         '<div class="salary-kpi"><span>Контракторство</span><b>'+money(t.contract)+'</b><small>разово за каждый новый договорный цикл</small></div>'+
-        '<div class="salary-kpi good"><span>CampBox · 10%</span><b>'+money(t.campbox)+'</b><small>12 месяцев с учётом пауз</small></div>'+
+        '<div class="salary-kpi good"><span>CampBox · 10%</span><b>'+money(t.campbox)+'</b><small>12 месяцев, паузы и успешные удержания</small></div>'+
         '<div class="salary-kpi"><span>Доп. продукты</span><b>'+money(t.products)+'</b><small>модули и карты</small></div>'+
         '<div class="salary-kpi warn"><span>Сайты / 1% РОП</span><b>'+money(t.site+t.head)+'</b><small>сайты, сопровождение, управленческий 1%</small></div>'+
       '</div>'+
       '<div class="salary-grid2">'+
-        '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка</h2><p>Пауза не съедает срок мотивации, новый договор запускает новый цикл.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
+        '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка</h2><p>Пауза не съедает срок мотивации; успешное удержание даёт отдельное шестимесячное окно без нового договора.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
           '<div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Доп. продукты</span><b>'+money(t.products)+'</b></div><div><span>Сайты / сопровождение</span><b>'+money(t.site)+'</b></div><div><span>1% руководителю</span><b>'+money(t.head)+'</b></div>'+
         '</div></div></div>'+
         '<div class="salary-card"><div class="salary-head"><div><h2>Действующие периоды мотивации</h2><p>12 месяцев с учётом пауз и успешных удержаний.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
@@ -780,7 +780,7 @@
 
   function renderRules(){
     const box=q('salaryRules');if(!box||!manager())return;const head=S.config?.sales_head_id||'',vat=vatRate();
-    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Настройки мотивации</h2><p>Правила V1, договорные циклы, паузы и получатель 1%.</p></div></div><div class="salary-body">'+
+    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Настройки мотивации</h2><p>Договорные циклы, паузы, успешное удержание и получатель 1%.</p></div></div><div class="salary-body">'+
       '<div class="salary-form-grid" style="margin-bottom:10px"><div class="salary-field"><label>Руководитель продаж · получатель 1%</label><select id="salaryHeadSelect"><option value="">Не выбран</option>'+employeeOptions(head)+'</select></div><div class="salary-field"><label>НДС CampBox, %</label><input id="salaryVatRate" type="number" min="0" max="99.99" step="0.01" value="'+vat+'"></div><div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="salaryHeadSave">Сохранить настройки</button></div></div>'+
       '<div class="salary-rule-list">'+
         rule('Контракторство','Разово за каждый новый подписанный договорный цикл. Повторное подключение после расторжения — новый фикс.','<80% = 0 ₽ · 80–99,99% = 2 000 ₽ · 100–103% = 5 000 ₽ · >103% = 7 000 ₽','1 раз / договор')+
@@ -807,7 +807,7 @@
 
   function renderHistory(){
     const box=q('salaryHistory');if(!box||!manager())return;
-    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>История изменений</h2><p>Договоры, паузы, расторжения, платежи и настройки сохраняются в аудите.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
+    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>История изменений</h2><p>Договоры, паузы, расторжения, удержания, платежи и настройки сохраняются в аудите.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
       (S.audit.length?S.audit.map(a=>'<div class="salary-event"><time>'+new Date(a.created_at).toLocaleString('ru-RU')+'</time><div><b>'+esc(a.entity_type)+' · '+esc(a.action)+'</b><small>'+esc(a.entity_id||'')+'</small></div><span class="salary-pill blue">'+esc(profileName(a.actor_id))+'</span></div>').join(''):'<div class="salary-empty">История пока пустая.</div>')+
       '</div></div></div>';
   }
