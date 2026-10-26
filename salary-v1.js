@@ -4,7 +4,7 @@
 
   const S={
     ready:false,loading:false,schemaReady:true,tab:'mine',clientView:'active',clientQuery:'',month:'',
-    clients:[],contracts:[],pauses:[],products:[],payments:[],dept:null,audit:[],config:null,lastError:''
+    clients:[],contracts:[],pauses:[],products:[],payments:[],retentions:[],retentionReady:false,retentionError:'',dept:null,audit:[],config:null,lastError:''
   };
 
   const PRODUCTS={
@@ -30,6 +30,17 @@
   function dateObj(s){return new Date(String(s).slice(0,10)+'T00:00:00Z')}
   function addDaysIso(s,n){const d=dateObj(s);d.setUTCDate(d.getUTCDate()+Number(n||0));return d.toISOString().slice(0,10)}
   function addMonthsIso(s,n){const [y,m,d]=String(s).slice(0,10).split('-').map(Number);const x=new Date(Date.UTC(y,m-1+n,d));return x.toISOString().slice(0,10)}
+  // Calendar-month expiry, clamped for dates like Aug 31 -> Feb 28.
+  function addMonthsClampedIso(s,n){
+    const [y,m,d]=String(s).slice(0,10).split('-').map(Number);
+    const first=new Date(Date.UTC(y,m-1+n,1)),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+    first.setUTCDate(Math.min(d,last));return first.toISOString().slice(0,10);
+  }
+  function retentionAt(contractId,date,managerId){
+    return S.retentions.find(r=>r.contract_id===contractId&&r.status==='successful'&&r.retained_by===managerId&&r.resolved_at&&r.resolved_at<=date&&date<addMonthsClampedIso(r.resolved_at,6))||null;
+  }
+  function retentionEnd(r){return r?.resolved_at?addMonthsClampedIso(r.resolved_at,6):null}
+  function retentionCurrent(contractId,date){return S.retentions.filter(r=>r.contract_id===contractId&&r.status==='successful'&&r.resolved_at&&date>=r.resolved_at&&date<retentionEnd(r)).sort((a,b)=>String(b.resolved_at).localeCompare(String(a.resolved_at)))[0]||null}
   function diffDaysInclusive(a,b){return Math.max(0,Math.floor((dateObj(b)-dateObj(a))/86400000)+1)}
   function maxDate(a,b){return !a?b:!b?a:(a>b?a:b)}
   function contractorRate(pct){pct=Number(pct)||0;if(pct<80)return 0;if(pct<100)return 2000;if(pct<=103)return 5000;return 7000}
@@ -81,7 +92,8 @@
     if(c?.terminated_date&&date>c.terminated_date)return 'terminated';
     if(pausedOn(c.id,date))return 'paused';
     const end=commissionEnd(prod.first_payment_date,c.id);
-    return date<end?'active':'expired';
+    if(date<end)return 'active';
+    return retentionAt(c.id,date,c.contractor_id)?'retained':'expired';
   }
   function monthIndexActive(prod,c,date){
     if(!prod?.first_payment_date)return null;
@@ -241,14 +253,15 @@
     let amount=0,rate='',formula='',note='',base=Number(p.amount||0),gross=null;
 
     if(cfg.period){
-      const state=commissionState(prod,cnt,p.payment_date);if(state!=='active')return null;
+      const state=commissionState(prod,cnt,p.payment_date);if(state!=='active'&&state!=='retained')return null;
       if(p.product_type==='campbox'){
         gross=Number(p.amount||0);base=round2(netOfVat(gross));amount=round2(base*.10);rate='10%';
         formula=money(gross)+' / '+(1+vatRate()/100).toLocaleString('ru-RU')+' = '+money(base)+' × 10%';
-        note='Поступление с НДС '+money(gross)+' · НДС '+vatRate().toLocaleString('ru-RU')+'% · '+monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
+        note=state==='retained'?'Успешное удержание · начисление по 10% до '+dateRu(retentionEnd(retentionAt(cnt.id,p.payment_date,userId))):
+        'Поступление с НДС '+money(gross)+' · НДС '+vatRate().toLocaleString('ru-RU')+'% · '+monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
       }else{
         amount=round2(base*cfg.rate);rate=(cfg.rate*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate;
-        note=monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
+        note=state==='retained'?'Успешное удержание · период до '+dateRu(retentionEnd(retentionAt(cnt.id,p.payment_date,userId))):monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
       }
     }else if(p.product_type==='maps'){
       if(p.event_type!=='payment')return null;amount=6000;rate='40%';formula='15 000 ₽ × 40%';
@@ -410,9 +423,9 @@
       if(!prod?.first_payment_date)txt='Это первая оплата направления. После сохранения начнётся новый 12-месячный период этого договорного цикла.';
       else {
         const state=commissionState(prod,cnt,date);
-        if(state==='active'){
-          if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.10);txt='С НДС '+money(amount)+' → без НДС '+money(base)+' → 10% = '+money(mot)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12.'}
-          else txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12.';
+        if(state==='active'||state==='retained'){
+          if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.10);txt='С НДС '+money(amount)+' → без НДС '+money(base)+' → 10% = '+money(mot)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12'+(state==='retained'?' · успешное удержание':'')+'.'}
+          else txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12'+(state==='retained'?' · успешное удержание':'')+'.';
         }else if(state==='expired'&&type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.01);txt='12 месяцев с учётом пауз завершены → без НДС '+money(base)+' → 1% = '+money(mot)+' руководителю продаж.'}
         else if(state==='paused')txt='На эту дату мотивационный период заморожен из-за паузы.';
         else txt='По этому направлению мотивация менеджеру уже не начисляется.';
