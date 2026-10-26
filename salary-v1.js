@@ -144,7 +144,7 @@
       '<div class="salary-tabs" id="salaryTabs">'+
         '<button data-salary-tab="mine" class="active">Моя зарплата</button>'+
         '<button data-salary-tab="payments" class="salary-manager-only">Поступления</button>'+
-        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button><button data-salary-tab="retention" class="salary-manager-only">Удержание</button>'+
+        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button><button data-salary-tab="retention" class="salary-manager-only">🛟 Удержание</button>'+
         '<button data-salary-tab="team" class="salary-manager-only">Команда</button>'+
         '<button data-salary-tab="rules" class="salary-manager-only">Настройки мотивации</button>'+
         '<button data-salary-tab="history" class="salary-manager-only">История изменений</button>'+
@@ -483,6 +483,8 @@
     if(terminate){await terminateContract(terminate);return}
     const renew=e.target.closest('[data-contract-renew]')?.dataset.contractRenew;
     if(renew){await renewContract(renew);return}
+    const retain=e.target.closest('[data-contract-retention]')?.dataset.contractRetention;
+    if(retain){openRetentionForContract(retain);return}
     const view=e.target.closest('[data-client-view]')?.dataset.clientView;
     if(view){S.clientView=view;renderClients();return}
   });
@@ -504,6 +506,12 @@
     if(q('salClientMatches'))q('salClientMatches').textContent='Найдено: '+matches.length;
   }
 
+  function openRetentionForContract(contractId){
+    if(!manager())return;
+    S.tab='retention';renderTabs();
+    const selector=q('retContract');if(selector&&Array.from(selector.options).some(o=>o.value===contractId))selector.value=contractId;
+    q('retReason')?.focus();
+  }
   function renderRetention(){
     const box=q('salaryRetention');if(!box||!manager())return;
     if(!S.retentionReady){box.innerHTML='<div class="salary-card"><div class="salary-body"><h2>Удержание пока не подключено</h2><p>Требуется отдельная миграция salary_retention_v1_migration.sql. Остальные разделы зарплаты продолжают работать.</p><small>'+esc(S.retentionError)+'</small></div></div>';return}
@@ -606,7 +614,7 @@
         return '<div><span class="salary-pill blue">'+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</span> старт '+dateRu(p.first_payment_date)+' → до '+dateRu(end)+(c.status==='paused'?' · <b>заморожено</b>':'')+'</div>';
       }).join('')||'<span style="color:#8293af">12-месячные направления ещё не запущены</span>';
       let actions='';
-      if(c.status==='active')actions='<button class="btn" data-contract-pause="'+c.id+'">Поставить на паузу</button><button class="btn danger" data-contract-terminate="'+c.id+'">Расторгнуть</button>';
+      if(c.status==='active')actions='<button class="btn primary" data-contract-retention="'+c.id+'">🛟 Поставить на удержание</button><button class="btn" data-contract-pause="'+c.id+'">Поставить на паузу</button><button class="btn danger" data-contract-terminate="'+c.id+'">Расторгнуть</button>';
       if(c.status==='paused')actions='<button class="btn good" data-contract-resume="'+c.id+'">Возобновить</button><button class="btn" data-contract-edit-pause="'+c.id+'">Изменить паузу</button><button class="btn danger" data-contract-terminate="'+c.id+'">Расторгнуть</button>';
       if(c.status==='terminated')actions='<button class="btn primary" data-contract-renew="'+c.id+'">↻ Новый договор</button>';
       return '<article class="salary-contract-card '+c.status+'"><div class="salary-contract-top"><div><h3>'+esc(cc?.client_name||'Без названия')+'</h3><small>Договор от '+dateRu(c.signed_date)+' · контрактор '+esc(profileName(c.contractor_id))+'</small></div>'+contractPill(c)+'</div>'+
