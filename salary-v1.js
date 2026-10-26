@@ -351,7 +351,7 @@
     const myContracts=S.contracts.filter(c=>c.contractor_id===currentUser.id);
     const activeProducts=S.products.filter(p=>{
       const c=contract(p.contract_id);if(!c||c.contractor_id!==currentUser.id||!p.first_payment_date||!PRODUCTS[p.product_type]?.period)return false;
-      return S.month+'-28'<commissionEnd(p.first_payment_date,c.id) && (!c.terminated_date||S.month+'-28'<=c.terminated_date);
+      return ['active','retained'].includes(commissionState(p,c,S.month+'-28'))&&(!c.terminated_date||S.month+'-28'<=c.terminated_date);
     });
 
     box.innerHTML=
@@ -370,8 +370,8 @@
         '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка</h2><p>Пауза не съедает срок мотивации, новый договор запускает новый цикл.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
           '<div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Доп. продукты</span><b>'+money(t.products)+'</b></div><div><span>Сайты / сопровождение</span><b>'+money(t.site)+'</b></div><div><span>1% руководителю</span><b>'+money(t.head)+'</b></div>'+
         '</div></div></div>'+
-        '<div class="salary-card"><div class="salary-head"><div><h2>Активные 12-месячные периоды</h2><p>Срок автоматически продлевается на длительность пауз.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
-          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),end=commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
+        '<div class="salary-card"><div class="salary-head"><div><h2>Действующие периоды мотивации</h2><p>12 месяцев с учётом пауз и успешных удержаний.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
+          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),retained=retentionAt(c.id,S.month+'-28',c.contractor_id),end=retained?retentionEnd(retained):commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':retained?'успешное удержание':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
         '</div></div></div>'+
       '</div>'+
       contractingPanel(currentUser.id)+
@@ -431,8 +431,8 @@
       else {
         const state=commissionState(prod,cnt,date);
         if(state==='active'||state==='retained'){
-          if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.10);txt='С НДС '+money(amount)+' → без НДС '+money(base)+' → 10% = '+money(mot)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12'+(state==='retained'?' · успешное удержание':'')+'.'}
-          else txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12'+(state==='retained'?' · успешное удержание':'')+'.';
+          if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.10);txt='С НДС '+money(amount)+' → без НДС '+money(base)+' → 10% = '+money(mot)+' контрактору '+profileName(cnt.contractor_id)+' · '+(state==='retained'?'успешное удержание до '+dateRu(retentionEnd(retentionAt(cnt.id,date,cnt.contractor_id))):monthIndexActive(prod,cnt,date)+' месяц из 12')+'.'}
+          else txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(cnt.contractor_id)+' · '+(state==='retained'?'успешное удержание до '+dateRu(retentionEnd(retentionAt(cnt.id,date,cnt.contractor_id))):monthIndexActive(prod,cnt,date)+' месяц из 12')+'.';
         }else if(state==='expired'&&type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.01);txt='12 месяцев с учётом пауз завершены → без НДС '+money(base)+' → 1% = '+money(mot)+' руководителю продаж.'}
         else if(state==='paused')txt='На эту дату мотивационный период заморожен из-за паузы.';
         else txt='По этому направлению мотивация менеджеру уже не начисляется.';
@@ -546,7 +546,7 @@
     if(success&&cnt.status!=='active'){alert('Для успешного удержания договор должен быть активным.');return}
     const done=prompt('Дата '+(success?'успешного удержания':'неуспешного завершения')+' (ГГГГ-ММ-ДД):',todayIso());
     if(!done)return;
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(done)||Number.isNaN(Date.parse(done))||done<r.opened_at||done>todayIso()){alert('Укажи корректную дату не раньше начала удержания и не позже сегодняшней.');return}
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(done)||Number.isNaN(Date.parse(done))||done<r.opened_at||done>todayIso()){alert('Укажи корректную дату не раньше начала удержания и не позже сегодняшней.');return}
     if(success){
       const nextEnd=addMonthsClampedIso(done,6);
       const overlaps=S.retentions.some(x=>x.id!==r.id&&x.contract_id===r.contract_id&&x.status==='successful'&&x.resolved_at&&done<retentionEnd(x)&&x.resolved_at<nextEnd);
@@ -602,7 +602,7 @@
     return '<div class="salary-contract-list">'+list.map(c=>{
       const cc=contractClient(c),ps=contractProducts(c.id),op=openPause(c.id);
       const period=ps.filter(p=>p.first_payment_date&&PRODUCTS[p.product_type]?.period).map(p=>{
-        const end=commissionEnd(p.first_payment_date,c.id);
+        const activeR=retentionCurrent(c.id,todayIso()),end=activeR?retentionEnd(activeR):commissionEnd(p.first_payment_date,c.id);
         return '<div><span class="salary-pill blue">'+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</span> старт '+dateRu(p.first_payment_date)+' → до '+dateRu(end)+(c.status==='paused'?' · <b>заморожено</b>':'')+'</div>';
       }).join('')||'<span style="color:#8293af">12-месячные направления ещё не запущены</span>';
       let actions='';
@@ -792,7 +792,8 @@
         rule('Comfort Booking','8,05% от оплаты, 12 месяцев продлеваются на паузы.','платёж × 8,05%','12 мес. + паузы')+
         rule('Разработка сайта','Первый платёж / следующие / выход в ЖР.','№1 = 11% · №2+ = 8,05% · ЖР = 4 025 ₽','по событиям')+
         rule('Сопровождение сайта','Первый и последующие платежи.','№1 = 11% · №2+ = 8,05%','по платежам')+
-        rule('Руководитель продаж','1% CampBox начинается только после завершения 12 месяцев менеджера с учётом пауз.','(платёж без НДС) × 1%','после срока')+
+        rule('Удержание','При подтверждённом успехе менеджер получает переменную мотивацию за платежи в течение 6 календарных месяцев с даты успешного удержания. Если обычный период ещё действует, ставки не удваиваются.','дата успеха → 6 мес. · без нового фикс-бонуса','6 месяцев')+
+        rule('Руководитель продаж','1% CampBox начинается после стандартного срока и всех действующих окон удержания.','(платёж без НДС) × 1%','после срока')+
       '</div></div></div>';
     q('salaryHeadSave')?.addEventListener('click',saveConfig);
   }
