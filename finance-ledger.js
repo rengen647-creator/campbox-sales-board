@@ -1,7 +1,7 @@
 /* CampBox Finance: managerial commission ledger linked to Salary contracts / receipts. */
 (function(){
 'use strict';
-var state={clients:[],contracts:[],charges:[],payments:[],busy:false,month:'',tab:'summary'};
+var state={clients:[],contracts:[],charges:[],payments:[],recent:[],busy:false,month:'',tab:'summary'};
 var productNames={campbox:'Комиссия CampBox',order_management:'МУЗ',comfort_booking:'КБ',site:'Сайт',maps:'Карты',site_support:'Поддержка сайта'};
 var productOptions=()=>[['campbox','Комиссия CampBox'],['order_management','МУЗ'],['comfort_booking','КБ'],['site','Сайт']].map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
 function switchTab(tab){state.tab=tab;var rank=$('finPanel-summary-ranking');if(rank)rank.hidden=tab!=='summary';['summary','charges','payments'].forEach(id=>{var el=$('finPanel-'+id),b=$('finTab-'+id);if(el)el.hidden=id!==tab;if(b){b.classList.toggle('primary',id===tab);b.setAttribute('aria-selected',String(id===tab));}})}
@@ -113,7 +113,7 @@ function section(){
  '<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px" role="tablist" aria-label="Разделы финансов"><button class="btn" id="finTab-summary" role="tab">Сводка</button><button class="btn" id="finTab-charges" role="tab">Начисления</button><button class="btn" id="finTab-payments" role="tab">Поступления</button></div><div id="finPanel-summary"><div id="finStats" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px"></div>'+
  matrixHtml+'</div><div id="finPanel-charges" hidden><section class="card pad"><div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><h2>Начисления по лагерям</h2><p style="color:var(--muted)">Каждый лагерь показывает текущий месяц и накопленный итог.</p></div><button class="btn primary" id="finAdd">+ Начисление</button></div><div class="table-wrap" style="margin-top:12px"><table style="min-width:900px"><thead><tr><th>Лагерь / договор</th><th>Менеджер</th><th>Направление</th><th>Начислено</th><th>Оплачено за месяц</th><th>Оплатить до</th><th></th></tr></thead><tbody id="finRows"></tbody></table></div></section>'+
  '</div><div id="finPanel-summary-ranking"><section class="card pad" style="margin-top:14px"><h2>Эффективность продаж по деньгам</h2><p style="color:var(--muted)">Рейтинг по начисленной комиссии, без смешения качества продажи со сроками оплаты.</p><div id="finRanking"></div></section>'+
- '</div><div id="finPanel-payments" hidden><section class="card pad"><h2>Фактические поступления</h2><p style="color:var(--muted)">Новая оплата появится также в зарплатном модуле. Указывай продукт и договор, чтобы исключить двойной учёт.</p><button class="btn" id="finPayAdd">+ Зафиксировать поступление</button><div id="finPayments" style="margin-top:12px"></div></section>';
+ '</div><div id="finPanel-payments" hidden><section class="card pad"><h2>Фактические поступления</h2><p style="color:var(--muted)">Новая оплата появится также в зарплатном модуле. Указывай продукт и договор, чтобы исключить двойной учёт.</p><button class="btn" id="finPayAdd">+ Зафиксировать поступление</button><div class="card pad" style="margin-top:14px;background:var(--panel3)"><h3 style="margin:0 0 5px">Последние внесённые записи</h3><p style="color:var(--muted);font-size:12px;margin:0 0 10px">Последние 50 записей по времени ввода, независимо от выбранного месяца. Дата оплаты отдельно.</p><label for="finRecentSearch">Поиск лагеря</label><input id="finRecentSearch" type="search" placeholder="Название лагеря" style="max-width:430px"><div id="finRecent" style="margin-top:12px"></div></div><h3 style="margin-top:20px">Оплаты за выбранный месяц</h3><div id="finPayments" style="margin-top:12px"></div></section>';
  $('finMonth').value=month();
  ['summary','charges','payments'].forEach(x=>{$('finTab-'+x).onclick=()=>switchTab(x)});
  switchTab(state.tab);
@@ -126,6 +126,7 @@ function section(){
  $('finMatrixFilter').onchange=renderMatrix;
  $('finAdd').onclick=()=>editCharge();
  $('finPayAdd').onclick=()=>editPayment();
+ $('finRecentSearch').oninput=renderRecent;
  return root;
 }
 function note(t,error){var e=$('finMessage');if(e){e.textContent=t||'';e.style.color=error?'#ff9dad':'var(--muted)';}}
@@ -139,10 +140,11 @@ async function load(){
   sb.from('salary_clients').select('id,client_name'),
   sb.from('salary_contracts').select('id,client_id,contractor_id,signed_date,status'),
   sb.from('sales_finance_charges').select('*').eq('month',begin),
-  allPayments()
+  allPayments(),
+  sb.from('salary_payments').select('id,contract_id,client_id,payment_date,product_type,amount,status,event_type,comment,created_at,created_by').eq('event_type','payment').order('created_at',{ascending:false}).limit(50)
  ]);
  for(var r of queries)if(r&&r.error)throw r.error;
- state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.payments=(queries[3]||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
+ state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.recent=queries[4].data||[];state.payments=(queries[3]||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
  state.month=m;
  var selected=$('finManager').value;
  $('finManager').innerHTML='<option value="all">Все менеджеры</option>'+[...new Set(state.contracts.map(c=>c.contractor_id).filter(Boolean))].map(id=>'<option value="'+esc(id)+'">'+esc(managerName(id))+'</option>').join('');
@@ -178,7 +180,18 @@ function render(){
  $('finRanking').innerHTML='<div class="table-wrap"><table style="min-width:540px"><thead><tr><th>Менеджер</th><th>Лагерей</th><th>Начислено за месяц</th><th>Получено за месяц</th><th>Средняя комиссия</th></tr></thead><tbody>'+[...groups].sort((a,b)=>b[1].amount-a[1].amount).map(([id,g])=>'<tr><td>'+esc(managerName(id))+'</td><td>'+g.clients.size+'</td><td>'+money(g.amount)+'</td><td>'+money(g.paid)+'</td><td>'+money(g.clients.size?g.amount/g.clients.size:0)+'</td></tr>').join('')+'</tbody></table></div>';
  var pay=state.payments.filter(p=>p.payment_date>=first(state.month)&&p.payment_date<next(state.month)&&contractSet.has(p.contract_id));
  renderMatrix();
+ renderRecent();
  $('finPayments').innerHTML=pay.map(p=>'<div style="padding:8px 0;border-bottom:1px solid var(--line)">'+esc(p.payment_date)+' · '+esc(client(p.client_id))+' · '+money(p.amount)+' · '+esc(productNames[p.product_type]||p.product_type)+'</div>').join('')||'Подтверждённых поступлений за месяц нет.';
+}
+function renderRecent(){
+ var el=$('finRecent');if(!el)return;
+ var query=String($('finRecentSearch')?.value||'').toLocaleLowerCase('ru').trim();
+ var rows=state.recent.filter(p=>!query||client(p.client_id).toLocaleLowerCase('ru').includes(query));
+ var fmt=v=>v?new Date(v).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+ el.innerHTML='<p style="color:var(--muted);font-size:12px">Найдено '+rows.length+' из последних '+state.recent.length+' записей. Предварительные и исключённые платежи видны для сверки, но не учитываются в подтверждённых поступлениях.</p>'+
+  (rows.length?'<div class="table-wrap"><table style="min-width:1000px"><thead><tr><th>Когда внесено</th><th>Лагерь</th><th>Дата оплаты</th><th>Направление</th><th>Сумма</th><th>Внёс</th><th>Статус</th></tr></thead><tbody>'+
+  rows.map(p=>'<tr><td>'+esc(fmt(p.created_at))+'</td><td><b>'+esc(client(p.client_id))+'</b></td><td>'+esc(p.payment_date||'—')+'</td><td>'+esc(productNames[p.product_type]||p.product_type)+'</td><td>'+money(p.amount)+'</td><td>'+esc(managerName(p.created_by))+'</td><td>'+esc(({paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'})[p.status]||p.status)+'</td></tr>').join('')+
+  '</tbody></table></div>':'<div class="hint">Записей по запросу нет.</div>');
 }
 function picker(existing){
  var options=state.contracts.map(c=>'<option value="'+esc(c.id)+'" '+(existing?.contract_id===c.id?'selected':'')+'>'+esc(client(c.client_id))+' · '+esc(managerName(c.contractor_id))+' · '+esc(c.signed_date||'без даты')+'</option>').join('');
