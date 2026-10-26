@@ -4,7 +4,7 @@
 
   const S={
     ready:false,loading:false,schemaReady:true,tab:'mine',clientView:'active',clientQuery:'',month:'',
-    clients:[],contracts:[],pauses:[],products:[],payments:[],dept:null,audit:[],config:null,lastError:''
+    clients:[],contracts:[],pauses:[],products:[],payments:[],retentions:[],retentionReady:false,retentionError:'',dept:null,audit:[],config:null,lastError:''
   };
 
   const PRODUCTS={
@@ -30,6 +30,17 @@
   function dateObj(s){return new Date(String(s).slice(0,10)+'T00:00:00Z')}
   function addDaysIso(s,n){const d=dateObj(s);d.setUTCDate(d.getUTCDate()+Number(n||0));return d.toISOString().slice(0,10)}
   function addMonthsIso(s,n){const [y,m,d]=String(s).slice(0,10).split('-').map(Number);const x=new Date(Date.UTC(y,m-1+n,d));return x.toISOString().slice(0,10)}
+  // Calendar-month expiry, clamped for dates like Aug 31 -> Feb 28.
+  function addMonthsClampedIso(s,n){
+    const [y,m,d]=String(s).slice(0,10).split('-').map(Number);
+    const first=new Date(Date.UTC(y,m-1+n,1)),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+    first.setUTCDate(Math.min(d,last));return first.toISOString().slice(0,10);
+  }
+  function retentionAt(contractId,date,managerId){
+    return S.retentions.find(r=>r.contract_id===contractId&&r.status==='successful'&&r.retained_by===managerId&&r.resolved_at&&r.resolved_at<=date&&date<addMonthsClampedIso(r.resolved_at,6))||null;
+  }
+  function retentionEnd(r){return r?.resolved_at?addMonthsClampedIso(r.resolved_at,6):null}
+  function retentionCurrent(contractId,date){return S.retentions.filter(r=>r.contract_id===contractId&&r.status==='successful'&&r.resolved_at&&date>=r.resolved_at&&date<retentionEnd(r)).sort((a,b)=>String(b.resolved_at).localeCompare(String(a.resolved_at)))[0]||null}
   function diffDaysInclusive(a,b){return Math.max(0,Math.floor((dateObj(b)-dateObj(a))/86400000)+1)}
   function maxDate(a,b){return !a?b:!b?a:(a>b?a:b)}
   function contractorRate(pct){pct=Number(pct)||0;if(pct<80)return 0;if(pct<100)return 2000;if(pct<=103)return 5000;return 7000}
@@ -81,7 +92,8 @@
     if(c?.terminated_date&&date>c.terminated_date)return 'terminated';
     if(pausedOn(c.id,date))return 'paused';
     const end=commissionEnd(prod.first_payment_date,c.id);
-    return date<end?'active':'expired';
+    if(date<end)return 'active';
+    return retentionAt(c.id,date,c.contractor_id)?'retained':'expired';
   }
   function monthIndexActive(prod,c,date){
     if(!prod?.first_payment_date)return null;
@@ -132,7 +144,7 @@
       '<div class="salary-tabs" id="salaryTabs">'+
         '<button data-salary-tab="mine" class="active">Моя зарплата</button>'+
         '<button data-salary-tab="payments" class="salary-manager-only">Поступления</button>'+
-        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button>'+
+        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button><button data-salary-tab="retention" class="salary-manager-only">🛟 Удержание</button>'+
         '<button data-salary-tab="team" class="salary-manager-only">Команда</button>'+
         '<button data-salary-tab="rules" class="salary-manager-only">Настройки мотивации</button>'+
         '<button data-salary-tab="history" class="salary-manager-only">История изменений</button>'+
@@ -141,6 +153,7 @@
       '<div id="salaryMine" class="salary-panel active"></div>'+
       '<div id="salaryPayments" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryClients" class="salary-panel salary-manager-only"></div>'+
+      '<div id="salaryRetention" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryTeam" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryRules" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryHistory" class="salary-panel salary-manager-only"></div>';
@@ -158,11 +171,12 @@
   function renderTabs(){
     applyRoles();
     document.querySelectorAll('[data-salary-tab]').forEach(b=>b.classList.toggle('active',b.dataset.salaryTab===S.tab));
-    const map={mine:'salaryMine',payments:'salaryPayments',clients:'salaryClients',team:'salaryTeam',rules:'salaryRules',history:'salaryHistory'};
+    const map={mine:'salaryMine',payments:'salaryPayments',clients:'salaryClients',retention:'salaryRetention',team:'salaryTeam',rules:'salaryRules',history:'salaryHistory'};
     Object.entries(map).forEach(([k,id])=>q(id)?.classList.toggle('active',k===S.tab));
     if(S.tab==='mine')renderMine();
     if(S.tab==='payments')renderPayments();
     if(S.tab==='clients')renderClients();
+    if(S.tab==='retention')renderRetention();
     if(S.tab==='team')renderTeam();
     if(S.tab==='rules')renderRules();
     if(S.tab==='history')renderHistory();
@@ -222,6 +236,11 @@
       if(manager())tasks.push(sb.from('salary_audit').select('*').order('created_at',{ascending:false}).limit(150));
       const res=await Promise.all(tasks);for(const r of res){if(r.error)throw r.error}
       S.clients=res[0].data||[];S.contracts=res[1].data||[];S.pauses=res[2].data||[];S.products=res[3].data||[];S.payments=res[4].data||[];S.dept=res[5].data||S.dept;S.config=res[6].data||null;S.audit=manager()?(res[7]?.data||[]):[];
+      // Optional until the separate retention migration is applied.
+      const retentionResult=await sb.from('salary_retentions').select('*').order('created_at',{ascending:false}).limit(2000);
+      S.retentionReady=!retentionResult.error;S.retentionError=retentionResult.error?.message||'';
+      S.retentions=retentionResult.data||[];
+
       renderAll();
     }catch(e){
       console.error('Salary cycles load',e);S.lastError=e?.message||String(e);
@@ -241,14 +260,15 @@
     let amount=0,rate='',formula='',note='',base=Number(p.amount||0),gross=null;
 
     if(cfg.period){
-      const state=commissionState(prod,cnt,p.payment_date);if(state!=='active')return null;
+      const state=commissionState(prod,cnt,p.payment_date);if(state!=='active'&&state!=='retained')return null;
       if(p.product_type==='campbox'){
         gross=Number(p.amount||0);base=round2(netOfVat(gross));amount=round2(base*.10);rate='10%';
         formula=money(gross)+' / '+(1+vatRate()/100).toLocaleString('ru-RU')+' = '+money(base)+' × 10%';
-        note='Поступление с НДС '+money(gross)+' · НДС '+vatRate().toLocaleString('ru-RU')+'% · '+monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
+        note=state==='retained'?'Успешное удержание · начисление по 10% до '+dateRu(retentionEnd(retentionAt(cnt.id,p.payment_date,userId))):
+        'Поступление с НДС '+money(gross)+' · НДС '+vatRate().toLocaleString('ru-RU')+'% · '+monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
       }else{
         amount=round2(base*cfg.rate);rate=(cfg.rate*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate;
-        note=monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
+        note=state==='retained'?'Успешное удержание · период до '+dateRu(retentionEnd(retentionAt(cnt.id,p.payment_date,userId))):monthIndexActive(prod,cnt,p.payment_date)+' месяц из 12';
       }
     }else if(p.product_type==='maps'){
       if(p.event_type!=='payment')return null;amount=6000;rate='40%';formula='15 000 ₽ × 40%';
@@ -331,7 +351,7 @@
     const myContracts=S.contracts.filter(c=>c.contractor_id===currentUser.id);
     const activeProducts=S.products.filter(p=>{
       const c=contract(p.contract_id);if(!c||c.contractor_id!==currentUser.id||!p.first_payment_date||!PRODUCTS[p.product_type]?.period)return false;
-      return S.month+'-28'<commissionEnd(p.first_payment_date,c.id) && (!c.terminated_date||S.month+'-28'<=c.terminated_date);
+      return ['active','retained'].includes(commissionState(p,c,S.month+'-28'))&&(!c.terminated_date||S.month+'-28'<=c.terminated_date);
     });
 
     box.innerHTML=
@@ -342,16 +362,16 @@
       '<div class="salary-kpis">'+
         '<div class="salary-kpi good"><span>Итого начислено</span><b>'+money(t.total)+'</b><small>за выбранный месяц</small></div>'+
         '<div class="salary-kpi"><span>Контракторство</span><b>'+money(t.contract)+'</b><small>разово за каждый новый договорный цикл</small></div>'+
-        '<div class="salary-kpi good"><span>CampBox · 10%</span><b>'+money(t.campbox)+'</b><small>12 месяцев с учётом пауз</small></div>'+
+        '<div class="salary-kpi good"><span>CampBox · 10%</span><b>'+money(t.campbox)+'</b><small>12 месяцев, паузы и успешные удержания</small></div>'+
         '<div class="salary-kpi"><span>Доп. продукты</span><b>'+money(t.products)+'</b><small>модули и карты</small></div>'+
         '<div class="salary-kpi warn"><span>Сайты / 1% РОП</span><b>'+money(t.site+t.head)+'</b><small>сайты, сопровождение, управленческий 1%</small></div>'+
       '</div>'+
       '<div class="salary-grid2">'+
-        '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка</h2><p>Пауза не съедает срок мотивации, новый договор запускает новый цикл.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
+        '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка</h2><p>Пауза не съедает срок мотивации; успешное удержание даёт отдельное шестимесячное окно без нового договора.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
           '<div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Доп. продукты</span><b>'+money(t.products)+'</b></div><div><span>Сайты / сопровождение</span><b>'+money(t.site)+'</b></div><div><span>1% руководителю</span><b>'+money(t.head)+'</b></div>'+
         '</div></div></div>'+
-        '<div class="salary-card"><div class="salary-head"><div><h2>Активные 12-месячные периоды</h2><p>Срок автоматически продлевается на длительность пауз.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
-          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),end=commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
+        '<div class="salary-card"><div class="salary-head"><div><h2>Действующие периоды мотивации</h2><p>12 месяцев с учётом пауз и успешных удержаний.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
+          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),retained=retentionAt(c.id,S.month+'-28',c.contractor_id),end=retained?retentionEnd(retained):commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':retained?'успешное удержание':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
         '</div></div></div>'+
       '</div>'+
       contractingPanel(currentUser.id)+
@@ -410,9 +430,9 @@
       if(!prod?.first_payment_date)txt='Это первая оплата направления. После сохранения начнётся новый 12-месячный период этого договорного цикла.';
       else {
         const state=commissionState(prod,cnt,date);
-        if(state==='active'){
-          if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.10);txt='С НДС '+money(amount)+' → без НДС '+money(base)+' → 10% = '+money(mot)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12.'}
-          else txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(cnt.contractor_id)+' · '+monthIndexActive(prod,cnt,date)+' месяц из 12.';
+        if(state==='active'||state==='retained'){
+          if(type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.10);txt='С НДС '+money(amount)+' → без НДС '+money(base)+' → 10% = '+money(mot)+' контрактору '+profileName(cnt.contractor_id)+' · '+(state==='retained'?'успешное удержание до '+dateRu(retentionEnd(retentionAt(cnt.id,date,cnt.contractor_id))):monthIndexActive(prod,cnt,date)+' месяц из 12')+'.'}
+          else txt=money(amount)+' × '+(cfg.rate*100).toLocaleString('ru-RU')+'% = '+money(amount*cfg.rate)+' контрактору '+profileName(cnt.contractor_id)+' · '+(state==='retained'?'успешное удержание до '+dateRu(retentionEnd(retentionAt(cnt.id,date,cnt.contractor_id))):monthIndexActive(prod,cnt,date)+' месяц из 12')+'.';
         }else if(state==='expired'&&type==='campbox'){const base=round2(netOfVat(amount)),mot=round2(base*.01);txt='12 месяцев с учётом пауз завершены → без НДС '+money(base)+' → 1% = '+money(mot)+' руководителю продаж.'}
         else if(state==='paused')txt='На эту дату мотивационный период заморожен из-за паузы.';
         else txt='По этому направлению мотивация менеджеру уже не начисляется.';
@@ -463,6 +483,8 @@
     if(terminate){await terminateContract(terminate);return}
     const renew=e.target.closest('[data-contract-renew]')?.dataset.contractRenew;
     if(renew){await renewContract(renew);return}
+    const retain=e.target.closest('[data-contract-retention]')?.dataset.contractRetention;
+    if(retain){openRetentionForContract(retain);return}
     const view=e.target.closest('[data-client-view]')?.dataset.clientView;
     if(view){S.clientView=view;renderClients();return}
   });
@@ -482,6 +504,66 @@
     const matches=filteredClientContracts(S.contracts.filter(c=>c.status===status));
     if(q('salClientSearchResults'))q('salClientSearchResults').innerHTML=contractTable(matches);
     if(q('salClientMatches'))q('salClientMatches').textContent='Найдено: '+matches.length;
+  }
+
+  function openRetentionForContract(contractId){
+    if(!manager())return;
+    S.tab='retention';renderTabs();
+    const selector=q('retContract');if(selector&&Array.from(selector.options).some(o=>o.value===contractId))selector.value=contractId;
+    q('retReason')?.focus();
+  }
+  function renderRetention(){
+    const box=q('salaryRetention');if(!box||!manager())return;
+    if(!S.retentionReady){box.innerHTML='<div class="salary-card"><div class="salary-body"><h2>Удержание пока не подключено</h2><p>Требуется отдельная миграция salary_retention_v1_migration.sql. Остальные разделы зарплаты продолжают работать.</p><small>'+esc(S.retentionError)+'</small></div></div>';return}
+    const active=S.contracts.filter(c=>c.status==='active');
+    const opened=S.retentions.filter(r=>r.status==='in_progress'),successful=S.retentions.filter(r=>r.status==='successful');
+    const current=successful.filter(r=>retentionEnd(r)>todayIso());
+    const rowName=r=>esc(contractClient(contract(r.contract_id))?.client_name||'Лагерь не найден');
+    const label=r=>r.status==='in_progress'?'В работе':r.status==='successful'?'Удержан':'Не удержан';
+    box.innerHTML=
+      '<div class="salary-card"><div class="salary-head"><div><h2>Удержание лагерей</h2><p>Успех даёт исходному контрактору право на переменную мотивацию за платежи в течение 6 календарных месяцев с даты удержания, если обычный 12-месячный срок уже завершён. Новый договор или фикс за контрактинг не создаются.</p></div></div>'+
+      '<div class="salary-body"><div class="salary-kpis">'+
+      '<div class="salary-kpi"><span>В удержании</span><b>'+opened.length+'</b></div>'+
+      '<div class="salary-kpi good"><span>Успешных удержаний</span><b>'+successful.length+'</b></div>'+
+      '<div class="salary-kpi good"><span>Активных 6-месячных окон</span><b>'+current.length+'</b></div></div>'+
+      (active.length?'<div class="salary-form-grid" style="margin-top:12px"><div class="salary-field"><label>Лагерь / действующий договор</label><select id="retContract">'+active.map(c=>'<option value="'+esc(c.id)+'">'+esc(contractClient(c)?.client_name||'—')+' · '+esc(profileName(c.contractor_id))+'</option>').join('')+'</select></div>'+
+      '<div class="salary-field"><label>Дата начала удержания</label><input id="retOpened" type="date" value="'+todayIso()+'"></div>'+
+      '<div class="salary-field"><label>Причина риска</label><input id="retReason" placeholder="Например: отказ продлевать работу"></div>'+
+      '<div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="retAdd" type="button">+ Взять в удержание</button></div></div>':'<div class="salary-empty">Нет активных договоров.</div>')+
+      '</div></div>'+
+      '<div class="salary-card"><div class="salary-head"><div><h2>Реестр удержаний</h2><p>Успех фиксируется руководителем с датой и сохраняется в истории изменений. Окна от разных случаев не суммируются дважды.</p></div></div>'+
+      '<div class="salary-body">'+(S.retentions.length?'<div class="salary-table-wrap"><table class="salary-table"><thead><tr><th>Лагерь</th><th>Ответственный</th><th>Начало</th><th>Статус</th><th>Дата результата</th><th>Мотивация до</th><th>Причина</th><th>Действие</th></tr></thead><tbody>'+
+      S.retentions.map(r=>{const c=contract(r.contract_id);return '<tr><td>'+rowName(r)+'</td><td>'+esc(profileName(c?.contractor_id))+'</td><td>'+dateRu(r.opened_at)+'</td><td>'+label(r)+'</td><td>'+dateRu(r.resolved_at)+'</td><td>'+(r.status==='successful'?dateRu(retentionEnd(r)):'—')+'</td><td>'+esc(r.reason||'—')+'</td><td>'+(r.status==='in_progress'?'<button class="btn good" type="button" data-ret-success="'+esc(r.id)+'">Удержан</button> <button class="btn" type="button" data-ret-fail="'+esc(r.id)+'">Не удержан</button>':'<span class="salary-pill '+(r.status==='successful'?'good':'warn')+'">Завершено</span>')+'</td></tr>'}).join('')+
+      '</tbody></table></div>':'<div class="salary-empty">Случаев удержания пока нет.</div>')+'</div></div>';
+    q('retAdd')?.addEventListener('click',addRetention);
+    box.querySelectorAll('[data-ret-success]').forEach(b=>b.addEventListener('click',()=>resolveRetention(b.dataset.retSuccess,true)));
+    box.querySelectorAll('[data-ret-fail]').forEach(b=>b.addEventListener('click',()=>resolveRetention(b.dataset.retFail,false)));
+  }
+  async function addRetention(){
+    if(!manager()||!S.retentionReady)return;
+    const contractId=q('retContract')?.value,opened=q('retOpened')?.value,reason=q('retReason')?.value.trim(),cnt=contract(contractId);
+    if(!cnt||cnt.status!=='active'||!opened||!reason){alert('Выбери активный договор, дату и причину риска.');return}
+    if(S.retentions.some(r=>r.contract_id===contractId&&r.status==='in_progress')){alert('Этот лагерь уже находится в удержании.');return}
+    const {error}=await sb.from('salary_retentions').insert({contract_id:contractId,status:'in_progress',opened_at:opened,reason,created_by:currentUser.id});
+    if(error)alert('Не удалось создать удержание: '+error.message);else await load();
+  }
+  async function resolveRetention(id,success){
+    if(!manager()||!S.retentionReady)return;
+    const r=S.retentions.find(x=>x.id===id),cnt=contract(r?.contract_id);
+    if(!r||r.status!=='in_progress'||!cnt)return;
+    if(success&&cnt.status!=='active'){alert('Для успешного удержания договор должен быть активным.');return}
+    const done=prompt('Дата '+(success?'успешного удержания':'неуспешного завершения')+' (ГГГГ-ММ-ДД):',todayIso());
+    if(!done)return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(done)||Number.isNaN(Date.parse(done))||done<r.opened_at||done>todayIso()){alert('Укажи корректную дату не раньше начала удержания и не позже сегодняшней.');return}
+    if(success){
+      const nextEnd=addMonthsClampedIso(done,6);
+      const overlaps=S.retentions.some(x=>x.id!==r.id&&x.contract_id===r.contract_id&&x.status==='successful'&&x.resolved_at&&done<retentionEnd(x)&&x.resolved_at<nextEnd);
+      if(overlaps){alert('На эту дату уже действует 6-месячное окно удержания. Повторное начисление не создаём.');return}
+    }
+    if(!confirm(success?'Подтвердить успешное удержание и период мотивации на 6 месяцев с '+dateRu(done)+'? Это может изменить расчёт прошлых месяцев.':'Закрыть удержание как неуспешное?'))return;
+    const payload={status:success?'successful':'unsuccessful',resolved_at:done,retained_by:success?cnt.contractor_id:null,updated_at:new Date().toISOString()};
+    const {error}=await sb.from('salary_retentions').update(payload).eq('id',id).eq('status','in_progress');
+    if(error)alert('Не удалось сохранить результат: '+error.message);else await load();
   }
 
   function renderClients(){
@@ -528,11 +610,11 @@
     return '<div class="salary-contract-list">'+list.map(c=>{
       const cc=contractClient(c),ps=contractProducts(c.id),op=openPause(c.id);
       const period=ps.filter(p=>p.first_payment_date&&PRODUCTS[p.product_type]?.period).map(p=>{
-        const end=commissionEnd(p.first_payment_date,c.id);
+        const activeR=retentionCurrent(c.id,todayIso()),end=activeR?retentionEnd(activeR):commissionEnd(p.first_payment_date,c.id);
         return '<div><span class="salary-pill blue">'+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</span> старт '+dateRu(p.first_payment_date)+' → до '+dateRu(end)+(c.status==='paused'?' · <b>заморожено</b>':'')+'</div>';
       }).join('')||'<span style="color:#8293af">12-месячные направления ещё не запущены</span>';
       let actions='';
-      if(c.status==='active')actions='<button class="btn" data-contract-pause="'+c.id+'">Поставить на паузу</button><button class="btn danger" data-contract-terminate="'+c.id+'">Расторгнуть</button>';
+      if(c.status==='active')actions='<button class="btn primary" data-contract-retention="'+c.id+'">🛟 Поставить на удержание</button><button class="btn" data-contract-pause="'+c.id+'">Поставить на паузу</button><button class="btn danger" data-contract-terminate="'+c.id+'">Расторгнуть</button>';
       if(c.status==='paused')actions='<button class="btn good" data-contract-resume="'+c.id+'">Возобновить</button><button class="btn" data-contract-edit-pause="'+c.id+'">Изменить паузу</button><button class="btn danger" data-contract-terminate="'+c.id+'">Расторгнуть</button>';
       if(c.status==='terminated')actions='<button class="btn primary" data-contract-renew="'+c.id+'">↻ Новый договор</button>';
       return '<article class="salary-contract-card '+c.status+'"><div class="salary-contract-top"><div><h3>'+esc(cc?.client_name||'Без названия')+'</h3><small>Договор от '+dateRu(c.signed_date)+' · контрактор '+esc(profileName(c.contractor_id))+'</small></div>'+contractPill(c)+'</div>'+
@@ -706,7 +788,7 @@
 
   function renderRules(){
     const box=q('salaryRules');if(!box||!manager())return;const head=S.config?.sales_head_id||'',vat=vatRate();
-    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Настройки мотивации</h2><p>Правила V1, договорные циклы, паузы и получатель 1%.</p></div></div><div class="salary-body">'+
+    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>Настройки мотивации</h2><p>Договорные циклы, паузы, успешное удержание и получатель 1%.</p></div></div><div class="salary-body">'+
       '<div class="salary-form-grid" style="margin-bottom:10px"><div class="salary-field"><label>Руководитель продаж · получатель 1%</label><select id="salaryHeadSelect"><option value="">Не выбран</option>'+employeeOptions(head)+'</select></div><div class="salary-field"><label>НДС CampBox, %</label><input id="salaryVatRate" type="number" min="0" max="99.99" step="0.01" value="'+vat+'"></div><div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="salaryHeadSave">Сохранить настройки</button></div></div>'+
       '<div class="salary-rule-list">'+
         rule('Контракторство','Разово за каждый новый подписанный договорный цикл. Повторное подключение после расторжения — новый фикс.','<80% = 0 ₽ · 80–99,99% = 2 000 ₽ · 100–103% = 5 000 ₽ · >103% = 7 000 ₽','1 раз / договор')+
@@ -718,7 +800,8 @@
         rule('Comfort Booking','8,05% от оплаты, 12 месяцев продлеваются на паузы.','платёж × 8,05%','12 мес. + паузы')+
         rule('Разработка сайта','Первый платёж / следующие / выход в ЖР.','№1 = 11% · №2+ = 8,05% · ЖР = 4 025 ₽','по событиям')+
         rule('Сопровождение сайта','Первый и последующие платежи.','№1 = 11% · №2+ = 8,05%','по платежам')+
-        rule('Руководитель продаж','1% CampBox начинается только после завершения 12 месяцев менеджера с учётом пауз.','(платёж без НДС) × 1%','после срока')+
+        rule('Удержание','При подтверждённом успехе менеджер получает переменную мотивацию за платежи в течение 6 календарных месяцев с даты успешного удержания. Если обычный период ещё действует, ставки не удваиваются.','дата успеха → 6 мес. · без нового фикс-бонуса','6 месяцев')+
+        rule('Руководитель продаж','1% CampBox начинается после стандартного срока и всех действующих окон удержания.','(платёж без НДС) × 1%','после срока')+
       '</div></div></div>';
     q('salaryHeadSave')?.addEventListener('click',saveConfig);
   }
@@ -732,7 +815,7 @@
 
   function renderHistory(){
     const box=q('salaryHistory');if(!box||!manager())return;
-    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>История изменений</h2><p>Договоры, паузы, расторжения, платежи и настройки сохраняются в аудите.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
+    box.innerHTML='<div class="salary-card"><div class="salary-head"><div><h2>История изменений</h2><p>Договоры, паузы, расторжения, удержания, платежи и настройки сохраняются в аудите.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
       (S.audit.length?S.audit.map(a=>'<div class="salary-event"><time>'+new Date(a.created_at).toLocaleString('ru-RU')+'</time><div><b>'+esc(a.entity_type)+' · '+esc(a.action)+'</b><small>'+esc(a.entity_id||'')+'</small></div><span class="salary-pill blue">'+esc(profileName(a.actor_id))+'</span></div>').join(''):'<div class="salary-empty">История пока пустая.</div>')+
       '</div></div></div>';
   }

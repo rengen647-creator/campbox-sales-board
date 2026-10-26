@@ -1,8 +1,13 @@
 /* CampBox Finance: managerial commission ledger linked to Salary contracts / receipts. */
 (function(){
 'use strict';
-var state={clients:[],contracts:[],charges:[],payments:[],busy:false,month:'',tab:'summary'};
+var state={clients:[],contracts:[],charges:[],payments:[],recentByTab:{},busy:false,month:'',tab:'summary',paymentTab:'all'};
 var productNames={campbox:'Комиссия CampBox',order_management:'МУЗ',comfort_booking:'КБ',site:'Сайт',maps:'Карты',site_support:'Поддержка сайта'};
+var paymentTabs=[{id:'all',label:'Все'},{id:'campbox',label:'Комиссия CampBox'},{id:'order_management',label:'МУЗ'},{id:'comfort_booking',label:'КБ'},{id:'site',label:'Сайт'},{id:'site_support',label:'Поддержка сайта'},{id:'maps',label:'Карты'}];
+function paymentGroup(p){return typeof p==='string'?p:p?.product_type}
+function paymentMatches(p,tab){return tab==='all'||paymentGroup(p)===tab}
+function receiptCount(n){var mod=n%100,unit=n%10;return n+' '+(mod>=11&&mod<=14?'поступлений':unit===1?'поступление':unit>=2&&unit<=4?'поступления':'поступлений')}
+
 var productOptions=()=>[['campbox','Комиссия CampBox'],['order_management','МУЗ'],['comfort_booking','КБ'],['site','Сайт']].map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('');
 function switchTab(tab){state.tab=tab;var rank=$('finPanel-summary-ranking');if(rank)rank.hidden=tab!=='summary';['summary','charges','payments'].forEach(id=>{var el=$('finPanel-'+id),b=$('finTab-'+id);if(el)el.hidden=id!==tab;if(b){b.classList.toggle('primary',id===tab);b.setAttribute('aria-selected',String(id===tab));}})}
 var $=id=>document.getElementById(id);
@@ -113,7 +118,7 @@ function section(){
  '<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px" role="tablist" aria-label="Разделы финансов"><button class="btn" id="finTab-summary" role="tab">Сводка</button><button class="btn" id="finTab-charges" role="tab">Начисления</button><button class="btn" id="finTab-payments" role="tab">Поступления</button></div><div id="finPanel-summary"><div id="finStats" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px"></div>'+
  matrixHtml+'</div><div id="finPanel-charges" hidden><section class="card pad"><div style="display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap"><div><h2>Начисления по лагерям</h2><p style="color:var(--muted)">Каждый лагерь показывает текущий месяц и накопленный итог.</p></div><button class="btn primary" id="finAdd">+ Начисление</button></div><div class="table-wrap" style="margin-top:12px"><table style="min-width:900px"><thead><tr><th>Лагерь / договор</th><th>Менеджер</th><th>Направление</th><th>Начислено</th><th>Оплачено за месяц</th><th>Оплатить до</th><th></th></tr></thead><tbody id="finRows"></tbody></table></div></section>'+
  '</div><div id="finPanel-summary-ranking"><section class="card pad" style="margin-top:14px"><h2>Эффективность продаж по деньгам</h2><p style="color:var(--muted)">Рейтинг по начисленной комиссии, без смешения качества продажи со сроками оплаты.</p><div id="finRanking"></div></section>'+
- '</div><div id="finPanel-payments" hidden><section class="card pad"><h2>Фактические поступления</h2><p style="color:var(--muted)">Новая оплата появится также в зарплатном модуле. Указывай продукт и договор, чтобы исключить двойной учёт.</p><button class="btn" id="finPayAdd">+ Зафиксировать поступление</button><div id="finPayments" style="margin-top:12px"></div></section>';
+ '</div><div id="finPanel-payments" hidden><section class="card pad"><h2>Фактические поступления</h2><p style="color:var(--muted)">Новая оплата появится также в зарплатном модуле. Указывай продукт и договор, чтобы исключить двойной учёт.</p><button class="btn" id="finPayAdd">+ Зафиксировать поступление</button><div id="finPaymentTabs" class="fin-payment-tabs" role="tablist" aria-label="Направление поступлений">'+paymentTabs.map(t=>'<button type="button" class="fin-payment-tab" role="tab" aria-selected="false" data-fin-payment-tab="'+t.id+'">'+esc(t.label)+'</button>').join('')+'</div><div id="finPaymentSummary" class="fin-payment-summary" aria-live="polite"></div><div class="card pad" style="margin-top:14px;background:var(--panel3)"><h3 style="margin:0 0 5px">Последние внесённые записи</h3><p style="color:var(--muted);font-size:12px;margin:0 0 10px">Последние 50 записей по выбранному направлению, независимо от месяца. Дата поступления отдельно.</p><label for="finRecentSearch">Поиск лагеря</label><input id="finRecentSearch" type="search" placeholder="Название лагеря" style="max-width:430px"><div id="finRecent" style="margin-top:12px"></div></div><h3 style="margin-top:20px">Оплаты за выбранный месяц</h3><div id="finPayments" style="margin-top:12px"></div></section>';
  $('finMonth').value=month();
  ['summary','charges','payments'].forEach(x=>{$('finTab-'+x).onclick=()=>switchTab(x)});
  switchTab(state.tab);
@@ -126,6 +131,18 @@ function section(){
  $('finMatrixFilter').onchange=renderMatrix;
  $('finAdd').onclick=()=>editCharge();
  $('finPayAdd').onclick=()=>editPayment();
+ $('finRecentSearch').oninput=renderRecent;
+ $('finPaymentTabs').addEventListener('click',e=>{
+  var b=e.target.closest('[data-fin-payment-tab]');if(!b)return;
+  if(paymentTabs.some(t=>t.id===b.dataset.finPaymentTab)){state.paymentTab=b.dataset.finPaymentTab;renderPayments();}
+ });
+ $('finPaymentTabs').addEventListener('keydown',e=>{
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+  var idx=paymentTabs.findIndex(t=>t.id===state.paymentTab);
+  var target=e.key==='Home'?0:e.key==='End'?paymentTabs.length-1:e.key==='ArrowRight'?(idx+1)%paymentTabs.length:(idx-1+paymentTabs.length)%paymentTabs.length;
+  state.paymentTab=paymentTabs[target].id;renderPayments();
+  $('finPaymentTabs').querySelector('[data-fin-payment-tab="'+state.paymentTab+'"]')?.focus();e.preventDefault();
+ });
  return root;
 }
 function note(t,error){var e=$('finMessage');if(e){e.textContent=t||'';e.style.color=error?'#ff9dad':'var(--muted)';}}
@@ -134,15 +151,25 @@ async function load(){
  if(state.busy)return;section();state.busy=true;note('Загрузка…');
  try{
  var m=$('finMonth').value||month(),begin=first(m),end=next(m);
+ async function recentPayments(){
+  var cols='id,contract_id,client_id,payment_date,product_type,amount,status,event_type,comment,created_at,created_by';
+  var pages=await Promise.all(paymentTabs.map(t=>{
+   var q=sb.from('salary_payments').select(cols).eq('event_type','payment');
+   if(t.id!=='all')q=q.eq('product_type',t.id);
+   return q.order('created_at',{ascending:false}).limit(50);
+  }));
+  var result={};pages.forEach((p,i)=>{if(p.error)throw p.error;result[paymentTabs[i].id]=p.data||[]});return result;
+ }
  async function allPayments(){var out=[],offset=0,limit=1000;for(;;){var page=await sb.from('salary_payments').select('id,contract_id,client_id,payment_date,product_type,amount,status,event_type,comment').lt('payment_date',end).order('id',{ascending:true}).range(offset,offset+limit-1);if(page.error)throw page.error;out.push(...(page.data||[]));if((page.data||[]).length<limit)break;offset+=limit;}return out;}
  var queries=await Promise.all([
   sb.from('salary_clients').select('id,client_name'),
   sb.from('salary_contracts').select('id,client_id,contractor_id,signed_date,status'),
   sb.from('sales_finance_charges').select('*').eq('month',begin),
-  allPayments()
+  allPayments(),
+  recentPayments()
  ]);
  for(var r of queries)if(r&&r.error)throw r.error;
- state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.payments=(queries[3]||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
+ state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.recentByTab=queries[4]||{};state.payments=(queries[3]||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
  state.month=m;
  var selected=$('finManager').value;
  $('finManager').innerHTML='<option value="all">Все менеджеры</option>'+[...new Set(state.contracts.map(c=>c.contractor_id).filter(Boolean))].map(id=>'<option value="'+esc(id)+'">'+esc(managerName(id))+'</option>').join('');
@@ -176,9 +203,37 @@ function render(){
  $('finRows').querySelectorAll('[data-contract]').forEach(b=>b.onclick=()=>editCharge(state.charges.find(x=>x.id===b.dataset.charge),b.dataset.contract));
  var groups=new Map();contractRows.forEach(c=>{var id=c.contractor_id||'none';var g=groups.get(id)||{amount:0,paid:0,clients:new Set()};g.amount+=rows.filter(ch=>ch.contract_id===c.id).reduce((sum,ch)=>sum+n(ch.amount),0);g.paid+=receipts(c.id);g.clients.add(c.client_id);groups.set(id,g)});
  $('finRanking').innerHTML='<div class="table-wrap"><table style="min-width:540px"><thead><tr><th>Менеджер</th><th>Лагерей</th><th>Начислено за месяц</th><th>Получено за месяц</th><th>Средняя комиссия</th></tr></thead><tbody>'+[...groups].sort((a,b)=>b[1].amount-a[1].amount).map(([id,g])=>'<tr><td>'+esc(managerName(id))+'</td><td>'+g.clients.size+'</td><td>'+money(g.amount)+'</td><td>'+money(g.paid)+'</td><td>'+money(g.clients.size?g.amount/g.clients.size:0)+'</td></tr>').join('')+'</tbody></table></div>';
- var pay=state.payments.filter(p=>p.payment_date>=first(state.month)&&p.payment_date<next(state.month)&&contractSet.has(p.contract_id));
  renderMatrix();
- $('finPayments').innerHTML=pay.map(p=>'<div style="padding:8px 0;border-bottom:1px solid var(--line)">'+esc(p.payment_date)+' · '+esc(client(p.client_id))+' · '+money(p.amount)+' · '+esc(productNames[p.product_type]||p.product_type)+'</div>').join('')||'Подтверждённых поступлений за месяц нет.';
+ renderPayments();
+}
+function selectedPayments(){
+ var manager=$('finManager')?.value||'all',allowed=new Set(state.contracts.filter(c=>manager==='all'||c.contractor_id===manager).map(c=>c.id));
+ return state.payments.filter(p=>p.payment_date>=first(state.month)&&p.payment_date<next(state.month)&&allowed.has(p.contract_id));
+}
+function renderPayments(){
+ var el=$('finPayments');if(!el)return;
+ var all=selectedPayments(),tab=state.paymentTab;
+ $('finPaymentTabs')?.querySelectorAll('[data-fin-payment-tab]').forEach(b=>{
+  var id=b.dataset.finPaymentTab,active=id===tab,count=all.filter(p=>paymentMatches(p,id)).length;
+  b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1;
+  b.textContent=paymentTabs.find(t=>t.id===id).label+' · '+count;
+ });
+ var rows=all.filter(p=>paymentMatches(p,tab)).sort((a,b)=>String(b.payment_date).localeCompare(String(a.payment_date))||String(b.id).localeCompare(String(a.id)));
+ var amount=rows.reduce((sum,p)=>sum+n(p.amount),0),label=paymentTabs.find(t=>t.id===tab)?.label||'Все';
+ $('finPaymentSummary').innerHTML='<strong>'+esc(label)+'</strong><span>За '+esc(state.month)+': '+receiptCount(rows.length)+' · <b>'+money(amount)+'</b></span>';
+ el.innerHTML=rows.map(p=>'<div class="fin-payment-row"><span>'+esc(p.payment_date)+' · '+esc(client(p.client_id))+'</span><b>'+money(p.amount)+'</b><small>'+esc(productNames[p.product_type]||p.product_type)+'</small></div>').join('')||'<div class="hint">Подтверждённых поступлений по направлению за этот месяц нет.</div>';
+ renderRecent();
+}
+function renderRecent(){
+ var el=$('finRecent');if(!el)return;
+ var tab=state.paymentTab,manager=$('finManager')?.value||'all',allowed=new Set(state.contracts.filter(c=>manager==='all'||c.contractor_id===manager).map(c=>c.id));
+ var recent=state.recentByTab[tab]||[],search=String($('finRecentSearch')?.value||'').toLocaleLowerCase('ru').trim();
+ var rows=recent.filter(p=>allowed.has(p.contract_id)&&(!search||client(p.client_id).toLocaleLowerCase('ru').includes(search)));
+ var fmt=v=>v?new Date(v).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+ el.innerHTML='<p style="color:var(--muted);font-size:12px">Показано '+rows.length+' из '+recent.length+' последних записей направления. Предварительные и исключённые платежи видны, но не входят в итоги.</p>'+
+  (rows.length?'<div class="table-wrap"><table class="fin-recent-table"><thead><tr><th>Когда внесено</th><th>Лагерь</th><th>Дата оплаты</th><th>Направление</th><th>Сумма</th><th>Внёс</th><th>Статус</th></tr></thead><tbody>'+
+  rows.map(p=>'<tr><td>'+esc(fmt(p.created_at))+'</td><td><b>'+esc(client(p.client_id))+'</b></td><td>'+esc(p.payment_date||'—')+'</td><td>'+esc(productNames[p.product_type]||p.product_type)+'</td><td>'+money(p.amount)+'</td><td>'+esc(managerName(p.created_by))+'</td><td>'+esc(({paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'})[p.status]||p.status)+'</td></tr>').join('')+
+  '</tbody></table></div>':'<div class="hint">По этому направлению и фильтру записей нет.</div>');
 }
 function picker(existing){
  var options=state.contracts.map(c=>'<option value="'+esc(c.id)+'" '+(existing?.contract_id===c.id?'selected':'')+'>'+esc(client(c.client_id))+' · '+esc(managerName(c.contractor_id))+' · '+esc(c.signed_date||'без даты')+'</option>').join('');
