@@ -48,10 +48,10 @@ const document={
 };
 let saved=0,calculated=0;
 const escape=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const make=new Function('document','currentUser','dayRows','activityKeys','metricLabels',
+const make=new Function('document','currentUser','currentSelf','dayRows','activityKeys','metricLabels',
  'coachAutoPlan','coachPriorityData','changed','recalc','pct','h','fd','diag','risk','worst',
  code+';return renderToday;');
-const render=make(document,{id:'u1'},[row],['calls','booked','meetings','offers','follow'],
+const render=make(document,{id:'u1'},()=> 'u1',[row],['calls','booked','meetings','offers','follow'],
  {calls:'Звонки',booked:'Назначено встреч',meetings:'Проведено встреч',offers:'КП / расчёты',follow:'Повторные контакты'},
  ()=>({metrics:{calls:{shortReason:'Рекомендация: 10, пояснение '+('много слов '.repeat(80))},booked:{shortReason:'План рассчитывается'}}}),
  ()=>[{title:'Позвонить первым',text:'Вернуться к рабочему темпу'}],
