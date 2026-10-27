@@ -290,7 +290,7 @@
   function mountFinance() {
     var root=screen('finance');if(!root||root.dataset.cbV2||!$('finTab-summary'))return;
     root.dataset.cbV2='1';
-    var header=intro('Финансовый контроль','Начисления — сколько должны. Поступления — сколько действительно оплатили. Эти показатели нельзя смешивать.','09 / ДЕНЬГИ');
+    var header=intro('Финансовый контроль','Начисления — выставленные суммы. Поступления — подтверждённые оплаты. Это разные показатели.','09 / ДЕНЬГИ');
     root.insertBefore(header,root.firstChild);
     var tabs=$('finTab-summary')?.parentElement;
     if(tabs)tabs.classList.add('cb-finance-tabs');
