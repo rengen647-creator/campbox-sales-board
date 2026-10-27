@@ -1,6 +1,6 @@
 const CACHE = 'campbox-sales-os3-reqa-2026-10-27';
 const SHELL = [
-  './sales-board.css?v=20261027qa3',
+  './sales-board.css?v=20261027reqa',
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './sales-coach.js?v=20261019stableplan',
   './os3-report.js?v=20261027qa2',

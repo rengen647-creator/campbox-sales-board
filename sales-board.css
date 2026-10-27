@@ -1993,7 +1993,8 @@ html.os3 .os3-context{margin-bottom:16px!important}
 .os3 .v13-screen{overflow-wrap:anywhere}
 @media print{.os3 .os3-section-links{display:none!important}
 .os3 .os3-table-scroll{overflow:visible!important;max-height:none!important}
-.os3 .v13-report-table{display:table!important}
+.os3 .v13-report-table{display:table!important;min-width:0!important;width:100%!important;table-layout:fixed;overflow:visible!important}
+.os3 .v13-report-table td{white-space:normal!important;overflow-wrap:anywhere}
 .os3 .v13-report-preview{display:block!important}
 }
 .os3-state{padding:24px;border:1px solid var(--os-border);border-radius:14px;background:var(--os-raised);line-height:1.6}
