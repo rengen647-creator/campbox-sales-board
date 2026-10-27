@@ -40,12 +40,13 @@
     var m=titleMeta(id),t=document.getElementById('v13PageTitle'),d=document.getElementById('v13PageDesc');
     if(t)t.textContent=m[0];if(d)d.textContent=m[1];
     refresh();
+    if((id==='month'||id==='analytics')&&typeof renderPace==='function'){renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();}
     if(id==='salary'&&typeof window.salaryOpen==='function')window.salaryOpen();
     if(id==='finance'&&typeof window.salesFinanceOpen==='function')window.salesFinanceOpen();
     if(id==='contracts')loadMissingContractNumbers();
     window.scrollTo({top:0,behavior:'smooth'});
   }
-  window.v13Go=go;
+  window.v13Go=go;window.os3RefreshAnalytics=function(){renderAnalytics();};
 
   function navButton(id,icon,label){
     return '<button type="button" data-v13-view="'+id+'">'+icon+' &nbsp;'+label+'</button>';
@@ -350,6 +351,7 @@
       '<div class="v13-manager-columns"><div class="v13-coach-box"><h4>Что получается</h4><ul>'+(good.length?good.map(function(x){return '<li>'+h(x.label)+': '+h(x.diagnosis)+'</li>';}).join(''):'<li>Нужно больше данных для устойчивого вывода.</li>')+'</ul></div><div class="v13-coach-box"><h4>Что тянет вниз</h4><ul>'+(weak.length?weak.slice(0,4).map(function(x){return '<li>'+h(x.label)+': '+h(x.fact)+' при ориентире '+h(x.guide)+'</li>';}).join(''):'<li>Критичных просадок нет.</li>')+(cr.over7?'<li>Контрактинг: '+cr.over7+' договор(а) старше 7 дней.</li>':'')+'</ul></div></div>'+
       '<div class="v13-coach-box" style="margin-top:8px;border-color:rgba(163,109,245,.35)"><h4>Фокус Coach</h4><p>'+h(actionFor(weak[0]))+'</p></div>';
     clientActions(box,id);
+    if(isManager()){var moneyButton=el('button','btn','Поступления менеджера');moneyButton.type='button';moneyButton.onclick=function(){if(window.salesFinanceFor)window.salesFinanceFor(id);go('finance');};box.append(moneyButton);}
     var close=document.getElementById('v13ManagerClose');if(close)close.addEventListener('click',function(){V.managerOpen=false;renderTeam();setTimeout(function(){var g=document.getElementById('v13TeamGrid');if(g)g.scrollIntoView({behavior:'smooth',block:'start'});},30);});
   }
 
@@ -451,7 +453,7 @@
     var modes={activity:'Активность',conversion:'Конверсия',pace:'Темп месяца',discipline:'Дисциплина'};
     tabs.innerHTML=Object.keys(modes).map(function(k){return '<button type="button" data-v13-analytics="'+k+'" class="'+(V.analytics===k?'active':'')+'">'+modes[k]+'</button>';}).join('');
     tabs.querySelectorAll('[data-v13-analytics]').forEach(function(b){b.addEventListener('click',function(){V.analytics=this.getAttribute('data-v13-analytics');renderAnalytics();});});
-    var uid=safeScope();if(!uid)return;var d=diag(uid),f=fd(uid),title='',source='',diagnosis='',what='',why='',next='';
+    var uid=isManager()&&typeof os3AnalyticsScope!=='undefined'?os3AnalyticsScope:currentSelf();if(!uid)return;var d=diag(uid),f=fd(uid),title='',source='',diagnosis='',what='',why='',next='';
     if(V.analytics==='activity'){
       var aa=d.filter(function(x){return x.type==='activity';}),weak=aa.filter(function(x){return x.tone!=='good';}).sort(function(a,b){return a.score-b.score;})[0];
       title='Активность · хватает ли объёма работы';source='Источник: ежедневный автоплан и факт действий менеджеров.';diagnosis=weak?weak.label+': '+weak.diagnosis:'Объём активности выполняется.';what='Сравниваем накопленный план и факт по каждому действию.';why='Отделяем проблему объёма от проблемы качества конверсии.';next=weak?actionFor(weak):'Не увеличивать активность без необходимости.';

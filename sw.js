@@ -20,6 +20,7 @@ const SHELL = [
   './product-v2.js?v=20261027os3',
   './ios-v3.js?v=20261027c',
   './ios-v4.js?v=20261027d',
+  './os3-components.js?v=20261027qa2',
   './os3-charts.js?v=20261027qa2',
   './os3-ui.js?v=20261027qa2',
   './os3.css?v=20261027qa2'

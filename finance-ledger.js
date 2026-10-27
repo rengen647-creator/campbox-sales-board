@@ -182,7 +182,7 @@ async function load(){
  for(var r of queries)if(r&&r.error)throw r.error;
  state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.recentByTab=queries[4]||{};state.payments=(queries[3]||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
  state.month=m;
- var selected=$('finManager').value;
+ var selected=state.pendingManager||$('finManager').value;state.pendingManager=null;
  $('finManager').innerHTML='<option value="all">Все менеджеры</option>'+[...new Set(state.contracts.map(c=>c.contractor_id).filter(Boolean))].map(id=>'<option value="'+esc(id)+'">'+esc(managerName(id))+'</option>').join('');
  $('finManager').value=[...$('finManager').options].some(o=>o.value===selected)?selected:'all';
  note('«Принёс всего» — сумма подтверждённых поступлений за всю сохранённую историю платежей до конца выбранного месяца. Не прогноз и не задолженность.');
@@ -280,5 +280,6 @@ function exportCsv(){
  var csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
  var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=url;a.download='CampBox_Финансы_'+state.month+'.csv';a.click();URL.revokeObjectURL(url);
 }
+window.salesFinanceFor=id=>{state.pendingManager=id;if(section())load();};
 window.salesFinanceOpen=()=>{if(section())load();};
 })();

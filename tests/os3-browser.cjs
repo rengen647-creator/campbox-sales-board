@@ -33,8 +33,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
  }
  await page.evaluate(()=>window.v13Go('finance'));await page.locator('#finMatrixRows tr').waitFor();const finance=await page.locator('#finStats').innerText();assert.match(finance,/6\s*000/);assert.match(finance,/10\s*000/);assert.ok(!/8\s*000/.test(finance));
  await page.locator('[data-fin-month="2026-10"]').click();await page.locator('#os3FinanceInspector[open]').waitFor();assert.match(await page.locator('#os3FinanceInspector').innerText(),/6\s*000/);await page.keyboard.press('Escape');
- await page.evaluate(()=>window.v13Go('analytics'));assert.equal(await page.locator('.os3-spark').count(),4);await page.locator('.os3-point').first().focus();assert.ok((await page.locator('.os3-chart-readout').first().innerText()).includes('·'));
- assert.deepEqual(errors,[]);fs.writeFileSync(out+'/results.json',JSON.stringify({checks,failures,errors},null,2));assert.deepEqual(failures,[]);
+ await page.evaluate(()=>window.v13Go('analytics'));assert.equal(await page.locator('.os3-spark').count(),4);await page.locator('#v13-analytics .os3-point').first().focus();assert.ok((await page.locator('#v13-analytics .os3-chart-readout').first().innerText()).includes('·'));
+ fs.writeFileSync(out+'/results.json',JSON.stringify({checks,failures,errors},null,2));assert.deepEqual(errors,[]);assert.deepEqual(failures,[]);
+ await page.goto('file://'+path.resolve('qa/os3-components.html'));assert.equal(await page.locator('.os3-state').count(),3);await page.screenshot({path:out+'/component-states.png',fullPage:true});
  }finally{await browser.close();}
  console.log('PASS OS3: 160 screen/theme/width states, 20 expanded zoom states, workbook values, print artifacts, financial inspector and keyboard chart.');
 })().catch(e=>{console.error(e);process.exit(1);});

@@ -6,7 +6,7 @@ const valid=v=>v!==null&&v!==undefined&&Number.isFinite(Number(v));
 const fmt=v=>valid(v)?Number(v).toLocaleString('ru-RU',{maximumFractionDigits:1}):'Нет данных';
 function chart({labels=[],series=[],title='Динамика',unit='',kind='line',band,cutoff=-1}={}){
  const values=series.flatMap(s=>s.values.filter(valid)).concat(band?band.flat().filter(valid):[]);
- if(!labels.length||!values.length)return '<div class="os3-empty" role="status"><b>Недостаточно данных</b><p>График появится после внесения фактов за выбранный период.</p></div>';
+ if(!labels.length||!values.length)return root.CampBoxComponents?root.CampBoxComponents.state('empty','Недостаточно данных','График появится после внесения фактов за выбранный период.'):'<div class="os3-empty" role="status"><b>Недостаточно данных</b><p>График появится после внесения фактов за выбранный период.</p></div>';
  const W=760,H=280,L=54,R=20,T=26,B=40,max=Math.max(1,...values)*1.12,min=Math.min(0,...values),range=max-min;
  const x=i=>L+(W-L-R)*(i+.5)/labels.length,y=v=>T+(H-T-B)*(max-v)/range;
  let body='';

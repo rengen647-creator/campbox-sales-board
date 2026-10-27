@@ -3,7 +3,7 @@
 'use strict';
 const $=id=>document.getElementById(id),E=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;};
 const components={PageHeader:'.cb-page-intro',ContextBar:'.os3-context',HeroMetric:'.os3-hero',KpiTile:'.v13-kpi',DeltaBadge:'.pill',DecisionCard:'.os3-decision',ReasonDisclosure:'details',ActivityCard:'.ios4-activity',ChartShell:'.os3-chart',SegmentedControl:'.os3-conversions',FilterBar:'.fin-matrix-controls',DataTable:'.os3-table-scroll',MasterList:'.cb-contract-list',DetailInspector:'.cb-contract-detail',StatusTimeline:'.salary-timeline',MoneyMetric:'.salary-kpi',EmptyState:'.os3-empty',ErrorState:'.os3-error',LoadingSkeleton:'.os3-loading',ConfirmDialog:'.modal',SaveStatus:'#saveStatus',MobileBottomNav:'#v13MobileNav'};
-window.CampBoxOS3={components};
+window.CampBoxOS3={components,render:window.CampBoxComponents};
 function card(title,cls){const n=E('section','card os3-panel '+(cls||''));n.append(E('h2','',title));return n;}
 function disclose(node,title){if(!node)return;const d=E('details','os3-disclosure');d.append(E('summary','',title));node.before(d);d.append(node);}
 function mount(){
@@ -30,7 +30,7 @@ function mount(){
  const intro=a.querySelector('.cb-page-intro');
  const filters=E('div','os3-analytics-filters');filters.innerHTML='<label>Область <select id="os3AnalyticsScope"><option value="team">Команда</option></select></label><label>Детализация <select id="os3Granularity"><option value="day">День</option><option value="week">Неделя</option><option value="month">Месяц</option></select></label>';intro.after(filters);
  const scope=$('os3AnalyticsScope');scope.onfocus=()=>{const old=scope.value;scope.replaceChildren();if(isManager())scope.add(new Option('Команда','team'));profiles.filter(p=>isManager()||p.id===currentUser?.id).forEach(p=>scope.add(new Option(p.full_name||p.email,p.id)));if([...scope.options].some(o=>o.value===old))scope.value=old;};
- const update=()=>{os3AnalyticsScope=isManager()?scope.value:currentUser.id;os3Granularity=$('os3Granularity').value;setCoachUser(os3AnalyticsScope);renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();};scope.onchange=update;$('os3Granularity').onchange=update;
+ const update=()=>{os3AnalyticsScope=isManager()?scope.value:currentUser.id;os3Granularity=$('os3Granularity').value;setCoachUser(os3AnalyticsScope);window.os3RefreshAnalytics?.();renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();};scope.onchange=update;$('os3Granularity').onchange=update;
 
  const pace=card('Темп результата','os3-analytics-pace');const ch=E('div','os3-chart');ch.id='os3AnalyticsPace';pace.append(ch);
  const decision=E('aside','os3-decision');decision.id='os3PaceDecision';
