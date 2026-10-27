@@ -15,7 +15,7 @@ assert.ok(html.indexOf('ios-v3.js')>html.indexOf('product-v2.js'));
 assert.match(sw,/campbox-sales-ios-v4-2026-10-27/);
 assert.match(sw,/ios-v3\.css\?v=20261027c/);
 assert.match(sw,/ios-v3\.js\?v=20261027c/);
-assert.match(sw,/ui-v13\.js\?v=20261027ios3/);
+assert.match(sw,/ui-v13\.js\?v=20261027ios4/);
 // Five canonical facts, still using the same data-v13-fact + changed() + recalc() contract.
 const begin=v13.indexOf('  function renderToday(){'),end=v13.indexOf('\n  function renderMonth(){',begin);
 assert.ok(begin>=0&&end>begin,'source daily renderer exists');
