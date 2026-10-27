@@ -8,7 +8,9 @@ s=s.replace(/const SUPABASE_ANON_KEY\s*=.*?;/,'const SUPABASE_ANON_KEY="";');
 s=s.replace('<head>','<head><base href="../"><meta name="robots" content="noindex">');
 s=s.replace('</body>',`<script>
 window.fetch=()=>Promise.reject(new Error('QA: network disabled'));
+${fs.readFileSync('tests/os3-fixture-db.js','utf8')}
 window.addEventListener('DOMContentLoaded',()=>{
+ qaInstallDatabase();
  currentUser={id:'qa-lead',email:'qa@example.invalid'};currentProfile={id:'qa-lead',full_name:'Тестовый руководитель',role:'manager',active:true};
  profiles=[currentProfile,{id:'qa-sales',full_name:'Тестовый менеджер с длинным именем',role:'employee',active:true}];
  selectedMonth='2026-10';selectedDate='2026-10-27';

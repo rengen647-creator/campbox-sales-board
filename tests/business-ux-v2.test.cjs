@@ -14,7 +14,7 @@ new vm.Script(salary,{filename:'salary-v1.js'});
 const checks=[];function ok(label,result){assert.ok(result,label);checks.push(label)}
 ok('v2 assets loaded in app',html.includes('product-v2.css?v=20261027b')&&html.includes('product-v2.js?v=20261027os3'));
 ok('v2 assets loaded after baseline',html.indexOf('refined-ui.css')<html.indexOf('product-v2.css')&&html.indexOf('refined-ui.js')<html.indexOf('product-v2.js'));
-ok('v2 PWA versioned and assets cached',/(?:campbox-sales-product-v2|campbox-sales-ios-v3|campbox-sales-ios-v4|campbox-sales-os3-preview)-2026-10-27/.test(sw)&&sw.includes('product-v2.css?v=20261027b')&&sw.includes('product-v2.js?v=20261027os3'));
+ok('v2 PWA versioned and assets cached',/(?:campbox-sales-product-v2|campbox-sales-ios-v3|campbox-sales-ios-v4|campbox-sales-os3-qa)-2026-10-27/.test(sw)&&sw.includes('product-v2.css?v=20261027b')&&sw.includes('product-v2.js?v=20261027os3'));
 ok('five original operation screens reused', ['today','month','contracts','finance','salary'].every(x=>ui.includes("screen('"+x+"')")));
 ok('live KPI nodes moved not imitated',ui.includes("$('v13TodayKpis')")&&ui.includes('relocate(kpis,summary'));
 ok('existing period fields moved intact',ui.includes("root.querySelector(':scope > .context-card')")&&ui.includes('relocate(context,filter'));
@@ -22,7 +22,7 @@ ok('real fact editing not replaced',legacy.includes("data-v13-fact")&&ui.include
 ok('contract card delegates to actual original editor',ui.includes("card.querySelector('[data-open-contract]')")&&ui.includes('source.click()'));
 ok('contract search is display-only',ui.includes('c.hidden=!visible')&&ui.includes('cbContractsSearch'));
 ok('manager detail preserves existing render',ui.includes("$('v13ManagerPanel')")&&ui.includes('aside.append(details)'));
-ok('original finance tabs preserved',ui.includes("$('finTab-summary')")&&finance.includes("switchTab('payments')"));
+ok('original finance tabs preserved',ui.includes("$('finTab-summary')")&&finance.includes("['summary','charges','payments']"));
 ok('salary payout nav not overwritten',ui.includes("$('salaryTabs')")&&salary.includes("S.tab='retention';renderTabs()"));
 ok('right permissions remain in source',finance.includes("!isManager()")&&salary.includes("if(!manager())"));
 ok('confirmed payments only count as received',finance.includes("['paid','confirmed'].includes(p.status)"));

@@ -23,14 +23,18 @@ function mount(){
   groups.forEach(([title,ids])=>{nav.append(E('div','os3-nav-group',title));ids.forEach(id=>{const n=nodes.get(id);if(n)nav.append(n);});});
  }
  nav?.querySelectorAll('.cb-group').forEach(n=>n.remove());
- document.querySelector('.v13-brand small')?.replaceChildren(document.createTextNode('Sales OS 3.0 · preview'));
+ document.querySelector('.v13-brand small')?.replaceChildren(document.createTextNode('Sales OS 3.0'));
  document.querySelectorAll('.cb-eyebrow').forEach(n=>{n.textContent=n.textContent.replace(/^\d+\s*\/\s*/, '');});
  const a=$('v13-analytics');a.classList.add('show-legacy');
  const title=a.querySelector('.cb-page-h');if(title)title.textContent='Динамика и решения';
  const intro=a.querySelector('.cb-page-intro');
+ const filters=E('div','os3-analytics-filters');filters.innerHTML='<label>Область <select id="os3AnalyticsScope"><option value="team">Команда</option></select></label><label>Детализация <select id="os3Granularity"><option value="day">День</option><option value="week">Неделя</option><option value="month">Месяц</option></select></label>';intro.after(filters);
+ const scope=$('os3AnalyticsScope');scope.onfocus=()=>{const old=scope.value;scope.replaceChildren();if(isManager())scope.add(new Option('Команда','team'));profiles.filter(p=>isManager()||p.id===currentUser?.id).forEach(p=>scope.add(new Option(p.full_name||p.email,p.id)));if([...scope.options].some(o=>o.value===old))scope.value=old;};
+ const update=()=>{os3AnalyticsScope=isManager()?scope.value:currentUser.id;os3Granularity=$('os3Granularity').value;setCoachUser(os3AnalyticsScope);renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();};scope.onchange=update;$('os3Granularity').onchange=update;
+
  const pace=card('Темп результата','os3-analytics-pace');const ch=E('div','os3-chart');ch.id='os3AnalyticsPace';pace.append(ch);
  const decision=E('aside','os3-decision');decision.id='os3PaceDecision';
- const lead=E('div','os3-analytics-lead');lead.append(pace,decision);intro.after(lead);
+ const lead=E('div','os3-analytics-lead');lead.append(pace,decision);filters.after(lead);
  const work=E('div','os3-analytics-work');lead.after(work);
  const activity=$('activityChart')?.closest('.card'),calendar=$('calendarHeatmap')?.closest('.card'),conversion=$('conversionChart')?.closest('.card');
  if(activity)work.append(activity);if(calendar){work.append(calendar);calendar.append(E('p','os3-calendar-legend','100%+ — выполнено · 70–99% — частично · <70% — ниже плана. Нет данных, нулевой факт и нерабочий день различаются.'));}
@@ -48,21 +52,14 @@ function mount(){
  const reflect=E('button','btn primary','Мой итог дня');reflect.type='button';reflect.onclick=()=>{if(typeof currentUser!=='undefined'&&currentUser&&typeof openReflection==='function')openReflection(currentUser.id);};note.append(reflect);summary.querySelector('.cb-page-intro')?.after(note);
  // Contract dossier is text-only; editing delegates to the canonical editor in product-v2.
  // No DOM clones or secondary inputs are created here.
- const report=$('v13ReportPreview');if(report){const obs=new MutationObserver(()=>decorateReport());obs.observe(report,{childList:true});decorateReport();}
+ const settings=document.querySelector('.v13-report-settings');if(settings){const label=E('label','','Менеджер / команда'),select=E('select');select.id='os3ReportScope';label.append(select);settings.insertBefore(label,settings.querySelector('button'));const refresh=()=>{const old=select.value;select.replaceChildren();const manager=typeof isManager==='function'&&isManager();if(manager)select.add(new Option('Команда','team'));(typeof profiles==='undefined'?[]:profiles).filter(p=>manager||p.id===currentUser?.id).forEach(p=>select.add(new Option(p.full_name||p.email,p.id)));if([...select.options].some(o=>o.value===old))select.value=old;};select.addEventListener('focus',refresh);select.onchange=()=>window.CampBoxReport.render();refresh();}
+ installSectionLinks();
  const fin=$('v13-finance');if(fin){const obs=new MutationObserver(()=>{const rows=$('finRows');if(rows)rows.closest('.card')?.classList.add('os3-ledger');});obs.observe(fin,{childList:true});}
  if(typeof selectedMonth!=='undefined'&&selectedMonth&&typeof renderPace==='function')renderPace();
- window.CampBoxDesignVersion='sales-os3-20261027-preview';
+ window.CampBoxDesignVersion='sales-os3-20261027-qa';
 }
-function decorateReport(){
- const box=$('v13ReportPreview');if(!box||!box.querySelector('h2')||box.querySelector('.os3-report-charts'))return;
- const top=box.querySelector('.v13-report-callout');if(top){top.classList.add('os3-report-verdict');box.querySelector('.sub')?.after(top);}
- const chartWrap=E('section','os3-report-charts');chartWrap.append(E('h3','','Результат в динамике'));
- // A read-only rendering of the same prepared result series, with no inference of causality.
- const source=$('paceChart');if(source){const graph=E('div','os3-chart');graph.innerHTML=source.innerHTML;chartWrap.append(graph);}
- const kpis=box.querySelector('.v13-report-kpis');if(kpis)kpis.after(chartWrap);else box.append(chartWrap);
- box.querySelectorAll('.v13-report-section h3').forEach(n=>{if(n.textContent==='Что имеем')n.textContent='Показатели, требующие разбора';if(n.textContent==='Что делаем')n.textContent='Рекомендуемые действия';});
- const meta=E('p','os3-report-meta','Источник: Sales Board · сформировано '+new Date().toLocaleString('ru-RU'));
- box.append(meta);
+function installSectionLinks(){
+ document.querySelectorAll('.v13-screen').forEach(root=>{const details=E('details','os3-section-links'),summary=E('summary','','Перейти к подразделу');details.append(summary);const list=E('div');details.append(list);root.prepend(details);details.addEventListener('toggle',()=>{if(!details.open)return;list.replaceChildren();root.querySelectorAll('h2,h3,details > summary').forEach((heading,i)=>{if(details.contains(heading))return;const button=E('button','btn',heading.textContent.trim());button.type='button';button.onclick=()=>{let node=heading;while(node&&node!==root){if(node.tagName==='DETAILS')node.open=true;node=node.parentElement;}heading.tabIndex=-1;heading.focus();heading.scrollIntoView({block:'start'});details.open=false;};list.append(button);});});});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 })();

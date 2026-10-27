@@ -1,0 +1,33 @@
+name: OS3 — reports, business invariants and browser QA
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  os3-required:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: All calculation and chart regressions
+        run: node --test tests/*.test.cjs
+      - name: Install browser and workbook verifier
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1 exceljs@4.4.0
+          npx playwright install --with-deps chromium
+      - name: Generate isolated full application fixture
+        run: node tests/build-os3-fixture.cjs
+      - name: Ten screens, eight widths, two themes, zoom and export
+        run: node tests/os3-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: os3-browser-evidence
+          path: qa/os3-evidence/
+          retention-days: 15
