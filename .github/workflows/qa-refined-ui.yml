@@ -3,7 +3,7 @@ on:
   pull_request:
     paths:
       - 'index.html'
-      - 'refined-ui.css'
+      - 'sales-board.css'
       - 'refined-ui.js'
       - 'sw.js'
       - 'tests/refined-ui.test.cjs'
@@ -16,6 +16,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

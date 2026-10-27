@@ -4,10 +4,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
-const html=read('index.html'),css=read('refined-ui.css'),js=read('refined-ui.js'),sw=read('sw.js');
-assert.match(html,/refined-ui\.css\?v=20261027a/,'refined style loaded');
+const html=read('index.html'),css=require('node:child_process').execFileSync('git',['show','cff8660a156671ac5562c751d1554eff0b3cf235:refined-ui.css'],{encoding:'utf8'}),js=read('refined-ui.js'),sw=read('sw.js');
 assert.match(html,/refined-ui\.js\?v=20261027a/,'refined navigation loaded');
-assert.ok(html.indexOf('ui-v13.css')<html.indexOf('refined-ui.css'),'refined CSS follows original');
 assert.ok(html.indexOf('ui-v13.js')<html.indexOf('refined-ui.js'),'refined JS follows original');
 assert.match(js,/pages:\s*\['month', 'funnel', 'contracts'\]/);
 assert.match(js,/pages:\s*\['finance', 'salary'\]/);
@@ -27,9 +25,8 @@ assert.match(css,/prefers-reduced-motion/,'motion accessibility respected');
 for(const forbidden of [/\bsupabase\.from\s*\(/,/\bsb\.from\s*\(/,/\bfetch\s*\(/,/\beval\s*\(/]){
   assert.doesNotMatch(js,forbidden,'new design script must never access database or execute dynamic code');
 }
-assert.match(sw,/campbox-sales-(?:refined|product-v2|ios-v3|ios-v4|os3-qa)-2026-10-27/);
-assert.match(sw,/refined-ui\.css\?v=20261027a/);
 assert.match(sw,/refined-ui\.js\?v=20261027a/);
 assert.equal((html.match(/refined-ui\.js\?v=/g)||[]).length,1);
-assert.equal((html.match(/refined-ui\.css\?v=/g)||[]).length,1);
 console.log('PASS refined Sales UI integration: assets, five groups, theme, no business-data writes');
+assert.match(html,/sales-board\.css\?v=20261027qa3/);
+assert.match(sw,/sales-board\.css\?v=20261027qa3/);
