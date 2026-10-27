@@ -264,20 +264,31 @@
     var dayPct=vals.length?Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length):0;
     var focus=prio[0]||{title:'Сохранить текущий темп',text:'Критичных просадок по текущим данным нет.'};
 
-    var rows=keys.map(function(k){
-      var why=auto&&auto.metrics&&auto.metrics[k]?auto.metrics[k].shortReason:'автоплан';
-      return '<tr><td><b>'+h(metricLabels[k])+'</b></td><td><b>'+Number(row[k+'_plan']||0)+'</b></td><td><input type="number" min="0" data-v13-fact="'+k+'" value="'+Number(row[k+'_fact']||0)+'"></td><td class="v13-plan-why">'+h(why)+'</td></tr>';
+    // iOS V3: a single, responsive source-of-truth fact input for each activity.
+    // The same original changed()/recalc() handlers below persist input into daily_sales.
+    var icons={calls:'phone',booked:'calendar',meetings:'users',offers:'file',follow:'repeat'};
+    var cards=keys.map(function(k){
+      var target=Number(row[k+'_plan']||0),fact=Number(row[k+'_fact']||0);
+      var rest=Math.max(0,target-fact),autoMetric=auto&&auto.metrics&&auto.metrics[k]?auto.metrics[k]:null;
+      var why=autoMetric?autoMetric.shortReason:'Показатель рассчитывается автоматически';
+      var tone=target===0?'neutral':rest===0?'good':'progress';
+      return '<article class="cb-task-item '+tone+'" data-task-kind="'+h(k)+'">'+
+        '<div class="cb-task-icon" data-cb-icon="'+h(icons[k]||'activity')+'" aria-hidden="true"></div>'+
+        '<div class="cb-task-info"><div class="cb-task-name">'+h(metricLabels[k]||k)+'</div>'+
+        '<div class="cb-task-status">'+(target===0?'План не установлен':rest===0?'План выполнен':'Осталось '+rest)+'</div>'+
+        '<details class="cb-task-why"><summary>Как рассчитан план</summary><p>'+h(why)+'</p></details></div>'+
+        '<div class="cb-task-numbers"><div class="cb-task-plan"><small>План</small><b>'+target+'</b></div>'+
+        '<label class="cb-task-fact"><span>Факт</span><input type="number" min="0" step="1" inputmode="numeric" aria-label="'+h(metricLabels[k]||k)+': факт" data-v13-fact="'+h(k)+'" value="'+fact+'"></label></div>'+
+        '<div class="cb-task-progress-track" aria-hidden="true"><i style="width:'+(target?Math.max(0,Math.min(100,Math.round(fact/target*100))):0)+'%"></i></div>'+
+        '</article>';
     }).join('');
 
-    var mobileCards=keys.map(function(k){
-      var p=Number(row[k+'_plan']||0),fact=Number(row[k+'_fact']||0),remaining=Math.max(p-fact,0);
-      var m=auto&&auto.metrics&&auto.metrics[k]?auto.metrics[k]:null;
-      var why=m?m.shortReason:'автоплан',critical=remaining>0&&m&&m.uplift>0;
-      return '<article class="v13-plan-mobile-card '+(critical?'critical':'')+'"><div class="v13-plan-mobile-head"><div><b>'+h(metricLabels[k])+'</b><span>'+(critical?' · усиленный фокус':'')+'</span></div>'+pill(remaining===0?'good':critical?'bad':'warn',remaining===0?'готово':'осталось '+remaining)+'</div><div class="v13-plan-mobile-values"><div><span>План</span><b>'+p+'</b></div><div><span>Факт</span><input type="number" min="0" inputmode="numeric" data-v13-fact="'+k+'" value="'+fact+'"></div><div><span>Осталось</span><b>'+remaining+'</b></div></div><div class="v13-plan-mobile-why">'+h(why)+'</div></article>';
-    }).join('');
-
-    plan.innerHTML='<div class="v13-day-progress"><div class="v13-day-progress-head"><b>Прогресс дня</b><strong>'+dayPct+'%</strong></div><div class="v13-day-progress-bar"><i style="width:'+Math.min(dayPct,100)+'%"></i></div><small>'+h(focus.title)+'</small></div>'+
-      '<div class="v13-my-plan"><div><table class="v13-plan-table v13-plan-table-desktop"><thead><tr><th>Действие</th><th>План</th><th>Факт</th><th>Почему</th></tr></thead><tbody>'+rows+'</tbody></table><div class="v13-mobile-plan-list">'+mobileCards+'</div></div><div class="v13-focus-hero"><b>'+h(focus.title)+'</b><p>'+h(focus.text)+'</p><strong>'+h(worst(uid))+'</strong></div></div>';
+    plan.innerHTML='<div class="cb-workday-head"><div><span class="cb-overline">ТВОЙ ПЛАН</span><h3>Активность сегодня</h3>'+
+      '<p>Вноси только факт. План и рекомендации рассчитываются автоматически.</p></div>'+
+      '<div class="cb-workday-percent"><strong>'+dayPct+'%</strong><span>выполнено</span></div></div>'+
+      '<div class="cb-task-grid">'+cards+'</div>'+
+      '<div class="cb-plan-insight"><span class="cb-plan-insight-icon" data-cb-icon="sparkle" aria-hidden="true"></span>'+
+      '<div><b>'+h(focus.title)+'</b><p>'+h(focus.text)+'</p><small>'+h(worst(uid))+'</small></div></div>';
 
     plan.querySelectorAll('[data-v13-fact]').forEach(function(inp){
       inp.addEventListener('input',function(){
