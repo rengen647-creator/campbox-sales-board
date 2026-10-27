@@ -7,7 +7,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
  const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto('file://'+path.resolve('qa/os3-app-fixture.html'));await page.waitForSelector('html.os3');
- await page.addScriptTag({path:require.resolve('exceljs/dist/exceljs.min.js')});
+ await page.addScriptTag({path:require.resolve('exceljs/dist/exceljs.min.js')});await page.addScriptTag({path:require.resolve('jszip/dist/jszip.min.js')});
  const screens=['today','month','analytics','funnel','contracts','finance','team','salary','summary','report'];
  for(const theme of ['light','dark'])for(const width of [375,430,820,1024,1280,1440,1593,1920]){
   await page.setViewportSize({width,height:900});await page.evaluate(theme=>document.documentElement.classList.toggle('cb-apple-light',theme==='light'),theme);
@@ -29,7 +29,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.selectOption('#v13ReportPeriod',period);await page.selectOption('#v13ReportType',type);
   const expected=await page.evaluate(()=>window.CampBoxReport.table(window.CampBoxReport.snapshot));
   const dl=page.waitForEvent('download');await page.click('#v13ExcelReport');const download=await dl;const file=out+'/report-'+period+'-'+type+'.xlsx';await download.saveAs(file);
-  const workbook=new ExcelJS.Workbook();await workbook.xlsx.readFile(file);const sheet=workbook.worksheets[0];for(let r=0;r<expected.length;r++)for(let c=0;c<expected[r].length;c++)assert.equal(sheet.getRow(r+1).getCell(c+1).value??null,expected[r][c]??null,'XLSX mismatch '+r+','+c);
+  const workbook=new ExcelJS.Workbook();await workbook.xlsx.readFile(file);const sheet=workbook.getWorksheet('Отчёт');assert.ok(workbook.getWorksheet('Обзор'));const zip=await require('jszip').loadAsync(fs.readFileSync(file));assert.ok(zip.file('xl/charts/chart_sb_1.xml'));const chartXml=await zip.file('xl/charts/chart_sb_1.xml').async('string');assert.ok(chartXml.includes('dispBlanksAs val="gap"')); for(let r=0;r<expected.length;r++)for(let c=0;c<expected[r].length;c++)assert.equal(sheet.getRow(r+1).getCell(c+1).value??null,expected[r][c]??null,'XLSX mismatch '+r+','+c);
   await page.evaluate(()=>document.body.classList.add('v13-print-report'));await page.pdf({path:out+'/report-'+period+'-'+type+'.pdf',format:'A4',printBackground:true});await page.evaluate(()=>document.body.classList.remove('v13-print-report'));
  }
  await page.evaluate(()=>window.v13Go('finance'));await page.locator('#finMatrixRows tr').waitFor();const finance=await page.locator('#finStats').innerText();assert.match(finance,/6\s*000/);assert.match(finance,/10\s*000/);assert.ok(!/8\s*000/.test(finance));
