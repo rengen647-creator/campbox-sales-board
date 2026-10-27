@@ -34,11 +34,10 @@
    if(summary&&!summary.querySelector('.ios4-summary-links')){
       var nav=document.createElement('div');
       nav.className='ios4-summary-links';
-      [['Контрактинг','contracts'],['Команда','team'],['Поступления','finance']].forEach(function(it){
+      [['Контрактинг','contracts'],['Команда','team']].forEach(function(it){
          var b=document.createElement('button');
          b.type='button';b.className='cb-action';
          b.dataset.cbGo=it[1];b.textContent=it[0];
-         if(it[1]==='finance')b.classList.add('cb-role-manager');
          nav.appendChild(b);
       });
       var intro=summary.querySelector('.cb-page-intro');if(intro)intro.insertAdjacentElement('afterend',nav);
