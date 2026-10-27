@@ -9,13 +9,13 @@ new vm.Script(v13,{filename:'ui-v13.js'});
 new vm.Script(load('product-v2.js'),{filename:'product-v2.js'});
 assert.match(html,/ios-v3\.css\?v=20261027c/);
 assert.match(html,/ios-v3\.js\?v=20261027c/);
-assert.match(html,/ui-v13\.js\?v=20261027ios4/);
+assert.match(html,/ui-v13\.js\?v=20261027os3/);
 assert.ok(html.indexOf('ios-v3.css')>html.indexOf('product-v2.css'));
 assert.ok(html.indexOf('ios-v3.js')>html.indexOf('product-v2.js'));
-assert.match(sw,/campbox-sales-ios-v4-2026-10-27/);
+assert.match(sw,/campbox-sales-os3-preview-2026-10-27/);
 assert.match(sw,/ios-v3\.css\?v=20261027c/);
 assert.match(sw,/ios-v3\.js\?v=20261027c/);
-assert.match(sw,/ui-v13\.js\?v=20261027ios4/);
+assert.match(sw,/ui-v13\.js\?v=20261027os3/);
 // Five canonical facts, still using the same data-v13-fact + changed() + recalc() contract.
 const begin=v13.indexOf('  function renderToday(){'),end=v13.indexOf('\n  function renderMonth(){',begin);
 assert.ok(begin>=0&&end>begin,'source daily renderer exists');

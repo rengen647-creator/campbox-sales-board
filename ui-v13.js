@@ -350,15 +350,18 @@
     var grid=document.getElementById('v13ContractsGrid'),badge=document.getElementById('v13ContractBadge');if(!grid)return;
     var all=[];try{all=activeContractEntries();}catch(e){}
     var visible=(typeof isManager==='function'&&isManager())?all:all.filter(function(c){return c.user_id===currentSelf();});
-    visible.sort(function(a,b){return b.age-a.age;});
+    var sort=document.getElementById('os3ContractSort')?.value||'age';
+    visible.sort(function(a,b){if(sort==='name')return String(a.client||'').localeCompare(String(b.client||''),'ru');if(sort==='contact')return String(a.next_contact||'9999').localeCompare(String(b.next_contact||'9999'));return b.age-a.age;});
     if(badge)badge.innerHTML=pill(visible.some(function(c){return c.age>7;})?'bad':visible.length?'warn':'good',visible.length+' активных');
     if(!visible.length){grid.innerHTML='<div class="v13-empty">Активных договоров на подписании нет.</div>';return;}
     grid.innerHTML=visible.map(function(c){
       var tone=c.age>7?'bad':c.age>=4?'warn':'good',next=c.next_action||'Следующий шаг не указан';
-      return '<article class="v13-contract"><div class="v13-contract-head"><div><h3>'+h(c.client||'Без названия')+'</h3><small>'+h(c.manager||'')+'</small></div>'+pill(tone,c.age+' дн.')+'</div><div class="v13-contract-meta"><span class="v13-pill '+tone+'">'+(c.ball==='us'?'мяч у нас':'мяч у клиента')+'</span>'+(c.blocker?'<span class="v13-pill warn">'+h(c.blocker)+'</span>':'')+'</div><p>'+(c.age>7?'Высокий риск для месячного результата.':c.age>=4?'Требует контроля срока.':'Срок пока в норме.')+'</p><div class="v13-contract-next">'+h(next)+(c.next_contact?' · '+h(c.next_contact):'')+'</div><button type="button" class="btn" style="margin-top:8px" data-open-contract="'+h(c.user_id)+'">Открыть контрактинг</button></article>';
+      return '<article class="v13-contract" data-os3-key="'+h(c.user_id+'|'+c.id)+'" data-os3-sent="'+h(c.sent_date)+'" data-os3-target="'+h(c.target_date)+'" data-os3-contact="'+h(c.next_contact)+'"><div class="v13-contract-head"><div><h3>'+h(c.client||'Без названия')+'</h3><small>'+h(c.manager||'')+'</small></div>'+pill(tone,c.age+' дн.')+'</div><div class="v13-contract-meta"><span class="v13-pill '+tone+'">'+(c.ball==='us'?'мяч у нас':'мяч у клиента')+'</span>'+(c.blocker?'<span class="v13-pill warn">'+h(c.blocker)+'</span>':'')+'</div><p>'+(c.age>7?'Высокий риск для месячного результата.':c.age>=4?'Требует контроля срока.':'Срок пока в норме.')+'</p><div class="v13-contract-next">'+h(next)+(c.next_contact?' · '+h(c.next_contact):'')+'</div><button type="button" class="btn" style="margin-top:8px" data-open-contract="'+h(c.user_id)+'">Открыть контрактинг</button></article>';
     }).join('');
     grid.querySelectorAll('[data-open-contract]').forEach(function(b){b.addEventListener('click',function(){if(typeof openContracts==='function')openContracts(this.getAttribute('data-open-contract'));});});
   }
+
+  window.os3RefreshContracts=renderContracts;
 
   async function loadMissingContractNumbers(){
     var root=document.getElementById('v13MissingContractNumbers');
@@ -425,7 +428,11 @@
     if(item){fact=item.fact;guide=item.guide;delta=item.delta;tone=item.tone;diagnosis=item.diagnosis;}
     else if(V.stage==='signing'){fact=cr.all.length;guide='без просрочки';delta=cr.over7?cr.over7+' >7 дн.':'0 >7 дн.';tone=cr.over7?'bad':cr.over3?'warn':'good';diagnosis=cr.over7?'Есть договоры с высоким риском':'Контрактинг под контролем';}
     else if(V.stage==='connected'){fact=f.fact;guide=f.target;delta=(f.forecast-f.target>=0?'+':'')+(f.forecast-f.target);tone=f.forecast>=f.target?'good':f.risk<=1?'warn':'bad';diagnosis='Прогноз '+f.forecast+' из '+f.target+'.';}
-    panel.innerHTML='<div class="v13-person-head"><div><h3>'+h(info.label)+'</h3><small>Детальный самоанализ показателя</small></div>'+pill(tone,tone==='good'?'НОРМА':tone==='warn'?'ВНИМАНИЕ':'ПРОСАДКА')+'</div>'+
+    var sourceRows=[];try{sourceRows=coachScopeRows(monthRows,uid,true);}catch(e){}
+    var bases={call_book:[sum(sourceRows,'booked_fact'),sum(sourceRows,'calls_fact')],book_meet:[sum(sourceRows,'meetings_fact'),sum(sourceRows,'booked_fact')],meet_offer:[sum(sourceRows,'offers_fact'),sum(sourceRows,'meetings_fact')]};
+    var base=bases[V.stage];
+    if(base&&!base[1]){fact='Недостаточно данных';diagnosis='Нет базы для оценки конверсии';tone='warn';}
+    panel.innerHTML=(base?'<div class="os3-base"><b>'+base[0]+' из '+base[1]+'</b><span>Числитель / знаменатель за период</span></div>':'')+'<div class="v13-person-head"><div><h3>'+h(info.label)+'</h3><small>Детальный самоанализ показателя</small></div>'+pill(tone,tone==='good'?'НОРМА':tone==='warn'?'ВНИМАНИЕ':'ПРОСАДКА')+'</div>'+
       '<div class="v13-stage-kpis"><div><span>Факт</span><b>'+h(fact)+'</b></div><div><span>Ориентир</span><b>'+h(guide)+'</b></div><div><span>Отклонение</span><b>'+h(delta)+'</b></div><div><span>Диагноз</span><b style="font-size:10px">'+h(diagnosis)+'</b></div></div>'+
       '<div class="v13-insight"><b>Coach:</b> '+h(diagnosis)+' '+h(actionFor(item))+'</div>'+
       '<div class="v13-self"><details><summary>Почему так может происходить</summary><ul>'+info.causes.map(function(x){return '<li>'+h(x)+'</li>';}).join('')+'</ul></details><details><summary>Вопросы к себе</summary><ul>'+info.questions.map(function(x){return '<li>'+h(x)+'</li>';}).join('')+'</ul></details><div><b style="font-size:11px">Что делать</b><ul>'+info.actions.map(function(x){return '<li>'+h(x)+'</li>';}).join('')+'</ul></div></div>';

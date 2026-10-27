@@ -97,6 +97,8 @@
   <link rel="stylesheet" href="./product-v2.css?v=20261027b">
   <link rel="stylesheet" href="./ios-v3.css?v=20261027c">
   <link rel="stylesheet" href="./ios-v4.css?v=20261027d">
+<link rel="stylesheet" href="os3.css?v=20261027os3">
+<script src="os3-charts.js?v=20261027os3"></script>
 </head>
 <body>
 
@@ -311,7 +313,7 @@
       <div class="chart-wrap"><div id="activityChart" class="chart-box"></div><div class="chart-legend"><span class="chart-legend-item"><i class="chart-line plan"></i>план</span><span class="chart-legend-item"><i class="chart-line fact"></i>факт</span></div></div>
     </div>
     <div class="card chart-card">
-      <div class="section-head"><div class="section-title"><h2>Конверсия по неделям</h2><p>Показывает не только объём работы, но и качество прохождения воронки.</p></div></div>
+      <div class="section-head"><div class="section-title"><h2>Конверсия · накопительно к дате</h2><p>Выбери переход. Процент рассматривается вместе с числителем и знаменателем.</p></div></div>
       <div class="chart-wrap"><div id="conversionChart" class="chart-box"></div><div class="chart-legend"><span class="chart-legend-item"><i class="chart-line" style="background:#47c8ff"></i>звонок → встреча</span><span class="chart-legend-item"><i class="chart-line" style="background:#a66df5"></i>встреча → КП</span><span class="chart-legend-item"><i class="chart-line" style="background:#f6bd57"></i>КП → подписание</span><span class="chart-legend-item"><i class="chart-line fact"></i>подписание → подключение</span></div></div>
     </div>
   </section>
@@ -695,83 +697,22 @@ function updateCheckpointDeltas(){document.querySelectorAll('#checkpointTable tb
 
 
 function svgLineChart(containerId,labels,series,{percent=false}={}){
-  const el=$(containerId);if(!el)return;
-  const all=series.flatMap(s=>s.values.filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))).map(Number));
-  if(!labels.length||!all.length){el.innerHTML='<div class="chart-empty">Пока недостаточно данных для графика</div>';return}
-  const W=900,H=245,L=42,R=16,T=14,B=30;
-  const maxRaw=Math.max(...all,1),max=percent?Math.max(100,maxRaw):Math.max(1,Math.ceil(maxRaw*1.15));
-  const x=i=>L+(labels.length===1?0:(W-L-R)*i/(labels.length-1));
-  const y=v=>T+(H-T-B)*(1-Number(v)/max);
-  let svg=`<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`;
-  for(let g=0;g<=4;g++){
-    const gy=T+(H-T-B)*g/4,val=Math.round(max*(1-g/4));
-    svg+=`<line x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}" stroke="#233653" stroke-width="1"/>`;
-    svg+=`<text x="${L-7}" y="${gy+4}" fill="#6f809d" font-size="10" text-anchor="end">${val}${percent?'%':''}</text>`;
-  }
-  const tickCount=Math.min(6,labels.length);
-  const idxs=[...new Set(Array.from({length:tickCount},(_,i)=>Math.round((labels.length-1)*i/Math.max(tickCount-1,1))))];
-  idxs.forEach(i=>{svg+=`<text x="${x(i)}" y="${H-8}" fill="#6f809d" font-size="10" text-anchor="middle">${esc(labels[i])}</text>`});
-  series.forEach(s=>{
-    const pts=s.values.map((v,i)=>v===null||v===undefined?null:`${x(i)},${y(v)}`).filter(Boolean);
-    if(!pts.length)return;
-    const dash=s.dash?` stroke-dasharray="${s.dash}"`:'';
-    svg+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.width||3}" stroke-linejoin="round" stroke-linecap="round"${dash}/>`;
-    const last=s.values.map((v,i)=>({v,i})).filter(o=>o.v!==null&&o.v!==undefined).pop();
-    if(last)svg+=`<circle cx="${x(last.i)}" cy="${y(last.v)}" r="4" fill="${s.color}" stroke="#09101f" stroke-width="2"/>`;
-  });
-  svg+='</svg>';el.innerHTML=svg;
+ const el=$(containerId);if(!el)return;
+ el.innerHTML=CampBoxCharts.chart({labels,series:series.map((s,i)=>({...s,name:s.name||'Ряд '+(i+1),tone:s.tone||(i?'positive':'primary')})),unit:percent?'%':'',title:'Динамика'});
 }
 function paceSnapshot(){
   const total=daysInMonth(selectedMonth),cut=Math.min(total,Math.max(1,Number(selectedDate.slice(8,10)))),wdTotal=totalWorkdays(selectedMonth),wdDone=workdaysThrough(selectedMonth,cut),target=num($('monthTarget').value),need=wdTotal?Math.ceil(target*wdDone/wdTotal):0,fact=monthRows.filter(r=>String(r.report_date)<=selectedDate).reduce((s,r)=>s+num(r.connected_fact),0);
   return {cut,wdTotal,wdDone,target,need,fact,delta:fact-need};
 }
 function renderPaceCorridor(labels,minVals,targetVals,maxVals,factVals){
-  const el=$('paceChart');if(!el)return;
-  const all=[...minVals,...targetVals,...maxVals,...factVals].filter(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))).map(Number);
-  if(!labels.length||!all.length){el.innerHTML='<div class="chart-empty">Пока недостаточно данных для графика</div>';return}
-  const W=900,H=245,L=42,R=102,T=16,B=30;
-  const max=Math.max(1,Math.ceil(Math.max(...all,1)*1.18));
-  const x=i=>L+(labels.length===1?0:(W-L-R)*i/(labels.length-1));
-  const y=v=>T+(H-T-B)*(1-Number(v)/max);
-  let svg=`<svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Темп к цели месяца">`;
-  for(let g=0;g<=4;g++){
-    const gy=T+(H-T-B)*g/4,val=Math.round(max*(1-g/4));
-    svg+=`<line x1="${L}" y1="${gy}" x2="${W-R}" y2="${gy}" stroke="#233653" stroke-width="1"/>`;
-    svg+=`<text x="${L-7}" y="${gy+4}" fill="#6f809d" font-size="10" text-anchor="end">${val}</text>`;
-  }
-  const tickCount=Math.min(6,labels.length),idxs=[...new Set(Array.from({length:tickCount},(_,i)=>Math.round((labels.length-1)*i/Math.max(tickCount-1,1))))];
-  idxs.forEach(i=>svg+=`<text x="${x(i)}" y="${H-8}" fill="#6f809d" font-size="10" text-anchor="middle">${esc(labels[i])}</text>`);
-
-  const upper=maxVals.map((v,i)=>`${x(i)},${y(v)}`);
-  const lower=minVals.map((v,i)=>`${x(i)},${y(v)}`).reverse();
-  svg+=`<polygon points="${[...upper,...lower].join(' ')}" fill="rgba(111,124,255,.10)" stroke="rgba(125,155,220,.18)" stroke-width="1"/>`;
-
-  const targetPts=targetVals.map((v,i)=>`${x(i)},${y(v)}`);
-  svg+=`<polyline points="${targetPts.join(' ')}" fill="none" stroke="#7f8cff" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>`;
-
-  const factPts=factVals.map((v,i)=>v===null||v===undefined?null:`${x(i)},${y(v)}`).filter(Boolean);
-  if(factPts.length)svg+=`<polyline points="${factPts.join(' ')}" fill="none" stroke="#35d39a" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>`;
-
-  const tLast=targetVals[targetVals.length-1];
-  svg+=`<circle cx="${x(targetVals.length-1)}" cy="${y(tLast)}" r="4" fill="#7f8cff" stroke="#09101f" stroke-width="2"/>`;
-  svg+=`<text x="${W-R+10}" y="${y(tLast)+4}" fill="#aeb7ff" font-size="11" font-weight="700">Цель ${Math.round(tLast)}</text>`;
-
-  const fLast=factVals.map((v,i)=>({v,i})).filter(o=>o.v!==null&&o.v!==undefined).pop();
-  if(fLast){
-    svg+=`<circle cx="${x(fLast.i)}" cy="${y(fLast.v)}" r="5" fill="#35d39a" stroke="#09101f" stroke-width="2"/>`;
-    let fy=y(fLast.v)-8;
-    if(Math.abs(fy-y(tLast))<14)fy+=22;
-    svg+=`<text x="${Math.min(x(fLast.i)+9,W-R+10)}" y="${fy}" fill="#83e7c1" font-size="11" font-weight="700">Факт ${Math.round(fLast.v)}</text>`;
-  }
-  const minLast=minVals[minVals.length-1],maxLast=maxVals[maxVals.length-1];
-  svg+=`<text x="${W-R+10}" y="${Math.max(T+11,y(maxLast)+4)}" fill="#8799b8" font-size="9">макс ${Math.round(maxLast)}</text>`;
-  svg+=`<text x="${W-R+10}" y="${Math.min(H-B-3,y(minLast)+4)}" fill="#8799b8" font-size="9">мин ${Math.round(minLast)}</text>`;
-  svg+='</svg>';el.innerHTML=svg;
+ const config={labels,series:[{name:'Факт накопительно',values:factVals,tone:'positive'},{name:'Целевой план',values:targetVals,tone:'primary'}],band:[minVals,maxVals],cutoff:paceSnapshot().cut-1,title:'Темп к цели месяца'};
+ ['paceChart','os3AnalyticsPace'].forEach(id=>{const el=$(id);if(el)el.innerHTML=CampBoxCharts.chart(config)});
+ const note=$('os3PaceDecision');if(note){const p=paceSnapshot();note.innerHTML='<span class="os3-kicker">ОТКЛОНЕНИЕ К ДАТЕ</span><strong>'+(p.delta>0?'+':'')+p.delta+'</strong><p>Факт '+p.fact+' · нужно к дате '+p.need+'.</p><p>Ориентир учитывает рабочие дни. Диапазон плана не является прогнозом.</p><button type="button" data-cb-go="month">Открыть план месяца →</button>';}
 }
 function renderPace(){
   const snap=paceSnapshot(),total=daysInMonth(selectedMonth),min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),wdTotal=totalWorkdays(selectedMonth)||1,labels=[],aMin=[],aTarget=[],aMax=[],aFact=[];let cumulative=0;
   const byDate={};monthRows.forEach(r=>byDate[r.report_date]=(byDate[r.report_date]||0)+num(r.connected_fact));
-  for(let d=1;d<=total;d++){const iso=isoForDay(selectedMonth,d);labels.push(String(d));const w=workdaysThrough(selectedMonth,d);aMin.push(min*w/wdTotal);aTarget.push(target*w/wdTotal);aMax.push(max*w/wdTotal);cumulative+=num(byDate[iso]);aFact.push(d<=snap.cut?cumulative:null)}
+  for(let d=1;d<=total;d++){const iso=isoForDay(selectedMonth,d);labels.push(String(d));const w=workdaysThrough(selectedMonth,d);aMin.push(min*w/wdTotal);aTarget.push(target*w/wdTotal);aMax.push(max*w/wdTotal);cumulative+=num(byDate[iso]);aFact.push(d<=snap.cut&&iso<=todayISO()&&Object.prototype.hasOwnProperty.call(byDate,iso)?cumulative:null)}
   $('paceNeed').textContent=snap.need;$('paceFact').textContent=snap.fact;$('paceDelta').textContent=(snap.delta>0?'+':'')+snap.delta;$('paceDays').textContent=`${snap.wdDone} / ${snap.wdTotal}`;
   const st=$('paceStatus'),cls=snap.delta>=0?'good':snap.delta===-1?'warn':'bad';st.className='pill '+cls;st.textContent=snap.delta>0?`Опережаем на ${snap.delta}`:snap.delta===0?'Идём по графику':`Отстаём на ${Math.abs(snap.delta)}`;$('paceDelta').parentElement.className='pace-item '+cls;
   renderPaceCorridor(labels,aMin,aTarget,aMax,aFact);
@@ -779,18 +720,22 @@ function renderPace(){
 function setActivityMetric(k){activeActivityMetric=k;renderActivitySwitch();renderActivityChart()}
 function renderActivitySwitch(){const box=$('activitySwitch');if(!box)return;box.innerHTML=activityKeys.map(k=>`<button type="button" class="${k===activeActivityMetric?'active':''}" onclick="setActivityMetric('${k}')">${metricLabels[k]}</button>`).join('')}
 function renderActivityChart(){
-  renderActivitySwitch();const limit=visibleMonthDays(),labels=[],plans=[],facts=[];
-  for(let d=1;d<=limit;d++){const iso=isoForDay(selectedMonth,d),rows=monthRows.filter(r=>r.report_date===iso);labels.push(String(d));plans.push(sum(rows,activeActivityMetric+'_plan'));facts.push(sum(rows,activeActivityMetric+'_fact'))}
-  svgLineChart('activityChart',labels,[{values:plans,color:'#6f7cff',width:2,dash:'5 4'},{values:facts,color:'#35d39a',width:3}]);
+ renderActivitySwitch();const limit=visibleMonthDays(),labels=[],plans=[],facts=[];
+ for(let d=1;d<=limit;d++){const iso=isoForDay(selectedMonth,d),rows=monthRows.filter(r=>r.report_date===iso);labels.push(String(d));plans.push(rows.length?sum(rows,activeActivityMetric+'_plan'):null);facts.push(rows.length?sum(rows,activeActivityMetric+'_fact'):null)}
+ const el=$('activityChart');if(el)el.innerHTML=CampBoxCharts.chart({labels,kind:'bars',title:metricLabels[activeActivityMetric],series:[{name:'Факт',values:facts,tone:'positive'},{name:'План дня',values:plans,tone:'primary',mark:true}]});
 }
+let os3ConversionIndex=0;
 function renderConversionChart(){
-  const limit=visibleMonthDays(),weeks=Math.ceil(limit/7),labels=[],c1=[],c2=[],c3=[],c4=[];
-  for(let w=0;w<weeks;w++){const end=Math.min(limit,(w+1)*7),rows=monthRows.filter(r=>Number(String(r.report_date).slice(8,10))<=end),calls=sum(rows,'calls_fact'),booked=sum(rows,'booked_fact'),meet=sum(rows,'meetings_fact'),offers=sum(rows,'offers_fact'),signing=monthlySigningCount(rows),conn=sum(rows,'connected_fact');labels.push(`1–${end}`);c1.push(pct(booked,calls));c2.push(pct(offers,meet));c3.push(pct(signing,offers));c4.push(pct(conn,signing))}
-  svgLineChart('conversionChart',labels,[{values:c1,color:'#47c8ff',width:3},{values:c2,color:'#a66df5',width:3},{values:c3,color:'#f6bd57',width:3},{values:c4,color:'#35d39a',width:3}],{percent:true});
+ const limit=visibleMonthDays(),weeks=Math.ceil(limit/7),labels=[],values=[[],[],[],[]],bases=[[],[],[],[]];
+ const names=['Звонок → встреча','Встреча → КП','КП → подписание','Подписание → подключение'];
+ for(let w=0;w<weeks;w++){const end=Math.min(limit,(w+1)*7),rows=monthRows.filter(r=>Number(String(r.report_date).slice(8,10))<=end),calls=sum(rows,'calls_fact'),booked=sum(rows,'booked_fact'),meet=sum(rows,'meetings_fact'),offers=sum(rows,'offers_fact'),signing=monthlySigningCount(rows),conn=sum(rows,'connected_fact');labels.push('1–'+end);[[booked,calls],[offers,meet],[signing,offers],[conn,signing]].forEach(([n,d],i)=>{values[i].push(d>0?pct(n,d):null);bases[i].push([n,d]);});}
+ const box=$('conversionChart');if(!box)return;
+ box.innerHTML='<div class="os3-conversions" role="group" aria-label="Выбор перехода">'+names.map((name,i)=>{const base=bases[i].at(-1)||[0,0],v=values[i].at(-1);return '<button type="button" data-os3-conversion="'+i+'" aria-pressed="'+(os3ConversionIndex===i)+'"><span>'+esc(name)+'</span><b>'+(v===null?'—':v+'%')+'</b><small>'+base[0]+' из '+base[1]+(base[1]===0?' · нет базы':base[1]<10?' · малая база':'')+'</small></button>';}).join('')+'</div><div class="os3-conversion-detail">'+CampBoxCharts.chart({labels,title:names[os3ConversionIndex]+' · накопительно к дате',unit:'%',series:[{name:names[os3ConversionIndex],values:values[os3ConversionIndex],bases:bases[os3ConversionIndex],tone:'primary'}]})+'</div>';
+ box.querySelectorAll('[data-os3-conversion]').forEach(b=>b.onclick=()=>{os3ConversionIndex=Number(b.dataset.os3Conversion);renderConversionChart();$('conversionChart').querySelector('[data-os3-conversion="'+os3ConversionIndex+'"]').focus();});
 }
 function renderCalendarHeatmap(){
   const box=$('calendarHeatmap');if(!box)return;const names=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],total=daysInMonth(selectedMonth);let html=names.map(x=>`<div class="cal-weekday">${x}</div>`).join('');const first=new Date(isoForDay(selectedMonth,1)+'T12:00:00').getDay(),offset=(first+6)%7;for(let i=0;i<offset;i++)html+='<div></div>';
-  for(let d=1;d<=total;d++){const iso=isoForDay(selectedMonth,d),rows=monthRows.filter(r=>r.report_date===iso),ps=[];activityKeys.forEach(k=>{const p=sum(rows,k+'_plan'),f=sum(rows,k+'_fact');if(p>0)ps.push(Math.min(100,pct(f,p)))});const score=ps.length?Math.round(ps.reduce((a,b)=>a+b,0)/ps.length):null,weekend=!isWorkdayISO(iso),cls=score===null?'empty':score>=100?'good':score>=70?'warn':'bad';html+=`<div class="cal-day ${cls} ${weekend?'weekend':''}" title="${score===null?'План не заполнен':`Выполнение активности: ${score}%`}"><span class="n">${d}</span><span class="v">${score===null?'—':score+'%'}</span></div>`}
+  for(let d=1;d<=total;d++){const iso=isoForDay(selectedMonth,d),rows=monthRows.filter(r=>r.report_date===iso),ps=[];activityKeys.forEach(k=>{const p=sum(rows,k+'_plan'),f=sum(rows,k+'_fact');if(p>0)ps.push(Math.min(100,pct(f,p)))});const score=ps.length?Math.round(ps.reduce((a,b)=>a+b,0)/ps.length):null,weekend=!isWorkdayISO(iso),cls=score===null?'empty':score>=100?'good':score>=70?'warn':'bad';html+=`<div class="cal-day ${cls} ${weekend?'weekend':''}" title="${score===null?(rows.length?'План не задан':'Нет данных'):`Выполнение активности: ${score}%`}"><span class="n">${d}</span><span class="v">${score===null?(weekend?'Выходной':rows.length?'Нет плана':'Нет данных'):score+'%'}</span></div>`}
   box.innerHTML=html;
 }
 function renderPersonal(){
@@ -870,7 +815,7 @@ function recalc(){
   const scores=activityKeys.filter(k=>totals[k+'P']>0).map(k=>Math.min(100,pct(totals[k+'F'],totals[k+'P'])));const overall=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;const day=$('dayStatus'),ts=$('teamStatus');if(!scores.length){day.className='pill warn';day.textContent='План активностей не заполнен';ts.className='pill warn';ts.textContent='Нет плана'}else{day.className='pill '+statusClass(overall);day.textContent=`Активности выполнены на ${overall}%`;ts.className='pill '+statusClass(overall);ts.textContent=`Активности: ${overall}%`}
   const reflectionDone=dayRows.filter(r=>reflectionState(r.comment).state==='done').length,reflectionAny=dayRows.filter(r=>reflectionState(r.comment).state!=='empty').length,reflectionEl=$('reflectionStatus');
   if(reflectionEl){reflectionEl.textContent=`Итоги: ${reflectionDone}/${dayRows.length}`;reflectionEl.className='pill '+(dayRows.length&&reflectionDone===dayRows.length?'good':reflectionAny>0?'warn':'bad')}
-  const fc=sum(monthRows,'calls_fact'),fb=sum(monthRows,'booked_fact'),fm=sum(monthRows,'meetings_fact'),fo=sum(monthRows,'offers_fact'),fn=sum(monthRows,'connected_fact');$('funnelCalls').textContent=fc;$('funnelBooked').textContent=fb;$('funnelMeetings').textContent=fm;$('funnelOffers').textContent=fo;$('funnelSigning').textContent=monthSigning;$('funnelConnected').textContent=fn;$('funnelConv1').textContent=`${pct(fb,fc)}% от звонков`;$('funnelConv2').textContent=`${pct(fm,fb)}% от назначенных`;$('funnelConv3').textContent=`${pct(fo,fm)}% от встреч`;$('funnelConv4').textContent=`${pct(monthSigning,fo)}% от КП`;$('funnelConv5').textContent=`${pct(fn,monthSigning)}% от подписания`;
+  const fc=sum(monthRows,'calls_fact'),fb=sum(monthRows,'booked_fact'),fm=sum(monthRows,'meetings_fact'),fo=sum(monthRows,'offers_fact'),fn=sum(monthRows,'connected_fact');$('funnelCalls').textContent=fc;$('funnelBooked').textContent=fb;$('funnelMeetings').textContent=fm;$('funnelOffers').textContent=fo;$('funnelSigning').textContent=monthSigning;$('funnelConnected').textContent=fn;$('funnelConv1').textContent=fc>0?`${pct(fb,fc)}% · ${fb} из ${fc}`:'Недостаточно данных';$('funnelConv2').textContent=fb>0?`${pct(fm,fb)}% · ${fm} из ${fb}`:'Недостаточно данных';$('funnelConv3').textContent=fm>0?`${pct(fo,fm)}% · ${fo} из ${fm}`:'Недостаточно данных';$('funnelConv4').textContent=fo>0?`${pct(monthSigning,fo)}% · ${monthSigning} из ${fo}`:'Недостаточно данных';$('funnelConv5').textContent=monthSigning>0?`${pct(fn,monthSigning)}% · ${fn} из ${monthSigning}`:'Недостаточно данных';
   renderAnalytics(totals,overall);
 }
 
@@ -959,15 +904,16 @@ initPWA();
 })();
 </script>
 
-  <script src="./ui-v13.js?v=20261027ios4"></script>
+  <script src="./ui-v13.js?v=20261027os3"></script>
   <script src="./salary-v1.js?v=20261026retention"></script>
   <script src="./finance-ledger.js?v=20261026tabs"></script>
   <script src="./sales-visual-charts.js?v=20261013a"></script>
   <script src="./sales-report-v2.js?v=20261013excelcheck"></script>
   <script src="./refined-ui.js?v=20261027a"></script>
-  <script src="./product-v2.js?v=20261027b"></script>
+  <script src="./product-v2.js?v=20261027os3"></script>
   <script src="./ios-v3.js?v=20261027c"></script>
   <script src="./ios-v4.js?v=20261027d"></script>
+  <script src="./os3-ui.js?v=20261027os3"></script>
 
 </body>
 </html>

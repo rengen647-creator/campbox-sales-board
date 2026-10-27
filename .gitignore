@@ -1,0 +1,4 @@
+# Local preview staging and generated synthetic fixture
+.openai/
+dist/
+qa/os3-app-fixture.html
