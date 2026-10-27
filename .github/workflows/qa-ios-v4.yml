@@ -5,7 +5,7 @@ on:
       - 'index.html'
       - 'sw.js'
       - 'ui-v13.js'
-      - 'ios-v4.css'
+      - 'sales-board.css'
       - 'ios-v4.js'
       - 'qa/ios4-visual-fixture.html'
       - 'tests/ios-v4-visual.cjs'
@@ -20,6 +20,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
