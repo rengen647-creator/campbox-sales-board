@@ -7,6 +7,7 @@ on:
       - 'product-v2.js'
       - 'product-v2.css'
       - 'tests/business-ux-v2.test.cjs'
+      - 'tests/refined-ui.test.cjs'
       - 'qa/SALES_BOARD_BUSINESS_QA_20261027.md'
       - '.github/workflows/qa-product-v2.yml'
   workflow_dispatch:
