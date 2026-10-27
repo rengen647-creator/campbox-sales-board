@@ -160,12 +160,16 @@
     var title=card.querySelector('h3');
     heading.append(E('h3','cb-detail-title',title?title.textContent:'Карточка договора'));
     var body=E('div','cb-detail-content');
-    var clone=card.cloneNode(true);
-    clone.className='cb-contract-copy';
-    clone.removeAttribute('tabindex');
-    clone.removeAttribute('role');
-    Array.from(clone.querySelectorAll('button')).forEach(function(x){x.remove()});
-    body.appendChild(clone);
+    // Read-only dossier is built from displayed text, never a cloned interactive DOM.
+    ['.v13-contract-meta','.v13-contract-next'].forEach(function(selector){
+      var sourceText=card.querySelector(selector);
+      if(sourceText)body.append(E('p','cb-dossier-field',sourceText.textContent));
+    });
+    var timing=card.querySelector('.v13-contract-head small');
+    if(timing)body.append(E('p','cb-dossier-owner',timing.textContent));
+    [['Отправлен','os3Sent'],['Ожидаемая подпись','os3Target'],['Следующий контакт','os3Contact']].forEach(function(it){
+      var line=E('p','cb-dossier-field');line.append(E('small','',it[0]+' · '),E('strong','',card.dataset[it[1]]||'Не указан'));body.append(line);
+    });
     var footer=E('div','cb-detail-footer');
     footer.append(action('Ко всем договорам','contracts'));
     var edit=E('button','cb-action primary','Открыть контрактинг');
@@ -194,15 +198,19 @@
     input.type='search';input.id='cbContractsSearch';input.placeholder='Найти договор';input.autocomplete='off';
     search.append(input);
     var count=E('div','cb-list-counter','');
-    left.append(search,count,grid);
+    var sortLabel=E('label','os3-sort','Сортировка');var sort=E('select','');sort.id='os3ContractSort';
+    [['age','Сначала самые давние'],['contact','Ближайший контакт'],['name','По названию лагеря']].forEach(function(it){var op=E('option','',it[1]);op.value=it[0];sort.append(op);});
+    sortLabel.append(sort);sort.addEventListener('change',function(){if(window.os3RefreshContracts)window.os3RefreshContracts();});
+    left.append(search,sortLabel,count,grid);
     var detail=E('aside','cb-contract-detail');detail.id='cbContractDetail';
     detail.setAttribute('aria-label','Подробности выбранного договора');
     layout.append(left,detail);
     originalBody.appendChild(layout);
-    var chosen=0, scheduled=false;
+    var chosen=0, chosenKey=null, scheduled=false;
     function updateCards() {
       scheduled=false;
       var cards=Array.from(grid.querySelectorAll('.v13-contract'));
+      if(chosenKey){var retained=cards.findIndex(function(c){return c.dataset.os3Key===chosenKey});if(retained>=0)chosen=retained;}
       var query=input.value.trim().toLocaleLowerCase('ru');
       cards.forEach(function (c,index) {
         var visible=!query||c.textContent.toLocaleLowerCase('ru').includes(query);
@@ -219,6 +227,7 @@
         c.classList.toggle('cb-selected',index===chosen&&!c.hidden);
         c.setAttribute('aria-selected',String(index===chosen&&!c.hidden));
       });
+      chosenKey=cards[chosen]?.dataset.os3Key||null;
       contractPanel(cards,chosen);
     }
     input.addEventListener('input',updateCards);
@@ -226,14 +235,14 @@
       if(e.target.closest('button'))return;
       var card=e.target.closest('.v13-contract');
       if(!card)return;
-      chosen=Number(card.dataset.cbContractIndex);updateCards();
+      chosen=Number(card.dataset.cbContractIndex);chosenKey=card.dataset.os3Key;updateCards();
     });
     grid.addEventListener('keydown',function(e) {
       if(e.key!=='Enter'&&e.key!==' ')return;
       if(e.target.closest('button'))return;
       var card=e.target.closest('.v13-contract');
       if(!card)return;
-      e.preventDefault();chosen=Number(card.dataset.cbContractIndex);updateCards();
+      e.preventDefault();chosen=Number(card.dataset.cbContractIndex);chosenKey=card.dataset.os3Key;updateCards();
     });
     var observer=new MutationObserver(function () {
       if (scheduled)return;
