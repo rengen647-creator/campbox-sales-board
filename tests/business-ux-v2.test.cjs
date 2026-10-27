@@ -14,7 +14,7 @@ new vm.Script(salary,{filename:'salary-v1.js'});
 const checks=[];function ok(label,result){assert.ok(result,label);checks.push(label)}
 ok('v2 assets loaded in app',html.includes('product-v2.css?v=20261027b')&&html.includes('product-v2.js?v=20261027b'));
 ok('v2 assets loaded after baseline',html.indexOf('refined-ui.css')<html.indexOf('product-v2.css')&&html.indexOf('refined-ui.js')<html.indexOf('product-v2.js'));
-ok('v2 PWA versioned and assets cached',/(?:campbox-sales-product-v2|campbox-sales-ios-v3)-2026-10-27/.test(sw)&&sw.includes('product-v2.css?v=20261027b')&&sw.includes('product-v2.js?v=20261027b'));
+ok('v2 PWA versioned and assets cached',/(?:campbox-sales-product-v2|campbox-sales-ios-v3|campbox-sales-ios-v4)-2026-10-27/.test(sw)&&sw.includes('product-v2.css?v=20261027b')&&sw.includes('product-v2.js?v=20261027b'));
 ok('five original operation screens reused', ['today','month','contracts','finance','salary'].every(x=>ui.includes("screen('"+x+"')")));
 ok('live KPI nodes moved not imitated',ui.includes("$('v13TodayKpis')")&&ui.includes('relocate(kpis,summary'));
 ok('existing period fields moved intact',ui.includes("root.querySelector(':scope > .context-card')")&&ui.includes('relocate(context,filter'));

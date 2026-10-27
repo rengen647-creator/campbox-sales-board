@@ -264,31 +264,30 @@
     var dayPct=vals.length?Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length):0;
     var focus=prio[0]||{title:'Сохранить текущий темп',text:'Критичных просадок по текущим данным нет.'};
 
-    // iOS V3: a single, responsive source-of-truth fact input for each activity.
-    // The same original changed()/recalc() handlers below persist input into daily_sales.
+    // iOS V4 — one canonical fact input per activity; business callbacks below unchanged.
+    // "Reason" is in normal document flow, not an oversized table column or popover.
     var icons={calls:'phone',booked:'calendar',meetings:'users',offers:'file',follow:'repeat'};
     var cards=keys.map(function(k){
       var target=Number(row[k+'_plan']||0),fact=Number(row[k+'_fact']||0);
-      var rest=Math.max(0,target-fact),autoMetric=auto&&auto.metrics&&auto.metrics[k]?auto.metrics[k]:null;
-      var why=autoMetric?autoMetric.shortReason:'Показатель рассчитывается автоматически';
-      var tone=target===0?'neutral':rest===0?'good':'progress';
-      return '<article class="cb-task-item '+tone+'" data-task-kind="'+h(k)+'">'+
-        '<div class="cb-task-icon" data-cb-icon="'+h(icons[k]||'activity')+'" aria-hidden="true"></div>'+
-        '<div class="cb-task-info"><div class="cb-task-name">'+h(metricLabels[k]||k)+'</div>'+
-        '<div class="cb-task-status">'+(target===0?'План не установлен':rest===0?'План выполнен':'Осталось '+rest)+'</div>'+
-        '<details class="cb-task-why"><summary>Как рассчитан план</summary><p>'+h(why)+'</p></details></div>'+
-        '<div class="cb-task-numbers"><div class="cb-task-plan"><small>План</small><b>'+target+'</b></div>'+
-        '<label class="cb-task-fact"><span>Факт</span><input type="number" min="0" step="1" inputmode="numeric" aria-label="'+h(metricLabels[k]||k)+': факт" data-v13-fact="'+h(k)+'" value="'+fact+'"></label></div>'+
-        '<div class="cb-task-progress-track" aria-hidden="true"><i style="width:'+(target?Math.max(0,Math.min(100,Math.round(fact/target*100))):0)+'%"></i></div>'+
-        '</article>';
+      var rest=Math.max(target-fact,0),metric=auto&&auto.metrics&&auto.metrics[k]?auto.metrics[k]:null;
+      var why=metric&&metric.shortReason?metric.shortReason:'Автоплан рассчитывается по фактическому темпу.';
+      var completion=target>0?Math.min(100,Math.max(0,Math.round(fact/target*100))):0;
+      return '<div class="ios4-activity '+(target>0&&rest===0?'complete':'pending')+'" data-ios4-metric="'+h(k)+'">'+
+        '<div class="ios4-activity-main"><div class="ios4-activity-symbol" data-cb-icon="'+h(icons[k]||'today')+'" aria-hidden="true"></div>'+
+        '<div class="ios4-activity-name"><strong>'+h(metricLabels[k]||k)+'</strong><span>'+(target===0?'План не задан':rest===0?'Цель на сегодня достигнута':'Осталось '+rest+' до плана')+'</span></div></div>'+
+        '<div class="ios4-activity-values"><div class="ios4-activity-target"><small>План</small><b>'+target+'</b></div>'+
+        '<label class="ios4-activity-actual"><span>Факт</span><input type="number" min="0" step="1" inputmode="numeric" aria-label="'+h(metricLabels[k]||k)+': факт" data-v13-fact="'+h(k)+'" value="'+fact+'"></label></div>'+
+        '<div class="ios4-activity-lower"><div class="ios4-activity-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+completion+'" aria-label="Выполнение '+h(metricLabels[k]||k)+'"><i style="width:'+completion+'%"></i></div>'+
+        '<details class="ios4-activity-reason"><summary>Откуда план?</summary><p>'+h(why)+'</p></details></div></div>';
     }).join('');
-
-    plan.innerHTML='<div class="cb-workday-head"><div><span class="cb-overline">ТВОЙ ПЛАН</span><h3>Активность сегодня</h3>'+
-      '<p>Вноси только факт. План и рекомендации рассчитываются автоматически.</p></div>'+
-      '<div class="cb-workday-percent"><strong>'+dayPct+'%</strong><span>выполнено</span></div></div>'+
-      '<div class="cb-task-grid">'+cards+'</div>'+
-      '<div class="cb-plan-insight"><span class="cb-plan-insight-icon" data-cb-icon="sparkle" aria-hidden="true"></span>'+
-      '<div><b>'+h(focus.title)+'</b><p>'+h(focus.text)+'</p><small>'+h(worst(uid))+'</small></div></div>';
+    plan.innerHTML='<div class="ios4-day-head">'+
+      '<div class="ios4-day-heading"><span class="ios4-kicker">РАБОЧИЙ РИТМ</span><h3>Активность сегодня</h3>'+
+      '<p>Введи факт. Остальное доска посчитает сама.</p></div>'+
+      '<div class="ios4-day-ring" style="--ios4-pct:'+Math.min(100,Math.max(0,dayPct))+'"><div class="ios4-ring-core"><b>'+dayPct+'%</b><small>за день</small></div></div></div>'+
+      '<div class="ios4-activity-grid">'+cards+'</div>'+
+      '<div class="ios4-focus-strip"><div class="ios4-focus-symbol" data-cb-icon="sparkle" aria-hidden="true"></div>'+
+      '<div><span>РЕКОМЕНДАЦИЯ НА СЕГОДНЯ</span><strong>'+h(focus.title)+'</strong>'+
+      '<p>'+h(focus.text)+'</p><small>'+h(worst(uid))+'</small></div></div>';
 
     plan.querySelectorAll('[data-v13-fact]').forEach(function(inp){
       inp.addEventListener('input',function(){

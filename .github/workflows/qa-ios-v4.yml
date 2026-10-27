@@ -1,0 +1,54 @@
+name: iOS V4 — real browser visual QA and business regressions
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'ui-v13.js'
+      - 'ios-v4.css'
+      - 'ios-v4.js'
+      - 'qa/ios4-visual-fixture.html'
+      - 'tests/ios-v4-visual.cjs'
+      - 'tests/ios-v3-layout.test.cjs'
+      - 'tests/business-ux-v2.test.cjs'
+      - '.github/workflows/qa-ios-v4.yml'
+  workflow_dispatch:
+jobs:
+  real-browser-and-business:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and original workflow regression
+        run: |
+          node --check ui-v13.js
+          node --check ios-v3.js
+          node --check ios-v4.js
+          node --check product-v2.js
+          node --check finance-ledger.js
+          node --check salary-v1.js
+          node --check sw.js
+          node tests/ios-v3-layout.test.cjs
+          node tests/business-ux-v2.test.cjs
+          node tests/finance-matrix.test.cjs
+          node tests/finance-payment-tabs.test.cjs
+          node tests/retention-commission.test.cjs
+          node tests/signed-handoff.test.cjs
+      - name: Install browser QA dependencies
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: 12 real viewport checks (light and dark)
+        run: node tests/ios-v4-visual.cjs
+      - name: Keep synthetic QA screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios4-real-browser-qa-screenshots
+          path: qa/ios4-screenshots/*.png
+          if-no-files-found: ignore
+          retention-days: 15
