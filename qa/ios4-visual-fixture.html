@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru" class="cb-apple-light cb-v2 cb-v3 cb-v4">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CampBox V4 visual QA — synthetic data only</title>
+<link rel="stylesheet" href="../ui-v13.css">
+<link rel="stylesheet" href="../refined-ui.css">
+<link rel="stylesheet" href="../product-v2.css">
+<link rel="stylesheet" href="../ios-v3.css">
+<link rel="stylesheet" href="../ios-v4.css">
+<style>
+*{box-sizing:border-box}body{margin:0;padding:20px;min-width:0;font:14px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}
+#mainApp.v13-live{max-width:1520px!important;margin:auto;padding:0!important}
+.v13-screen.active{display:flex;flex-direction:column;gap:18px}
+.v13-block .v13-body{padding:0 22px 22px}
+.cb-command-layout{display:block!important;width:100%}.cb-command-main{display:block}
+#v13-today .cb-page-intro{padding:25px;background:#153963;color:white;border-radius:20px}
+#v13-today .cb-page-h{color:white}
+.v13-section-title{padding:20px 22px 14px}
+.v13-section-title h2{margin:0}.v13-section-title p{margin:6px 0 0}
+@media(max-width:600px){body{padding:8px}.v13-block .v13-body{padding:0 14px 14px}.v13-section-title{padding:14px}}
+</style>
+</head>
+<body>
+<div id="mainApp" class="v13-live">
+<section class="v13-screen active" id="v13-today">
+<section class="cb-page-intro"><div class="cb-page-copy"><div class="cb-eyebrow">CAMPBOX / ТЕСТОВЫЙ ЭКРАН</div><h1 class="cb-page-h">Мой рабочий день</h1><p class="cb-page-sub" style="color:#dceaff">Проверка вёрстки на синтетических значениях</p></div></section>
+<section class="card v13-block cb-primary-task">
+<div class="v13-section-title"><div><h2>Мой план сегодня</h2><p>План рассчитан автоматически. Заполняй только факт.</p></div></div>
+<div class="v13-body" id="v13TodayPlan">
+<div class="ios4-day-head">
+ <div class="ios4-day-heading"><span class="ios4-kicker">РАБОЧИЙ РИТМ</span><h3>Активность сегодня</h3><p>Введи факт. Остальное доска посчитает сама.</p></div>
+ <div class="ios4-day-ring" style="--ios4-pct:42"><div class="ios4-ring-core"><b>42%</b><small>за день</small></div></div>
+</div>
+<div class="ios4-activity-grid">
+ <div class="ios4-activity pending" data-ios4-metric="calls"><div class="ios4-activity-main"><div class="ios4-activity-symbol">☎</div><div class="ios4-activity-name"><strong>Звонки</strong><span>Осталось 6 до плана</span></div></div><div class="ios4-activity-values"><div class="ios4-activity-target"><small>План</small><b>10</b></div><label class="ios4-activity-actual"><span>Факт</span><input aria-label="Звонки: факт" type="number" min="0" value="4" data-v13-fact="calls"></label></div><div class="ios4-activity-lower"><div class="ios4-activity-progress"><i style="width:40%"></i></div><details class="ios4-activity-reason"><summary>Откуда план?</summary><p>Полное пояснение: рабочий план формируется по цели месяца и фактической конверсии команды.</p></details></div></div>
+ <div class="ios4-activity complete" data-ios4-metric="booked"><div class="ios4-activity-main"><div class="ios4-activity-symbol">▦</div><div class="ios4-activity-name"><strong>Назначено встреч</strong><span>Цель на сегодня достигнута</span></div></div><div class="ios4-activity-values"><div class="ios4-activity-target"><small>План</small><b>2</b></div><label class="ios4-activity-actual"><span>Факт</span><input aria-label="Назначено встреч: факт" type="number" min="0" value="2" data-v13-fact="booked"></label></div><div class="ios4-activity-lower"><div class="ios4-activity-progress"><i style="width:100%"></i></div><details class="ios4-activity-reason"><summary>Откуда план?</summary><p>Норматив рассчитывается по месячному целевому количеству встреч.</p></details></div></div>
+ <div class="ios4-activity pending" data-ios4-metric="meetings"><div class="ios4-activity-main"><div class="ios4-activity-symbol">♙</div><div class="ios4-activity-name"><strong>Проведено встреч</strong><span>Осталась 1 встреча</span></div></div><div class="ios4-activity-values"><div class="ios4-activity-target"><small>План</small><b>2</b></div><label class="ios4-activity-actual"><span>Факт</span><input aria-label="Проведено встреч: факт" type="number" min="0" value="1" data-v13-fact="meetings"></label></div><div class="ios4-activity-lower"><div class="ios4-activity-progress"><i style="width:50%"></i></div><details class="ios4-activity-reason"><summary>Откуда план?</summary><p>Необходимо поддерживать конверсию из назначенной встречи в проведённую.</p></details></div></div>
+ <div class="ios4-activity pending" data-ios4-metric="offers"><div class="ios4-activity-main"><div class="ios4-activity-symbol">▤</div><div class="ios4-activity-name"><strong>КП / расчёты</strong><span>Осталось 2 до плана</span></div></div><div class="ios4-activity-values"><div class="ios4-activity-target"><small>План</small><b>2</b></div><label class="ios4-activity-actual"><span>Факт</span><input aria-label="КП / расчёты: факт" type="number" min="0" value="0" data-v13-fact="offers"></label></div><div class="ios4-activity-lower"><div class="ios4-activity-progress"><i style="width:0%"></i></div><details class="ios4-activity-reason"><summary>Откуда план?</summary><p>Рекомендуемый темп поддерживает переходы от встреч к КП.</p></details></div></div>
+ <div class="ios4-activity pending" data-ios4-metric="follow"><div class="ios4-activity-main"><div class="ios4-activity-symbol">↻</div><div class="ios4-activity-name"><strong>Повторные контакты</strong><span>Осталось 4 до плана</span></div></div><div class="ios4-activity-values"><div class="ios4-activity-target"><small>План</small><b>5</b></div><label class="ios4-activity-actual"><span>Факт</span><input aria-label="Повторные контакты: факт" type="number" min="0" value="1" data-v13-fact="follow"></label></div><div class="ios4-activity-lower"><div class="ios4-activity-progress"><i style="width:20%"></i></div><details class="ios4-activity-reason"><summary>Откуда план?</summary><p>Регулярная работа с потенциальными клиентами, находящимися на этапах переговоров.</p></details></div></div>
+</div>
+<div class="ios4-focus-strip"><div class="ios4-focus-symbol">✦</div><div><span>РЕКОМЕНДАЦИЯ НА СЕГОДНЯ</span><strong>Вернуться к необходимому количеству звонков</strong><p>Проверить просадку объёма первичных контактов и восстановить рабочий ритм.</p><small>Рекомендация на основе текущей воронки</small></div></div>
+</div>
+</section>
+</section>
+</div>
+</body>
+</html>
