@@ -5,6 +5,7 @@ on:
       - 'index.html'
       - 'refined-ui.css'
       - 'refined-ui.js'
+      - 'sw.js'
       - 'tests/refined-ui.test.cjs'
       - '.github/workflows/qa-refined-ui.yml'
   workflow_dispatch:
@@ -21,6 +22,7 @@ jobs:
       - name: JS syntax
         run: |
           node --check refined-ui.js
+          node --check sw.js
           node --check ui-v13.js
           node --check finance-ledger.js
           node --check salary-v1.js
