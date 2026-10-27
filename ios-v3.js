@@ -98,8 +98,16 @@
    item.dataset.cbSignal='1';
   }
  }
+ function actions(){
+  document.querySelectorAll('.cb-today-hero [data-cb-go]').forEach(function(b){
+   if(b.dataset.cbActionIcon==='1')return;
+   const wrapper=document.createElement('span');
+   wrapper.className='cb-action-ico';wrapper.innerHTML=icon(b.dataset.cbGo);
+   b.prepend(wrapper);b.dataset.cbActionIcon='1';
+  });
+ }
  function decorate(){
-  setupNav();setupIcons(document.getElementById('v13TodayPlan'));signals();
+  setupNav();actions();setupIcons(document.getElementById('v13TodayPlan'));signals();
   const brand=document.querySelector('.v13-sidebar .v13-brand small');
   if(brand)brand.textContent='Sales Workspace';
  }
