@@ -1,4 +1,4 @@
-const CACHE = 'campbox-sales-product-v2-2026-10-27';
+const CACHE = 'campbox-sales-ios-v3-2026-10-27';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './sales-coach.css?v=20261005b',
@@ -7,14 +7,16 @@ const SHELL = [
   './salary-v1.css?v=20261014handoff',
   './refined-ui.css?v=20261027a',
   './product-v2.css?v=20261027b',
+  './ios-v3.css?v=20261027c',
   './sales-coach.js?v=20261019stableplan',
-  './ui-v13.js?v=20261020financefix',
+  './ui-v13.js?v=20261027ios3',
   './salary-v1.js?v=20261026retention',
   './finance-ledger.js?v=20261026tabs',
   './sales-visual-charts.js?v=20261013a',
   './sales-report-v2.js?v=20261013excelcheck',
   './refined-ui.js?v=20261027a',
-  './product-v2.js?v=20261027b'
+  './product-v2.js?v=20261027b',
+  './ios-v3.js?v=20261027c'
 ];
 
 self.addEventListener('install', event => {
