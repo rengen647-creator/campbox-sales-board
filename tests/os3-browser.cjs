@@ -17,6 +17,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
    const state=await page.evaluate(()=>{const ids=[...document.querySelectorAll('[id]')].map(e=>e.id);return {width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,duplicates:ids.filter((x,i)=>ids.indexOf(x)!==i),inputs:document.querySelectorAll('#v13TodayPlan [data-v13-fact]').length};});
    const label=theme+'-'+width+'-'+screen;checks.push({label,...state});if(state.scroll>state.width+3)failures.push(label+': horizontal overflow '+JSON.stringify(state));if(state.duplicates.length)failures.push(label+': duplicate IDs '+state.duplicates);assert.equal(state.inputs,5);
+   if(screen==='report'){const reportStyle=await page.evaluate(()=>({background:getComputedStyle(document.querySelector('.v13-report-kpis>div')).backgroundColor,width:document.getElementById('v13ReportPeriod').getBoundingClientRect().width}));assert.ok(reportStyle.width>=180,'Readable report select '+label);if(theme==='dark')assert.notEqual(reportStyle.background,'rgb(255, 255, 255)','Dark KPI background');}
    await page.screenshot({path:out+'/'+label+'.png',fullPage:true});
   }
  }
