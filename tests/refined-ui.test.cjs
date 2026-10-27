@@ -27,7 +27,7 @@ assert.match(css,/prefers-reduced-motion/,'motion accessibility respected');
 for(const forbidden of [/\bsupabase\.from\s*\(/,/\bsb\.from\s*\(/,/\bfetch\s*\(/,/\beval\s*\(/]){
   assert.doesNotMatch(js,forbidden,'new design script must never access database or execute dynamic code');
 }
-assert.match(sw,/campbox-sales-(?:refined|product-v2|ios-v3)-2026-10-27/);
+assert.match(sw,/campbox-sales-(?:refined|product-v2|ios-v3|ios-v4)-2026-10-27/);
 assert.match(sw,/refined-ui\.css\?v=20261027a/);
 assert.match(sw,/refined-ui\.js\?v=20261027a/);
 assert.equal((html.match(/refined-ui\.js\?v=/g)||[]).length,1);
