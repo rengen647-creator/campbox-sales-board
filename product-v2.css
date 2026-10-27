@@ -415,3 +415,5 @@ html.cb-v2:not(.cb-apple-light) #mainApp.v13-live .cb-primary-task .v13-my-plan{
  html.cb-v2:not(.cb-apple-light) .cb-context-original .control-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  html.cb-v2:not(.cb-apple-light) .cb-detail-footer{flex-direction:column}
 }
+
+.cb-role-manager[hidden]{display:none!important}
