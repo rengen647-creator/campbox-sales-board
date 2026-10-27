@@ -345,8 +345,15 @@
       '</div></div>';
   }
 
+  function salaryStatusTotals(rows){
+    return rows.reduce((out,row)=>{const amount=Number(row.amount||0);if(row.status==='confirmed'||row.status==='paid')out.confirmed+=amount;else if(row.status==='preliminary')out.preliminary+=amount;return out;},{confirmed:0,preliminary:0});
+  }
+  function salarySummaryRows(rows){
+    const amounts=salaryStatusTotals(rows);
+    return [['Подтверждённые начисления',amounts.confirmed],['Предварительные начисления',amounts.preliminary],['Всего расчётных начислений, включая предварительные',totals(rows).total]];
+  }
   function salaryStatusSummary(rows){
-    const confirmed=rows.filter(r=>r.status==='confirmed'||r.status==='paid').reduce((s,r)=>s+Number(r.amount||0),0),preliminary=rows.filter(r=>r.status==='preliminary').reduce((s,r)=>s+Number(r.amount||0),0);
+    const {confirmed,preliminary}=salaryStatusTotals(rows);
     const excluded=S.payments.filter(p=>p.status==='excluded'&&contract(p.contract_id)?.contractor_id===currentUser.id);
     return '<section class="salary-kpis" aria-label="Статусы начислений"><div class="salary-kpi good"><span>Подтверждённые начисления</span><b>'+money(confirmed)+'</b></div><div class="salary-kpi warn"><span>Предварительные начисления</span><b>'+money(preliminary)+'</b></div><div class="salary-kpi"><span>Исключённые поступления</span><b>'+excluded.length+'</b><small>'+money(excluded.reduce((s,p)=>s+Number(p.amount||0),0))+' поступлений; в зарплату не включены</small></div></section>';
   }
@@ -358,7 +365,7 @@
   }
   function renderMine(){
     const box=q('salaryMine');if(!box)return;if(!S.schemaReady){box.innerHTML='';return}
-    const rows=mineRows(),t=totals(rows),status=S.month<currentMonth()?'Закрытый период':'Предварительно';
+    const rows=mineRows(),t=totals(rows),amounts=salaryStatusTotals(rows),status=S.month<currentMonth()?'Закрытый период':'Предварительно';
     const myContracts=S.contracts.filter(c=>c.contractor_id===currentUser.id);
     const activeProducts=S.products.filter(p=>{
       const c=contract(p.contract_id);if(!c||c.contractor_id!==currentUser.id||!p.first_payment_date||!PRODUCTS[p.product_type]?.period)return false;
@@ -368,18 +375,18 @@
     box.innerHTML=
       '<div class="salary-card"><div class="salary-head"><div><h2>Отчёт по зарплате</h2><p>Месяц, итог и полная расшифровка по договорным циклам.</p></div><span class="salary-pill blue">XLSX</span></div><div class="salary-body">'+
         '<div class="salary-toolbar">'+monthControl('salaryMineMonth')+'<div class="salary-field"><label>Сотрудник</label><input value="'+esc(profileName(currentUser.id))+'" disabled></div><button class="btn primary" id="salaryExcelBtn">Сформировать Excel</button></div>'+
-        '<div class="salary-report-preview"><div><span>Период</span><b>'+esc(monthName(S.month))+'</b></div><div><span>Начислено</span><b>'+money(t.total)+'</b></div><div><span>Начислений</span><b>'+rows.length+'</b></div><div><span>Статус</span><b>'+status+'</b></div></div>'+
+        '<div class="salary-report-preview"><div><span>Период</span><b>'+esc(monthName(S.month))+'</b></div><div data-salary-confirmed><span>Подтверждённые начисления</span><b>'+money(amounts.confirmed)+'</b></div><div><span>Начислений</span><b>'+rows.length+'</b></div><div><span>Статус</span><b>'+status+'</b></div></div>'+
       '</div></div>'+
       '<div class="salary-kpis">'+
-        '<div class="salary-kpi good"><span>Итого начислено</span><b>'+money(t.total)+'</b><small>за выбранный месяц</small></div>'+
+        '<div class="salary-kpi" data-salary-total><span>Всего расчётных начислений</span><b>'+money(t.total)+'</b><small>включая предварительные; разбивка по направлениям ниже</small></div>'+
         '<div class="salary-kpi"><span>Контракторство</span><b>'+money(t.contract)+'</b><small>разово за каждый новый договорный цикл</small></div>'+
         '<div class="salary-kpi good"><span>CampBox · 10%</span><b>'+money(t.campbox)+'</b><small>12 месяцев, паузы и успешные удержания</small></div>'+
         '<div class="salary-kpi"><span>Доп. продукты</span><b>'+money(t.products)+'</b><small>модули и карты</small></div>'+
         '<div class="salary-kpi warn"><span>Сайты / 1% РОП</span><b>'+money(t.site+t.head)+'</b><small>сайты, сопровождение, управленческий 1%</small></div>'+
       '</div>'+salaryStatusSummary(rows)+salaryLifecycle(myContracts)+
-      '<p class="os3-rule-note">База фиксированной ставки контракторства — минимальный план отдела. Правило подтверждено владельцем 27.10.2026. Выполнение = фактические договоры / минимальный план. Закрытые периоды не пересчитываются.</p>'+
+      '<p class="os3-rule-note">База фиксированной ставки контракторства — минимальный план отдела. Выполнение = фактические договоры / минимальный план. Закрытые периоды не пересчитываются.</p>'+
       '<div class="salary-grid2">'+
-        '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка</h2><p>Пауза не съедает срок мотивации; успешное удержание даёт отдельное шестимесячное окно без нового договора.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
+        '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка расчётных начислений</h2><p>Суммы по направлениям включают предварительные начисления. Пауза не съедает срок мотивации; успешное удержание даёт отдельное шестимесячное окно без нового договора.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
           '<div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Доп. продукты</span><b>'+money(t.products)+'</b></div><div><span>Сайты / сопровождение</span><b>'+money(t.site)+'</b></div><div><span>1% руководителю</span><b>'+money(t.head)+'</b></div>'+
         '</div></div></div>'+
         '<div class="salary-card"><div class="salary-head"><div><h2>Действующие периоды мотивации</h2><p>12 месяцев с учётом пауз и успешных удержаний.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
@@ -395,7 +402,7 @@
   async function exportMineExcel(){
     const rows=mineRows(),t=totals(rows),name=profileName(currentUser.id);
     if(typeof XLSX==='undefined'){alert('Библиотека Excel не загрузилась. Обнови страницу и попробуй ещё раз.');return}
-    const summary=[['Отчёт по зарплате CampBox'],['Сотрудник',name],['Период',monthName(S.month)],['Итого начислено',t.total],[],['Категория','Сумма'],['Контракторство',t.contract],['CampBox · 10%',t.campbox],['Доп. продукты',t.products],['Сайты / сопровождение',t.site],['1% руководителю',t.head]];
+    const summary=[['Отчёт по зарплате CampBox'],['Сотрудник',name],['Период',monthName(S.month)],...salarySummaryRows(rows),['Примечание','Статусы начислений взяты из исходных записей. Подтверждённая сумма не означает остаток к выплате.'],[],['Категория','Расчётная сумма, включая предварительные'],['Контракторство',t.contract],['CampBox · 10%',t.campbox],['Доп. продукты',t.products],['Сайты / сопровождение',t.site],['1% руководителю',t.head]];
     const details=[['Дата','Клиент','Дата договора','Направление','Событие','Поступление с НДС','База расчёта','Ставка','Формула','Начислено','Статус'],
       ...rows.map(r=>[r.date,r.client,r.contract_signed||'',r.direction,r.event,r.gross??'',r.base,r.rate,r.formula,r.amount,{paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
     ];
@@ -790,9 +797,9 @@
     const active=(typeof profiles!=='undefined'?profiles:[]).filter(p=>p.active!==false),rows=active.map(p=>({p,rows:salaryFor(p.id)}));
     const all=rows.reduce((a,x)=>a+totals(x.rows).total,0),contractSum=rows.reduce((a,x)=>a+totals(x.rows).contract,0),comm=rows.reduce((a,x)=>a+totals(x.rows).campbox,0),head=rows.reduce((a,x)=>a+totals(x.rows).head,0);
     box.innerHTML='<div id="salaryExecutiveSummary">Загрузка межкомандной сводки…</div>'+ '<div id="salaryQualityDashboard">Загрузка контроля данных…</div>'+ '<div class="salary-card"><div class="salary-head"><div><h2>Команда · '+esc(monthName(S.month))+'</h2><p>ФОТ и расчёты с учётом пауз и повторных договоров.</p></div>'+monthControl('salaryTeamMonth')+'</div><div class="salary-body">'+
-      '<div class="salary-kpis"><div class="salary-kpi good"><span>ФОТ продаж</span><b>'+money(all)+'</b></div><div class="salary-kpi"><span>Контракторство</span><b>'+money(contractSum)+'</b></div><div class="salary-kpi good"><span>CampBox</span><b>'+money(comm)+'</b></div><div class="salary-kpi"><span>Сотрудников</span><b>'+rows.length+'</b></div><div class="salary-kpi warn"><span>1% руководителю</span><b>'+money(head)+'</b></div></div>'+
+      '<div class="salary-kpis"><div class="salary-kpi good"><span>Подтверждённые начисления команды</span><b>'+money(rows.reduce((n,x)=>n+salaryStatusTotals(x.rows).confirmed,0))+'</b><small>Всего расчётных, включая предварительные: '+money(all)+'</small></div><div class="salary-kpi"><span>Контракторство</span><b>'+money(contractSum)+'</b></div><div class="salary-kpi good"><span>CampBox</span><b>'+money(comm)+'</b></div><div class="salary-kpi"><span>Сотрудников</span><b>'+rows.length+'</b></div><div class="salary-kpi warn"><span>1% руководителю</span><b>'+money(head)+'</b></div></div>'+
       '<div class="salary-card"><div class="salary-head"><div><h2>Контрактинг по сотрудникам</h2><p>Количество договоров и фиксированное начисление по каждому менеджеру.</p></div></div><div class="salary-body"><div class="salary-team-cards">'+rows.map(x=>{const k=contractingSummary(x.p.id);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+k.count+' договоров · '+money(k.total)+'</div><small>Ставка '+money(k.rate)+'</small>'+k.items.map(z=>'<div class="salary-breakdown"><div><span>'+esc(z.name)+'</span><b>'+money(z.amount)+'</b></div></div>').join('')+'</div>'}).join('')+'</div></div></div>'+ 
-      '<div class="salary-team-cards">'+rows.map(x=>{const t=totals(x.rows);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+money(t.total)+'</div><small>'+x.rows.length+' начислений</small><div class="salary-breakdown"><div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Остальное</span><b>'+money(t.products+t.site+t.head)+'</b></div></div></div>'}).join('')+'</div>'+
+      '<div class="salary-team-cards">'+rows.map(x=>{const t=totals(x.rows);return '<div class="salary-person"><h3>'+esc(x.p.full_name||x.p.email||'Сотрудник')+'</h3><div class="sum">'+money(salaryStatusTotals(x.rows).confirmed)+'</div><small>Подтверждённые начисления</small><p>Всего расчётных, включая предварительные: '+money(t.total)+'</p><small>'+x.rows.length+' начислений · ниже расчётные суммы по направлениям</small><div class="salary-breakdown"><div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Остальное</span><b>'+money(t.products+t.site+t.head)+'</b></div></div></div>'}).join('')+'</div>'+
     '</div></div>';bindMonth('salaryTeamMonth');loadQualityDashboard();loadExecutiveSummary();
   }
 

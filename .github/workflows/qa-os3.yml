@@ -24,6 +24,7 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.56.1 exceljs@4.4.0 jszip@3.10.1 pngjs@7.0.0 pixelmatch@6.0.0
           npx playwright install --with-deps chromium
+          sudo apt-get install -y poppler-utils
       - name: Generate isolated full application fixture
         run: node tests/build-os3-fixture.cjs
       - name: Pixel parity against reviewed release
