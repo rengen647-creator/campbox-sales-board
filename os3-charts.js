@@ -6,7 +6,7 @@ const valid=v=>v!==null&&v!==undefined&&Number.isFinite(Number(v));
 const fmt=v=>valid(v)?Number(v).toLocaleString('ru-RU',{maximumFractionDigits:1}):'Нет данных';
 function chart({labels=[],series=[],title='Динамика',unit='',kind='line',band,cutoff=-1}={}){
  const values=series.flatMap(s=>s.values.filter(valid)).concat(band?band.flat().filter(valid):[]);
- if(!labels.length||!values.length)return '<div class="os3-empty" role="status"><b>Недостаточно данных</b><p>График появится после внесения фактов за выбранный период.</p></div>';
+ if(!labels.length||!values.length)return root.CampBoxComponents?root.CampBoxComponents.state('empty','Недостаточно данных','График появится после внесения фактов за выбранный период.'):'<div class="os3-empty" role="status"><b>Недостаточно данных</b><p>График появится после внесения фактов за выбранный период.</p></div>';
  const W=760,H=280,L=54,R=20,T=26,B=40,max=Math.max(1,...values)*1.12,min=Math.min(0,...values),range=max-min;
  const x=i=>L+(W-L-R)*(i+.5)/labels.length,y=v=>T+(H-T-B)*(max-v)/range;
  let body='';
@@ -27,7 +27,8 @@ function chart({labels=[],series=[],title='Динамика',unit='',kind='line'
  const legend=series.map(s=>`<span><i class="os3-${esc(s.tone||'primary')}"></i>${esc(s.name)}</span>`).join('')+(band?'<span>Зона: минимум–максимум</span>':'');
  return `<div class="os3-chart-scroll" tabindex="0" aria-label="${esc(title)}. График с горизонтальной прокруткой"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">${body}</svg></div><div class="os3-chart-legend">${legend}</div><p class="os3-chart-readout" aria-live="polite">Выбери точку для значения. Все значения доступны в таблице.</p><details class="os3-source"><summary>Исходные значения и методика</summary><p>Пустая ячейка — нет данных. Линия прерывается на пропусках. ${esc(unit==='%'?'Конверсия накопительно к дате; база указана в карточке перехода.':'План и факт показаны отдельными рядами.')}</p><div class="os3-table-scroll"><table><thead><tr><th>Дата</th>${series.map(s=>`<th>${esc(s.name)}</th>`).join('')}</tr></thead><tbody>${labels.map((l,i)=>`<tr><th>${esc(l)}</th>${series.map(s=>`<td>${esc(fmt(s.values[i]))}${valid(s.values[i])?esc(unit):''}${s.bases?' · '+s.bases[i][0]+' из '+s.bases[i][1]:''}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
 }
-root.CampBoxCharts={chart,esc,valid,fmt};
+function spark(values){const max=Math.max(1,...values.filter(valid)),min=Math.min(0,...values.filter(valid));let d='',open=false;values.forEach((v,i)=>{if(!valid(v)){open=false;return;}d+=(open?' L':' M')+(4+112*i/Math.max(1,values.length-1))+' '+(36-32*(v-min)/(max-min));open=true;});return '<svg class="os3-spark" viewBox="0 0 120 40" aria-hidden="true"><path d="'+d+'" fill="none" stroke="currentColor" stroke-width="2"/></svg>';}
+root.CampBoxCharts={chart,esc,valid,fmt,spark};
 if(typeof module!=='undefined')module.exports=root.CampBoxCharts;
 if(typeof document!=='undefined'){
  const show=e=>{const point=e.target.closest?.('.os3-point');if(!point)return;const box=point.closest('.os3-chart-scroll')?.parentElement,read=box?.querySelector('.os3-chart-readout');if(read)read.textContent=point.getAttribute('aria-label');};

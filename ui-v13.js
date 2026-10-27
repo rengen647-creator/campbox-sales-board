@@ -40,12 +40,13 @@
     var m=titleMeta(id),t=document.getElementById('v13PageTitle'),d=document.getElementById('v13PageDesc');
     if(t)t.textContent=m[0];if(d)d.textContent=m[1];
     refresh();
+    if((id==='month'||id==='analytics')&&typeof renderPace==='function'){renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();}
     if(id==='salary'&&typeof window.salaryOpen==='function')window.salaryOpen();
     if(id==='finance'&&typeof window.salesFinanceOpen==='function')window.salesFinanceOpen();
     if(id==='contracts')loadMissingContractNumbers();
     window.scrollTo({top:0,behavior:'smooth'});
   }
-  window.v13Go=go;
+  window.v13Go=go;window.os3RefreshAnalytics=function(){renderAnalytics();};
 
   function navButton(id,icon,label){
     return '<button type="button" data-v13-view="'+id+'">'+icon+' &nbsp;'+label+'</button>';
@@ -65,7 +66,7 @@
     var items=[];
     if(manager)items.push(['funnel','📊','Воронка']);
     items.push(['contracts','✍️','Контрактинг'],['analytics','📈','Аналитика'],['summary','✅','Итоги'],['salary','💰','Зарплата'],['finance','💳','Финансы']);
-    if(manager)items.push(['report','🧾','Отчёт']);
+    items.push(['report','🧾','Отчёт']);
     sheet.innerHTML='<div class="v13-more-sheet"><div class="v13-more-handle"></div><div class="v13-more-title"><b>Ещё</b><small>Дополнительные разделы</small></div><div class="v13-more-grid">'+items.map(function(x){return '<button type="button" data-v13-view="'+x[0]+'"><span>'+x[1]+'</span>'+x[2]+'</button>';}).join('')+'</div></div>';
   }
 
@@ -226,11 +227,12 @@
 
     var rep=el('div','v13-report-layout','<section class="card v13-report-settings"><div class="v13-section-title" style="padding:0 0 8px"><div><h2>Сформировать отчёт</h2><p>Краткий управленческий отчёт из живых данных.</p></div></div><label>Период</label><select id="v13ReportPeriod"><option value="current">К выбранной дате</option><option value="month">Весь выбранный месяц</option></select><label>Формат</label><select id="v13ReportType"><option value="short">Краткий управленческий</option><option value="team">По команде</option></select><button type="button" class="btn primary" style="width:100%;margin-top:12px" id="v13BuildReport">Сформировать отчёт</button><div class="v13-report-actions"><button type="button" class="btn" id="v13PdfReport">PDF</button><button type="button" class="btn" id="v13ExcelReport">Excel</button></div></section><section class="v13-report-preview" id="v13ReportPreview"></section>');
     screen('report').appendChild(rep);
+    ['v13ReportPeriod','v13ReportType'].forEach(function(id){document.getElementById(id).addEventListener('change',renderReport);});
     document.getElementById('v13BuildReport').addEventListener('click',renderReport);
-    document.getElementById('v13PdfReport').addEventListener('click',function(){document.body.classList.add('v13-print-report');window.print();setTimeout(function(){document.body.classList.remove('v13-print-report');},300);});
+    document.getElementById('v13PdfReport').addEventListener('click',function(){renderReport();document.body.classList.add('v13-print-report');window.print();setTimeout(function(){document.body.classList.remove('v13-print-report');},300);});
     document.getElementById('v13ExcelReport').textContent='Excel · дашборд';
     document.getElementById('v13ExcelReport').addEventListener('click',function(){
-      if(typeof window.exportExcelV2==='function') return window.exportExcelV2();
+      if(window.CampBoxReport) return window.CampBoxReport.excel();
       alert('Новая выгрузка Excel не загрузилась. Обнови страницу и повтори попытку.');
     });
   }
@@ -330,6 +332,11 @@
     var map={calls:'Вернуть необходимый объём звонков и закрыть накопленный долг.',booked:'Разобрать первые 30 секунд звонка и назначение встречи.',meetings:'Подтверждать встречу заранее и фиксировать ценность разговора.',offers:'Не завершать встречу без следующего шага и персонального КП.',follow:'Закрыть просроченные повторные контакты.',call_book:'Разобрать 5 последних звонков без назначения встречи.',book_meet:'Проверить причины недоходимости и подтверждение встреч.',meet_offer:'Разобрать, чем заканчиваются встречи и почему нет КП.'};
     return map[item&&item.key]||'Сохранить текущий темп и контролировать показатель.';
   }
+  function clientActions(root,uid){
+    var clients=activeContractEntries().filter(function(c){return uid==='team'||c.user_id===uid;});
+    var section=el('section','os3-client-actions','<h3>Клиенты и следующий шаг</h3><p>Доступны договоры на подписании. По ранним этапам поимённые данные в доске не ведутся.</p>'+clients.map(function(c){return '<article><b>'+h(c.client)+'</b><p>'+h(c.next_action||'Следующий шаг не указан')+' · '+h(c.next_contact||'Дата не задана')+' · '+(c.ball==='us'?'мяч у нас':'мяч у клиента')+'</p><button type="button" class="btn" data-os3-client-owner="'+h(c.user_id)+'">Открыть договоры менеджера</button></article>';}).join('')+(clients.length?'':'<p>Активных договоров нет.</p>'));
+    root.append(section);section.querySelectorAll('[data-os3-client-owner]').forEach(function(b){b.onclick=function(){openContracts(b.dataset.os3ClientOwner);};});
+  }
   function renderManagerPanel(id){
     var box=document.getElementById('v13ManagerPanel');if(!box||!id)return;
     box.classList.toggle('mobile-open',!isMobile()||V.managerOpen);
@@ -343,6 +350,8 @@
       '<div class="v13-health"><div><span>Факт</span><b>'+f.fact+'/'+f.target+'</b></div><div><span>Прогноз</span><b>'+f.forecast+'/'+f.target+'</b></div><div><span>Звонки</span><b>'+(calls?h(calls.fact):'—')+'</b></div><div><span>Звонок→встреча</span><b>'+(cb?h(cb.fact):'—')+'</b></div><div><span>Встреча→КП</span><b>'+(mo?h(mo.fact):'—')+'</b></div></div>'+
       '<div class="v13-manager-columns"><div class="v13-coach-box"><h4>Что получается</h4><ul>'+(good.length?good.map(function(x){return '<li>'+h(x.label)+': '+h(x.diagnosis)+'</li>';}).join(''):'<li>Нужно больше данных для устойчивого вывода.</li>')+'</ul></div><div class="v13-coach-box"><h4>Что тянет вниз</h4><ul>'+(weak.length?weak.slice(0,4).map(function(x){return '<li>'+h(x.label)+': '+h(x.fact)+' при ориентире '+h(x.guide)+'</li>';}).join(''):'<li>Критичных просадок нет.</li>')+(cr.over7?'<li>Контрактинг: '+cr.over7+' договор(а) старше 7 дней.</li>':'')+'</ul></div></div>'+
       '<div class="v13-coach-box" style="margin-top:8px;border-color:rgba(163,109,245,.35)"><h4>Фокус Coach</h4><p>'+h(actionFor(weak[0]))+'</p></div>';
+    clientActions(box,id);
+    if(isManager()){var moneyButton=el('button','btn','Поступления менеджера');moneyButton.type='button';moneyButton.onclick=function(){if(window.salesFinanceFor)window.salesFinanceFor(id);go('finance');};box.append(moneyButton);}
     var close=document.getElementById('v13ManagerClose');if(close)close.addEventListener('click',function(){V.managerOpen=false;renderTeam();setTimeout(function(){var g=document.getElementById('v13TeamGrid');if(g)g.scrollIntoView({behavior:'smooth',block:'start'});},30);});
   }
 
@@ -436,14 +445,16 @@
       '<div class="v13-stage-kpis"><div><span>Факт</span><b>'+h(fact)+'</b></div><div><span>Ориентир</span><b>'+h(guide)+'</b></div><div><span>Отклонение</span><b>'+h(delta)+'</b></div><div><span>Диагноз</span><b style="font-size:10px">'+h(diagnosis)+'</b></div></div>'+
       '<div class="v13-insight"><b>Coach:</b> '+h(diagnosis)+' '+h(actionFor(item))+'</div>'+
       '<div class="v13-self"><details><summary>Почему так может происходить</summary><ul>'+info.causes.map(function(x){return '<li>'+h(x)+'</li>';}).join('')+'</ul></details><details><summary>Вопросы к себе</summary><ul>'+info.questions.map(function(x){return '<li>'+h(x)+'</li>';}).join('')+'</ul></details><div><b style="font-size:11px">Что делать</b><ul>'+info.actions.map(function(x){return '<li>'+h(x)+'</li>';}).join('')+'</ul></div></div>';
+    clientActions(panel,uid);
   }
 
   function renderAnalytics(){
+    window.os3SyncAnalyticsScope?.();
     var tabs=document.getElementById('v13AnalyticsTabs'),panel=document.getElementById('v13AnalyticsPanel');if(!tabs||!panel)return;
     var modes={activity:'Активность',conversion:'Конверсия',pace:'Темп месяца',discipline:'Дисциплина'};
     tabs.innerHTML=Object.keys(modes).map(function(k){return '<button type="button" data-v13-analytics="'+k+'" class="'+(V.analytics===k?'active':'')+'">'+modes[k]+'</button>';}).join('');
     tabs.querySelectorAll('[data-v13-analytics]').forEach(function(b){b.addEventListener('click',function(){V.analytics=this.getAttribute('data-v13-analytics');renderAnalytics();});});
-    var uid=safeScope();if(!uid)return;var d=diag(uid),f=fd(uid),title='',source='',diagnosis='',what='',why='',next='';
+    var uid=isManager()&&typeof os3AnalyticsScope!=='undefined'?os3AnalyticsScope:currentSelf();if(!uid)return;var d=diag(uid),f=fd(uid),title='',source='',diagnosis='',what='',why='',next='';
     if(V.analytics==='activity'){
       var aa=d.filter(function(x){return x.type==='activity';}),weak=aa.filter(function(x){return x.tone!=='good';}).sort(function(a,b){return a.score-b.score;})[0];
       title='Активность · хватает ли объёма работы';source='Источник: ежедневный автоплан и факт действий менеджеров.';diagnosis=weak?weak.label+': '+weak.diagnosis:'Объём активности выполняется.';what='Сравниваем накопленный план и факт по каждому действию.';why='Отделяем проблему объёма от проблемы качества конверсии.';next=weak?actionFor(weak):'Не увеличивать активность без необходимости.';
@@ -462,21 +473,7 @@
   }
 
   function renderReport(){
-    var box=document.getElementById('v13ReportPreview');if(!box)return;var scope=(typeof isManager==='function'&&isManager())?'team':currentSelf();if(!scope)return;
-    var f=fd(scope),d=diag(scope),cr=risk(scope),w=worst(scope),prio=[];try{prio=coachPriorityData(scope,d,f,cr);}catch(e){}
-    var teamRows='';
-    if(typeof isManager==='function'&&isManager()&&typeof profiles!=='undefined'){
-      teamRows=profiles.map(function(p){var pf=fd(p.id);return '<tr><td>'+h(p.full_name||p.email||'Сотрудник')+'</td><td>'+pf.fact+' / '+pf.target+'</td><td>'+pf.forecast+' / '+pf.target+'</td><td>'+h(worst(p.id))+'</td></tr>';}).join('');
-    }else{
-      teamRows='<tr><td>Я</td><td>'+f.fact+' / '+f.target+'</td><td>'+f.forecast+' / '+f.target+'</td><td>'+h(w)+'</td></tr>';
-    }
-    var issues=d.filter(function(x){return x.tone!=='good';}).sort(function(a,b){return a.score-b.score;}).slice(0,4);
-    box.innerHTML='<h2>Отчёт по продажам CampBox</h2><div class="sub">'+h(typeof selectedDate!=='undefined'?selectedDate:'')+' · автоматически сформирован из Sales Board</div>'+
-      '<div class="v13-report-kpis"><div><span>План</span><b>'+f.target+'</b></div><div><span>Факт</span><b>'+f.fact+'</b></div><div><span>Прогноз</span><b>'+f.forecast+'</b></div><div><span>Риск</span><b>'+(f.risk?'-'+f.risk:'0')+'</b></div></div>'+
-      '<div class="v13-report-section"><div class="v13-report-callout"><b>Главный вывод:</b> '+h(w)+'. '+(f.risk?'При текущем темпе ожидаемый недобор — '+f.risk+'.':'Текущий темп позволяет идти в цель.')+'</div></div>'+
-      '<div class="v13-report-section"><h3>Что имеем</h3><table class="v13-report-table"><thead><tr><th>Показатель</th><th>Факт</th><th>Ориентир</th><th>Статус</th></tr></thead><tbody>'+issues.map(function(x){return '<tr><td>'+h(x.label)+'</td><td>'+h(x.fact)+'</td><td>'+h(x.guide)+'</td><td>'+h(x.diagnosis)+'</td></tr>';}).join('')+'</tbody></table></div>'+
-      '<div class="v13-report-section"><h3>По менеджерам</h3><table class="v13-report-table"><thead><tr><th>Менеджер</th><th>Факт / цель</th><th>Прогноз</th><th>Главная проблема</th></tr></thead><tbody>'+teamRows+'</tbody></table></div>'+
-      '<div class="v13-report-section"><h3>Что делаем</h3><div class="v13-report-callout good">'+(prio.length?prio.map(function(x,i){return (i+1)+'. '+h(x.title)+' — '+h(x.text);}).join('<br>'):'Сохраняем текущий темп и контролируем воронку.')+'</div></div>';
+    if(window.CampBoxReport)window.CampBoxReport.render();
   }
 
   function updateSide(){
@@ -487,7 +484,7 @@
   function refresh(){
     if(!V.built)return;updateSide();
     var manager=typeof isManager==='function'&&isManager();
-    document.querySelectorAll('[data-v13-view="report"]').forEach(function(b){b.style.display=manager?'':'none';});
+    document.querySelectorAll('[data-v13-view="report"]').forEach(function(b){b.style.display='';});
     document.querySelectorAll('.v13-nav [data-v13-view="salary"]').forEach(function(b){b.classList.add('salary-nav-separator');});
     renderMobileNav();renderMoreSheet();
     var more=document.getElementById('v13MobileMore');if(more)more.classList.toggle('open',V.moreOpen);

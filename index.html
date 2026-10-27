@@ -97,8 +97,9 @@
   <link rel="stylesheet" href="./product-v2.css?v=20261027b">
   <link rel="stylesheet" href="./ios-v3.css?v=20261027c">
   <link rel="stylesheet" href="./ios-v4.css?v=20261027d">
-<link rel="stylesheet" href="os3.css?v=20261027os3">
-<script src="os3-charts.js?v=20261027os3"></script>
+<link rel="stylesheet" href="os3.css?v=20261027qa2">
+<script src="os3-components.js?v=20261027qa2"></script>
+<script src="os3-charts.js?v=20261027qa2"></script>
 </head>
 <body>
 
@@ -700,8 +701,11 @@ function svgLineChart(containerId,labels,series,{percent=false}={}){
  const el=$(containerId);if(!el)return;
  el.innerHTML=CampBoxCharts.chart({labels,series:series.map((s,i)=>({...s,name:s.name||'Ряд '+(i+1),tone:s.tone||(i?'positive':'primary')})),unit:percent?'%':'',title:'Динамика'});
 }
+let os3AnalyticsScope='team',os3Granularity='day';
+function os3AnalyticsRows(){const scope=isManager()?($('v13-analytics')?.classList.contains('active')?os3AnalyticsScope:'team'):currentUser?.id;return coachScopeRows(monthRows,scope,true).filter(r=>String(r.report_date).startsWith(selectedMonth));}
+function os3AnalyticsTarget(id){return isManager()&&(!$('v13-analytics')?.classList.contains('active')||os3AnalyticsScope==='team')?num($(id).value):PERSONAL_MONTH_TARGET;}
 function paceSnapshot(){
-  const total=daysInMonth(selectedMonth),cut=Math.min(total,Math.max(1,Number(selectedDate.slice(8,10)))),wdTotal=totalWorkdays(selectedMonth),wdDone=workdaysThrough(selectedMonth,cut),target=num($('monthTarget').value),need=wdTotal?Math.ceil(target*wdDone/wdTotal):0,fact=monthRows.filter(r=>String(r.report_date)<=selectedDate).reduce((s,r)=>s+num(r.connected_fact),0);
+  const total=daysInMonth(selectedMonth),cut=Math.min(total,Math.max(1,Number(selectedDate.slice(8,10)))),wdTotal=totalWorkdays(selectedMonth),wdDone=workdaysThrough(selectedMonth,cut),target=os3AnalyticsTarget('monthTarget'),need=wdTotal?Math.ceil(target*wdDone/wdTotal):0,fact=os3AnalyticsRows().filter(r=>String(r.report_date)<=selectedDate).reduce((s,r)=>s+num(r.connected_fact),0);
   return {cut,wdTotal,wdDone,target,need,fact,delta:fact-need};
 }
 function renderPaceCorridor(labels,minVals,targetVals,maxVals,factVals){
@@ -710,8 +714,8 @@ function renderPaceCorridor(labels,minVals,targetVals,maxVals,factVals){
  const note=$('os3PaceDecision');if(note){const p=paceSnapshot();note.innerHTML='<span class="os3-kicker">ОТКЛОНЕНИЕ К ДАТЕ</span><strong>'+(p.delta>0?'+':'')+p.delta+'</strong><p>Факт '+p.fact+' · нужно к дате '+p.need+'.</p><p>Ориентир учитывает рабочие дни. Диапазон плана не является прогнозом.</p><button type="button" data-cb-go="month">Открыть план месяца →</button>';}
 }
 function renderPace(){
-  const snap=paceSnapshot(),total=daysInMonth(selectedMonth),min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),wdTotal=totalWorkdays(selectedMonth)||1,labels=[],aMin=[],aTarget=[],aMax=[],aFact=[];let cumulative=0;
-  const byDate={};monthRows.forEach(r=>byDate[r.report_date]=(byDate[r.report_date]||0)+num(r.connected_fact));
+  const snap=paceSnapshot(),total=daysInMonth(selectedMonth),min=os3AnalyticsTarget('monthMin'),target=os3AnalyticsTarget('monthTarget'),max=os3AnalyticsTarget('monthMax'),wdTotal=totalWorkdays(selectedMonth)||1,labels=[],aMin=[],aTarget=[],aMax=[],aFact=[];let cumulative=0;
+  const byDate={};os3AnalyticsRows().forEach(r=>byDate[r.report_date]=(byDate[r.report_date]||0)+num(r.connected_fact));
   for(let d=1;d<=total;d++){const iso=isoForDay(selectedMonth,d);labels.push(String(d));const w=workdaysThrough(selectedMonth,d);aMin.push(min*w/wdTotal);aTarget.push(target*w/wdTotal);aMax.push(max*w/wdTotal);cumulative+=num(byDate[iso]);aFact.push(d<=snap.cut&&iso<=todayISO()&&Object.prototype.hasOwnProperty.call(byDate,iso)?cumulative:null)}
   $('paceNeed').textContent=snap.need;$('paceFact').textContent=snap.fact;$('paceDelta').textContent=(snap.delta>0?'+':'')+snap.delta;$('paceDays').textContent=`${snap.wdDone} / ${snap.wdTotal}`;
   const st=$('paceStatus'),cls=snap.delta>=0?'good':snap.delta===-1?'warn':'bad';st.className='pill '+cls;st.textContent=snap.delta>0?`Опережаем на ${snap.delta}`:snap.delta===0?'Идём по графику':`Отстаём на ${Math.abs(snap.delta)}`;$('paceDelta').parentElement.className='pace-item '+cls;
@@ -721,21 +725,22 @@ function setActivityMetric(k){activeActivityMetric=k;renderActivitySwitch();rend
 function renderActivitySwitch(){const box=$('activitySwitch');if(!box)return;box.innerHTML=activityKeys.map(k=>`<button type="button" class="${k===activeActivityMetric?'active':''}" onclick="setActivityMetric('${k}')">${metricLabels[k]}</button>`).join('')}
 function renderActivityChart(){
  renderActivitySwitch();const limit=visibleMonthDays(),labels=[],plans=[],facts=[];
- for(let d=1;d<=limit;d++){const iso=isoForDay(selectedMonth,d),rows=monthRows.filter(r=>r.report_date===iso);labels.push(String(d));plans.push(rows.length?sum(rows,activeActivityMetric+'_plan'):null);facts.push(rows.length?sum(rows,activeActivityMetric+'_fact'):null)}
+ for(let d=1;d<=limit;d++){const iso=isoForDay(selectedMonth,d),rows=os3AnalyticsRows().filter(r=>r.report_date===iso);labels.push(String(d));plans.push(rows.length?sum(rows,activeActivityMetric+'_plan'):null);facts.push(rows.length?sum(rows,activeActivityMetric+'_fact'):null)}
+ if(os3Granularity!=='day'){const step=os3Granularity==='month'?31:7,ls=[],ps=[],fs=[];for(let i=0;i<labels.length;i+=step){ls.push(labels[i]+'–'+labels[Math.min(labels.length-1,i+step-1)]);for(const [src,out] of [[plans,ps],[facts,fs]]){const v=src.slice(i,i+step).filter(x=>x!==null);out.push(v.length?v.reduce((a,b)=>a+b,0):null);}}labels.splice(0,labels.length,...ls);plans.splice(0,plans.length,...ps);facts.splice(0,facts.length,...fs);}
  const el=$('activityChart');if(el)el.innerHTML=CampBoxCharts.chart({labels,kind:'bars',title:metricLabels[activeActivityMetric],series:[{name:'Факт',values:facts,tone:'positive'},{name:'План дня',values:plans,tone:'primary',mark:true}]});
 }
 let os3ConversionIndex=0;
 function renderConversionChart(){
- const limit=visibleMonthDays(),weeks=Math.ceil(limit/7),labels=[],values=[[],[],[],[]],bases=[[],[],[],[]];
+ const limit=visibleMonthDays(),step=os3Granularity==='day'?1:os3Granularity==='month'?31:7,weeks=Math.ceil(limit/step),labels=[],values=[[],[],[],[]],bases=[[],[],[],[]];
  const names=['Звонок → встреча','Встреча → КП','КП → подписание','Подписание → подключение'];
- for(let w=0;w<weeks;w++){const end=Math.min(limit,(w+1)*7),rows=monthRows.filter(r=>Number(String(r.report_date).slice(8,10))<=end),calls=sum(rows,'calls_fact'),booked=sum(rows,'booked_fact'),meet=sum(rows,'meetings_fact'),offers=sum(rows,'offers_fact'),signing=monthlySigningCount(rows),conn=sum(rows,'connected_fact');labels.push('1–'+end);[[booked,calls],[offers,meet],[signing,offers],[conn,signing]].forEach(([n,d],i)=>{values[i].push(d>0?pct(n,d):null);bases[i].push([n,d]);});}
+ for(let w=0;w<weeks;w++){const end=Math.min(limit,(w+1)*step),rows=os3AnalyticsRows().filter(r=>Number(String(r.report_date).slice(8,10))<=end),calls=sum(rows,'calls_fact'),booked=sum(rows,'booked_fact'),meet=sum(rows,'meetings_fact'),offers=sum(rows,'offers_fact'),signing=monthlySigningCount(rows),conn=sum(rows,'connected_fact');labels.push('1–'+end);[[booked,calls],[offers,meet],[signing,offers],[conn,signing]].forEach(([n,d],i)=>{values[i].push(d>0?pct(n,d):null);bases[i].push([n,d]);});}
  const box=$('conversionChart');if(!box)return;
- box.innerHTML='<div class="os3-conversions" role="group" aria-label="Выбор перехода">'+names.map((name,i)=>{const base=bases[i].at(-1)||[0,0],v=values[i].at(-1);return '<button type="button" data-os3-conversion="'+i+'" aria-pressed="'+(os3ConversionIndex===i)+'"><span>'+esc(name)+'</span><b>'+(v===null?'—':v+'%')+'</b><small>'+base[0]+' из '+base[1]+(base[1]===0?' · нет базы':base[1]<10?' · малая база':'')+'</small></button>';}).join('')+'</div><div class="os3-conversion-detail">'+CampBoxCharts.chart({labels,title:names[os3ConversionIndex]+' · накопительно к дате',unit:'%',series:[{name:names[os3ConversionIndex],values:values[os3ConversionIndex],bases:bases[os3ConversionIndex],tone:'primary'}]})+'</div>';
+ box.innerHTML='<div class="os3-conversions" role="group" aria-label="Выбор перехода">'+names.map((name,i)=>{const base=bases[i].at(-1)||[0,0],v=values[i].at(-1);return '<button type="button" data-os3-conversion="'+i+'" aria-pressed="'+(os3ConversionIndex===i)+'"><span>'+esc(name)+'</span><b>'+(v===null?'—':v+'%')+'</b><small>'+base[0]+' из '+base[1]+(base[1]===0?' · нет базы':base[1]<10?' · малая база':'')+'</small>'+CampBoxCharts.spark(values[i])+'</button>';}).join('')+'</div><div class="os3-conversion-detail">'+CampBoxCharts.chart({labels,title:names[os3ConversionIndex]+' · накопительно к дате',unit:'%',series:[{name:names[os3ConversionIndex],values:values[os3ConversionIndex],bases:bases[os3ConversionIndex],tone:'primary'}]})+'</div>';
  box.querySelectorAll('[data-os3-conversion]').forEach(b=>b.onclick=()=>{os3ConversionIndex=Number(b.dataset.os3Conversion);renderConversionChart();$('conversionChart').querySelector('[data-os3-conversion="'+os3ConversionIndex+'"]').focus();});
 }
 function renderCalendarHeatmap(){
   const box=$('calendarHeatmap');if(!box)return;const names=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],total=daysInMonth(selectedMonth);let html=names.map(x=>`<div class="cal-weekday">${x}</div>`).join('');const first=new Date(isoForDay(selectedMonth,1)+'T12:00:00').getDay(),offset=(first+6)%7;for(let i=0;i<offset;i++)html+='<div></div>';
-  for(let d=1;d<=total;d++){const iso=isoForDay(selectedMonth,d),rows=monthRows.filter(r=>r.report_date===iso),ps=[];activityKeys.forEach(k=>{const p=sum(rows,k+'_plan'),f=sum(rows,k+'_fact');if(p>0)ps.push(Math.min(100,pct(f,p)))});const score=ps.length?Math.round(ps.reduce((a,b)=>a+b,0)/ps.length):null,weekend=!isWorkdayISO(iso),cls=score===null?'empty':score>=100?'good':score>=70?'warn':'bad';html+=`<div class="cal-day ${cls} ${weekend?'weekend':''}" title="${score===null?(rows.length?'План не задан':'Нет данных'):`Выполнение активности: ${score}%`}"><span class="n">${d}</span><span class="v">${score===null?(weekend?'Выходной':rows.length?'Нет плана':'Нет данных'):score+'%'}</span></div>`}
+  for(let d=1;d<=total;d++){const iso=isoForDay(selectedMonth,d),rows=os3AnalyticsRows().filter(r=>r.report_date===iso),ps=[];activityKeys.forEach(k=>{const p=sum(rows,k+'_plan'),f=sum(rows,k+'_fact');if(p>0)ps.push(Math.min(100,pct(f,p)))});const score=ps.length?Math.round(ps.reduce((a,b)=>a+b,0)/ps.length):null,weekend=!isWorkdayISO(iso),cls=score===null?'empty':score>=100?'good':score>=70?'warn':'bad';html+=`<div class="cal-day ${cls} ${weekend?'weekend':''}" title="${score===null?(rows.length?'План не задан':'Нет данных'):`Выполнение активности: ${score}%`}"><span class="n">${d}</span><span class="v">${score===null?(weekend?'Выходной':rows.length?'Нет плана':'Нет данных'):score+'%'}</span></div>`}
   box.innerHTML=html;
 }
 function renderPersonal(){
@@ -904,16 +909,17 @@ initPWA();
 })();
 </script>
 
-  <script src="./ui-v13.js?v=20261027os3"></script>
-  <script src="./salary-v1.js?v=20261026retention"></script>
-  <script src="./finance-ledger.js?v=20261026tabs"></script>
-  <script src="./sales-visual-charts.js?v=20261013a"></script>
+  <script src="./os3-report.js?v=20261027qa2"></script>
+  <script src="./ui-v13.js?v=20261027qa2"></script>
+  <script src="./salary-v1.js?v=20261027qa2"></script>
+  <script src="./finance-ledger.js?v=20261027qa2"></script>
+  <script src="./sales-visual-charts.js?v=20261027qa2"></script>
   <script src="./sales-report-v2.js?v=20261013excelcheck"></script>
   <script src="./refined-ui.js?v=20261027a"></script>
   <script src="./product-v2.js?v=20261027os3"></script>
   <script src="./ios-v3.js?v=20261027c"></script>
   <script src="./ios-v4.js?v=20261027d"></script>
-  <script src="./os3-ui.js?v=20261027os3"></script>
+  <script src="./os3-ui.js?v=20261027qa2"></script>
 
 </body>
 </html>

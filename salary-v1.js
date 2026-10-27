@@ -345,6 +345,17 @@
       '</div></div>';
   }
 
+  function salaryStatusSummary(rows){
+    const confirmed=rows.filter(r=>r.status==='confirmed'||r.status==='paid').reduce((s,r)=>s+Number(r.amount||0),0),preliminary=rows.filter(r=>r.status==='preliminary').reduce((s,r)=>s+Number(r.amount||0),0);
+    const excluded=S.payments.filter(p=>p.status==='excluded'&&contract(p.contract_id)?.contractor_id===currentUser.id);
+    return '<section class="salary-kpis" aria-label="Статусы начислений"><div class="salary-kpi good"><span>Подтверждённые начисления</span><b>'+money(confirmed)+'</b></div><div class="salary-kpi warn"><span>Предварительные начисления</span><b>'+money(preliminary)+'</b></div><div class="salary-kpi"><span>Исключённые поступления</span><b>'+excluded.length+'</b><small>'+money(excluded.reduce((s,p)=>s+Number(p.amount||0),0))+' поступлений; в зарплату не включены</small></div></section>';
+  }
+  function salaryLifecycle(contracts){
+    const events=[];
+    contracts.forEach(c=>{const name=contractClient(c)?.client_name||'Лагерь';events.push({date:c.signed_date,label:name+' · договор подписан'});S.pauses.filter(p=>p.contract_id===c.id).forEach(p=>{events.push({date:p.pause_start,label:name+' · пауза'});if(p.pause_end)events.push({date:p.pause_end,label:name+' · возобновление'});});S.retentions.filter(r=>r.contract_id===c.id).forEach(r=>{events.push({date:r.opened_at,label:name+' · начало удержания'});if(r.resolved_at)events.push({date:r.resolved_at,label:name+(r.status==='successful'?' · удержан, отдельное окно до '+dateRu(retentionEnd(r)):' · не удержан')});});if(c.terminated_date)events.push({date:c.terminated_date,label:name+' · расторгнут'});});
+    events.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    return '<details class="os3-disclosure"><summary>История договоров, пауз и удержания</summary><ol class="salary-timeline">'+events.map(e=>'<li class="salary-event"><time>'+dateRu(e.date)+'</time><span>'+esc(e.label)+'</span></li>').join('')+'</ol>'+(events.length?'':'<p>Событий пока нет.</p>')+'</details>';
+  }
   function renderMine(){
     const box=q('salaryMine');if(!box)return;if(!S.schemaReady){box.innerHTML='';return}
     const rows=mineRows(),t=totals(rows),status=S.month<currentMonth()?'Закрытый период':'Предварительно';
@@ -365,7 +376,8 @@
         '<div class="salary-kpi good"><span>CampBox · 10%</span><b>'+money(t.campbox)+'</b><small>12 месяцев, паузы и успешные удержания</small></div>'+
         '<div class="salary-kpi"><span>Доп. продукты</span><b>'+money(t.products)+'</b><small>модули и карты</small></div>'+
         '<div class="salary-kpi warn"><span>Сайты / 1% РОП</span><b>'+money(t.site+t.head)+'</b><small>сайты, сопровождение, управленческий 1%</small></div>'+
-      '</div>'+
+      '</div>'+salaryStatusSummary(rows)+salaryLifecycle(myContracts)+
+      '<p class="os3-rule-note">База фиксированной ставки контракторства — минимальный план отдела. Правило подтверждено владельцем 27.10.2026. Выполнение = фактические договоры / минимальный план. Закрытые периоды не пересчитываются.</p>'+
       '<div class="salary-grid2">'+
         '<div class="salary-card"><div class="salary-head"><div><h2>Расшифровка</h2><p>Пауза не съедает срок мотивации; успешное удержание даёт отдельное шестимесячное окно без нового договора.</p></div></div><div class="salary-body"><div class="salary-breakdown">'+
           '<div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Доп. продукты</span><b>'+money(t.products)+'</b></div><div><span>Сайты / сопровождение</span><b>'+money(t.site)+'</b></div><div><span>1% руководителю</span><b>'+money(t.head)+'</b></div>'+

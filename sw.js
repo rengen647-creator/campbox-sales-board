@@ -1,4 +1,4 @@
-const CACHE = 'campbox-sales-os3-preview-2026-10-27';
+const CACHE = 'campbox-sales-os3-qa-2026-10-27';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './sales-coach.css?v=20261005b',
@@ -10,18 +10,20 @@ const SHELL = [
   './ios-v3.css?v=20261027c',
   './ios-v4.css?v=20261027d',
   './sales-coach.js?v=20261019stableplan',
-  './ui-v13.js?v=20261027os3',
-  './salary-v1.js?v=20261026retention',
-  './finance-ledger.js?v=20261026tabs',
-  './sales-visual-charts.js?v=20261013a',
+  './os3-report.js?v=20261027qa2',
+  './ui-v13.js?v=20261027qa2',
+  './salary-v1.js?v=20261027qa2',
+  './finance-ledger.js?v=20261027qa2',
+  './sales-visual-charts.js?v=20261027qa2',
   './sales-report-v2.js?v=20261013excelcheck',
   './refined-ui.js?v=20261027a',
   './product-v2.js?v=20261027os3',
   './ios-v3.js?v=20261027c',
   './ios-v4.js?v=20261027d',
-  './os3-charts.js?v=20261027os3',
-  './os3-ui.js?v=20261027os3',
-  './os3.css?v=20261027os3'
+  './os3-components.js?v=20261027qa2',
+  './os3-charts.js?v=20261027qa2',
+  './os3-ui.js?v=20261027qa2',
+  './os3.css?v=20261027qa2'
 ];
 
 self.addEventListener('install', event => {

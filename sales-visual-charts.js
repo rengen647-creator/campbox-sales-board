@@ -11,7 +11,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
   const seriesColor=hex=>'<c:spPr><a:solidFill><a:srgbClr val="'+hex+'"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>';
   const strCache=list=>'<c:strCache><c:ptCount val="'+list.length+'"/>'+list.map((v,i)=>'<c:pt idx="'+i+'"><c:v>'+esc(v)+'</c:v></c:pt>').join('')+'</c:strCache>';
-  const numCache=(list,fmt='0')=>'<c:numCache><c:formatCode>'+esc(fmt)+'</c:formatCode><c:ptCount val="'+list.length+'"/>'+list.map((v,i)=>Number.isFinite(Number(v))?'<c:pt idx="'+i+'"><c:v>'+Number(v)+'</c:v></c:pt>':'').join('')+'</c:numCache>';
+  const numCache=(list,fmt='0')=>'<c:numCache><c:formatCode>'+esc(fmt)+'</c:formatCode><c:ptCount val="'+list.length+'"/>'+list.map((v,i)=>v!==null&&v!==undefined&&Number.isFinite(Number(v))?'<c:pt idx="'+i+'"><c:v>'+Number(v)+'</c:v></c:pt>':'').join('')+'</c:numCache>';
   function categories(ref,vals,numeric=false) {
     const kind=numeric?'numRef':'strRef';
     return '<c:cat><c:'+kind+'><c:f>'+esc(ref)+'</c:f>'+(numeric?numCache(vals,'dd.mm'):strCache(vals))+'</c:'+kind+'></c:cat>';

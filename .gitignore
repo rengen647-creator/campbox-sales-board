@@ -2,3 +2,6 @@
 .openai/
 dist/
 qa/os3-app-fixture.html
+
+node_modules/
+qa/os3-evidence/

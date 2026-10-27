@@ -65,6 +65,7 @@ function renderMatrix(){
  state.matrix=model;
  var query=($('finMatrixSearch').value||'').toLocaleLowerCase('ru').trim(),mode=$('finMatrixFilter').value;
  var rows=model.rows.filter(r=>(!query||r.name.toLocaleLowerCase('ru').includes(query))&&(mode==='all'||(mode==='drop'&&r.drop)||(mode==='quiet'&&r.quiet)));
+ var sort=$('finMatrixSort')?.value||'total';rows.sort((a,b)=>sort==='name'?a.name.localeCompare(b.name,'ru'):sort==='period'?b.period-a.period:b.total-a.total);
  state.matrixVisible=rows;
  $('finMatrixStatus').textContent='Показано '+rows.length+' из '+model.rows.length+' лагерей · спад ≥30%: '+model.rows.filter(r=>r.drop).length;
  var head='<tr><th scope="col" class="fin-col-name">Лагерь</th><th scope="col" class="fin-col-total">ИТОГО за всё время</th><th scope="col" class="fin-col-period">За 12 мес.</th>';
@@ -79,7 +80,7 @@ function renderMatrix(){
     var style=change!==null&&change<=-.3?' fin-cell-drop':change!==null&&change<0?' fin-cell-down':change!==null&&change>0?' fin-cell-rise':'';
     if(full&&value>0&&r.peak===value)style+=' fin-cell-peak';
     var desc=value===0?'Нет поступлений':money(value);
-    html+='<td class="fin-matrix-value'+style+'"><button type="button" data-fin-month="'+esc(m)+'" title="'+esc(matrixMonthLabel(m)+': '+desc+'. Открыть поступления')+'">'+matrixShortMoney(value)+'</button></td>';
+    html+='<td class="fin-matrix-value'+style+'"><button type="button" data-fin-client="'+esc(r.id)+'" data-fin-month="'+esc(m)+'" title="'+esc(matrixMonthLabel(m)+': '+desc+'. Открыть поступления')+'">'+matrixShortMoney(value)+'</button></td>';
    });
    return html+'</tr>';
   }).join('');
@@ -88,8 +89,17 @@ function renderMatrix(){
  rows.forEach(r=>{totals.all+=r.total;totals.period+=r.period;model.months.forEach(m=>{totals.byMonth[m]=(totals.byMonth[m]||0)+(r.byMonth[m]||0)})});
  $('finMatrixFoot').innerHTML='<tr><th class="fin-col-name">Итого по списку</th><td class="fin-col-total">'+money(totals.all)+'</td><td class="fin-col-period">'+money(totals.period)+'</td>'+model.months.map(m=>'<td title="'+esc(money(totals.byMonth[m]||0))+'">'+matrixShortMoney(totals.byMonth[m]||0)+'</td>').join('')+'</tr>';
  $('finMatrixRows').querySelectorAll('[data-fin-month]').forEach(btn=>btn.onclick=async()=>{
-  $('finMonth').value=btn.dataset.finMonth;await load();switchTab('payments');
+  inspectClient(btn.dataset.finClient,btn.dataset.finMonth,btn);
  });
+}
+function inspectClient(id,m,trigger){
+ var old=$('os3FinanceInspector');if(old)old.remove();
+ var dialog=document.createElement('dialog');dialog.id='os3FinanceInspector';dialog.className='os3-inspector';dialog.setAttribute('aria-label','Поступления по лагерю');
+ var manager=$('finManager').value,contracts=state.contracts.filter(c=>c.client_id===id&&(manager==='all'||c.contractor_id===manager)),ids=new Set(contracts.map(c=>c.id));
+ var rows=state.payments.filter(p=>(p.client_id===id||ids.has(p.contract_id))&&(manager==='all'||ids.has(p.contract_id))&&String(p.payment_date).startsWith(m));
+ var model=state.matrix.rows.find(r=>r.id===id);
+ dialog.innerHTML='<form method="dialog"><button class="btn" aria-label="Закрыть инспектор">Закрыть</button></form><h2>'+esc(client(id))+'</h2><p>'+esc(m)+' · только подтверждённые поступления</p><strong>'+money(rows.reduce((t,p)=>t+n(p.amount),0))+'</strong><p>Поступления не являются расчётом задолженности.</p>'+ (model&&window.CampBoxCharts?CampBoxCharts.chart({labels:state.matrix.months,kind:'bars',title:'История поступлений',unit:' ₽',series:[{name:'Подтверждено',values:state.matrix.months.map(m=>model.byMonth[m]||0),tone:'positive'}]}):'')+'<div class="os3-table-scroll"><table><thead><tr><th>Дата</th><th>Продукт</th><th>Сумма</th><th>Менеджер</th></tr></thead><tbody>'+rows.map(p=>'<tr><td>'+esc(p.payment_date)+'</td><td>'+esc(productNames[p.product_type]||p.product_type)+'</td><td>'+money(p.amount)+'</td><td>'+esc(managerName(contract(p.contract_id)?.contractor_id))+'</td></tr>').join('')+'</tbody></table></div>'+(rows.length?'':'<p>Подтверждённых поступлений нет.</p>');
+ document.body.append(dialog);dialog.addEventListener('close',()=>{dialog.remove();trigger?.focus();});dialog.showModal();
 }
 function exportMatrixCsv(){
  if(!state.matrix)return;
@@ -110,7 +120,7 @@ function section(){
  if(root.dataset.ready)return root;root.dataset.ready='1';
 
  var matrixHtml='<section class="card pad fin-matrix-card" aria-label="Помесячные поступления по лагерям"><div class="fin-matrix-intro"><div><h2>Поступления по лагерям · 12 месяцев</h2><p>Фактические оплаты по дате поступления. ИТОГО — накопленная сумма за всё время до конца выбранного месяца.</p></div><button type="button" class="btn" id="finMatrixCsv">Скачать CSV</button></div>'+
- '<div class="fin-matrix-controls"><label>Поиск лагеря<input id="finMatrixSearch" type="search" placeholder="Название лагеря"></label><label>Показать<select id="finMatrixFilter"><option value="all">Все лагеря</option><option value="drop">Спад ≥30%</option><option value="quiet">Без оплат в последнем закрытом месяце</option></select></label><span id="finMatrixStatus" role="status"></span></div>'+
+ '<div class="fin-matrix-controls"><label>Поиск лагеря<input id="finMatrixSearch" type="search" placeholder="Название лагеря"></label><label>Показать<select id="finMatrixFilter"><option value="all">Все лагеря</option><option value="drop">Спад ≥30%</option><option value="quiet">Без оплат в последнем закрытом месяце</option></select></label><label>Сортировка<select id="finMatrixSort"><option value="total">Получено всего</option><option value="period">За 12 месяцев</option><option value="name">Название</option></select></label><span id="finMatrixStatus" role="status"></span></div>'+
  '<div class="fin-matrix-scroll" tabindex="0" aria-label="Таблица поступлений по месяцам с прокруткой"><table class="fin-matrix-table"><thead id="finMatrixHead"></thead><tbody id="finMatrixRows"></tbody><tfoot id="finMatrixFoot"></tfoot></table></div>'+
  '<div class="fin-matrix-legend"><span><i class="fin-mark-rise"></i> Рост</span><span><i class="fin-mark-drop"></i> Спад ≥30%</span><span>Пик отмечен рамкой · * текущий месяц неполный · нажми сумму, чтобы увидеть платежи</span></div><p class="fin-matrix-note">Падение поступлений — повод проверить клиента, но не доказательство проблемы: учитывай сезонность, условия оплаты и график смен.</p></section>';
 
@@ -129,6 +139,7 @@ function section(){
  $('finMatrixCsv').onclick=exportMatrixCsv;
  $('finMatrixSearch').oninput=renderMatrix;
  $('finMatrixFilter').onchange=renderMatrix;
+ $('finMatrixSort').onchange=renderMatrix;
  $('finAdd').onclick=()=>editCharge();
  $('finPayAdd').onclick=()=>editPayment();
  $('finRecentSearch').oninput=renderRecent;
@@ -171,7 +182,7 @@ async function load(){
  for(var r of queries)if(r&&r.error)throw r.error;
  state.clients=queries[0].data||[];state.contracts=queries[1].data||[];state.charges=queries[2].data||[];state.recentByTab=queries[4]||{};state.payments=(queries[3]||[]).filter(p=>p.event_type==='payment'&&['paid','confirmed'].includes(p.status)&&p.payment_date<end);
  state.month=m;
- var selected=$('finManager').value;
+ var selected=state.pendingManager||$('finManager').value;state.pendingManager=null;
  $('finManager').innerHTML='<option value="all">Все менеджеры</option>'+[...new Set(state.contracts.map(c=>c.contractor_id).filter(Boolean))].map(id=>'<option value="'+esc(id)+'">'+esc(managerName(id))+'</option>').join('');
  $('finManager').value=[...$('finManager').options].some(o=>o.value===selected)?selected:'all';
  note('«Принёс всего» — сумма подтверждённых поступлений за всю сохранённую историю платежей до конца выбранного месяца. Не прогноз и не задолженность.');
@@ -269,5 +280,6 @@ function exportCsv(){
  var csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
  var url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');a.href=url;a.download='CampBox_Финансы_'+state.month+'.csv';a.click();URL.revokeObjectURL(url);
 }
+window.salesFinanceFor=id=>{state.pendingManager=id;if(section())load();};
 window.salesFinanceOpen=()=>{if(section())load();};
 })();
