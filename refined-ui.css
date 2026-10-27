@@ -188,3 +188,59 @@ html.cb-apple-light .v13-live .footer-note {color:#8893a0}
   html.cb-apple-light body {background:white!important}
   .cb-group,.cb-home,#cbAppearanceToggle {display:none!important}
 }
+
+
+/* Salary: bring the entire compensation workspace into the same design language. */
+html.cb-apple-light #v13-salary {--sal-bg:#f8fafc;--sal-line:#e3e8ef;--sal-muted:#6b798b}
+html.cb-apple-light #v13-salary .salary-card,
+html.cb-apple-light #v13-salary .salary-kpi {background:#fff;border:1px solid #e5e9ef;box-shadow:none;color:#1d1d1f}
+html.cb-apple-light #v13-salary .salary-kpi {border-top:2px solid #007aff}
+html.cb-apple-light #v13-salary .salary-kpi.good {border-top-color:#13875f}
+html.cb-apple-light #v13-salary .salary-kpi.warn {border-top-color:#af761c}
+html.cb-apple-light #v13-salary .salary-kpi.bad {border-top-color:#be4855}
+html.cb-apple-light #v13-salary .salary-kpi:before {display:none}
+html.cb-apple-light #v13-salary .salary-kpi span {font-size:11px;color:#758191}
+html.cb-apple-light #v13-salary .salary-kpi b {color:#1d1d1f}
+html.cb-apple-light #v13-salary .salary-kpi small {font-size:10px;color:#7e8b9b}
+html.cb-apple-light #v13-salary .salary-head h2 {color:#1d1d1f}
+html.cb-apple-light #v13-salary .salary-head p {font-size:12px;color:#788597}
+html.cb-apple-light #v13-salary .salary-field label {font-size:11px;color:#697789}
+html.cb-apple-light #v13-salary .salary-tabs button,
+html.cb-apple-light #v13-salary .salary-subtabs button {background:#f4f6f9;border-color:#e0e5ed;color:#526278;font-size:12px}
+html.cb-apple-light #v13-salary .salary-tabs button.active,
+html.cb-apple-light #v13-salary .salary-subtabs button.active {background:#e9f3ff;border-color:#b9d8ff;color:#0068d0}
+html.cb-apple-light #v13-salary .salary-note {background:#fff9ee;border-color:#f1e1c6;color:#86611e;font-size:12px}
+html.cb-apple-light #v13-salary .salary-person,
+html.cb-apple-light #v13-salary .salary-event,
+html.cb-apple-light #v13-salary .salary-rule,
+html.cb-apple-light #v13-salary .salary-contract-card,
+html.cb-apple-light #v13-salary .salary-report-preview>div {background:#f8fafc;border-color:#e3e8ee;color:#2e3d51}
+html.cb-apple-light #v13-salary .salary-contract-card.paused {background:#fffaed;border-color:#ecd9ac}
+html.cb-apple-light #v13-salary .salary-rule code {color:#4e6282}
+html.cb-apple-light #v13-salary .salary-contract-periods {background:#eef3f9;border-color:#dce6f0;color:#5c6c80}
+html.cb-apple-light #v13-salary .salary-contract-periods b {color:#906213}
+html.cb-apple-light #v13-salary .salary-breakdown>div {border-color:#e8edf4}
+html.cb-apple-light #v13-salary .salary-breakdown span {color:#6b798b;font-size:12px}
+html.cb-apple-light #v13-salary .salary-callout {background:#f5f3fc;color:#4c4e77;font-size:12px}
+html.cb-apple-light #v13-salary .salary-pause-banner {color:#916713;background:#fff7e8}
+html.cb-apple-light #v13-salary .salary-pause-banner.terminated {color:#a44852;background:#fff0f2}
+html.cb-apple-light #v13-salary .salary-table th,
+html.cb-apple-light #v13-salary .salary-table td {border-color:#e8edf3}
+html.cb-apple-light #v13-salary .salary-table th {background:#f7f9fc;color:#617186}
+html.cb-apple-light #v13-salary .salary-table td {font-size:12px;color:#314053}
+html.cb-apple-light #v13-salary .salary-table-wrap {border-color:#e3e8ef}
+html.cb-apple-light #v13-salary .salary-pill.good {color:#137b54;background:#e8f7f0}
+html.cb-apple-light #v13-salary .salary-pill.warn {color:#92621d;background:#fff5e7}
+html.cb-apple-light #v13-salary .salary-pill.bad {color:#af4353;background:#fff0f3}
+html.cb-apple-light #v13-salary .salary-pill.blue {color:#0868b7;background:#eaf3ff}
+html.cb-apple-light #v13-salary .salary-empty {color:#798696;border-color:#e3e8f0}
+html.cb-apple-light #v13-salary .salary-setup {background:#fff4f3;border-color:#eed4d3}
+html.cb-apple-light #v13-salary .salary-setup p {color:#8c4c4c}
+html.cb-apple-light #v13-salary .salary-field input,
+html.cb-apple-light #v13-salary .salary-field select,
+html.cb-apple-light #v13-salary .salary-field textarea {background:#fff;border:1px solid #dce3ec;color:#1d1d1f}
+
+/* Mobile appearance switch is always accessible, even with condensed header. */
+@media(max-width:820px){
+  #mainApp.v13-live .topbar .actions #cbAppearanceToggle {display:inline-flex!important;align-items:center;justify-content:center;min-height:38px;padding:8px!important;font-size:11px!important}
+}
