@@ -1,0 +1,41 @@
+name: Product Sales Board v2 — business and interface QA
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'sw.js'
+      - 'product-v2.js'
+      - 'product-v2.css'
+      - 'tests/business-ux-v2.test.cjs'
+      - 'tests/refined-ui.test.cjs'
+      - 'qa/SALES_BOARD_BUSINESS_QA_20261027.md'
+      - '.github/workflows/qa-product-v2.yml'
+  workflow_dispatch:
+jobs:
+  business-ui:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and JS integration
+        run: |
+          node --check product-v2.js
+          node --check refined-ui.js
+          node --check ui-v13.js
+          node --check finance-ledger.js
+          node --check salary-v1.js
+          node --check sw.js
+          node --check tests/business-ux-v2.test.cjs
+      - name: Business journey and design-system contracts
+        run: node tests/business-ux-v2.test.cjs
+      - name: Finance, retention and signed-contract regressions
+        run: |
+          node tests/refined-ui.test.cjs
+          node tests/finance-matrix.test.cjs
+          node tests/finance-payment-tabs.test.cjs
+          node tests/retention-commission.test.cjs
+          node tests/signed-handoff.test.cjs
