@@ -84,5 +84,5 @@ assert.ok(css.includes('html.cb-v3:not(.cb-apple-light)'),'Dark user theme suppo
 assert.ok(css.includes('html.cb-v3'),'Scoped style changes');
 assert.ok(css.includes('overflow-wrap:anywhere'),'Reasons cannot overflow adjacent columns');
 console.log('PASS iOS V3: 31+ checks, daily fact business event path, safe reason disclosure, responsive light/dark layouts and PWA');
-assert.match(html,/sales-board\.css\?v=20261027qa3/);
-assert.match(sw,/sales-board\.css\?v=20261027qa3/);
+assert.match(html,/sales-board\.css\?v=20261027reqa/);
+assert.match(sw,/sales-board\.css\?v=20261027reqa/);
