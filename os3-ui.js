@@ -30,6 +30,7 @@ function mount(){
  const intro=a.querySelector('.cb-page-intro');
  const filters=E('div','os3-analytics-filters');filters.innerHTML='<label>Область <select id="os3AnalyticsScope"><option value="team">Команда</option></select></label><label>Детализация <select id="os3Granularity"><option value="day">День</option><option value="week">Неделя</option><option value="month">Месяц</option></select></label>';intro.after(filters);
  const scope=$('os3AnalyticsScope');scope.onfocus=()=>{const old=scope.value;scope.replaceChildren();if(isManager())scope.add(new Option('Команда','team'));profiles.filter(p=>isManager()||p.id===currentUser?.id).forEach(p=>scope.add(new Option(p.full_name||p.email,p.id)));if([...scope.options].some(o=>o.value===old))scope.value=old;};
+ window.os3SyncAnalyticsScope=()=>{scope.onfocus();os3AnalyticsScope=isManager()?(scope.value||'team'):currentUser?.id;};
  const update=()=>{os3AnalyticsScope=isManager()?scope.value:currentUser.id;os3Granularity=$('os3Granularity').value;setCoachUser(os3AnalyticsScope);window.os3RefreshAnalytics?.();renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();};scope.onchange=update;$('os3Granularity').onchange=update;
 
  const pace=card('Темп результата','os3-analytics-pace');const ch=E('div','os3-chart');ch.id='os3AnalyticsPace';pace.append(ch);

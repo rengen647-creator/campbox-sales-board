@@ -449,6 +449,7 @@
   }
 
   function renderAnalytics(){
+    window.os3SyncAnalyticsScope?.();
     var tabs=document.getElementById('v13AnalyticsTabs'),panel=document.getElementById('v13AnalyticsPanel');if(!tabs||!panel)return;
     var modes={activity:'Активность',conversion:'Конверсия',pace:'Темп месяца',discipline:'Дисциплина'};
     tabs.innerHTML=Object.keys(modes).map(function(k){return '<button type="button" data-v13-analytics="'+k+'" class="'+(V.analytics===k?'active':'')+'">'+modes[k]+'</button>';}).join('');

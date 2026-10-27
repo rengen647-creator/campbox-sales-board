@@ -19,7 +19,7 @@ Against the linked Sales Board project, executed read-only transactions with `SE
 
 - Manager recognized; visible contract and finance counts exactly match privileged reference counts.
 - Employee not recognized as manager; foreign contracts, finance charges and audit rows hidden.
-- Employee contract count exactly matches reference count for own contracts (currently zero, so positive own-record visibility is not empirically proven).
+- Employee contract count exactly matches reference count for own contracts (positive own-record visibility still needs a seeded test fixture).
 - Relevant salary/finance/profile/month tables have RLS enabled.
 - Existing `daily_sales` policy intentionally permits active staff to read the current month's team activity; edits are restricted to own current-month rows or manager. Policy unchanged.
 
@@ -28,3 +28,7 @@ This verifies selected database read policies, **not** end-to-end sign-in, save/
 ## Acceptance boundary
 
 Do not mark the full blueprint accepted yet. Remaining work requires a disposable integration environment / test accounts for real save/reload, forbidden writes and idempotent handoff; historical CSS removal requires parity review beyond the responsive checks. Screenshots are review evidence plus layout assertions, not a maintained pixel baseline. The component gallery covers reusable states and charts; it is not a claim that every legacy input was rewritten.
+
+## Verified automated run
+
+Run 40498311693 at commit 56887b4 passed OS3 browser checks: 160 screen/theme/width states, 20 expanded zoom states, four downloaded workbooks with cell-by-cell equality, four print artifacts, financial inspector and keyboard chart. Six existing workflows also passed. Subsequent scope-label refinements require the same checks on the final head before merge.
