@@ -407,7 +407,7 @@
       ...rows.map(r=>[r.date,r.client,r.contract_signed||'',r.direction,r.event,r.gross??'',r.base,r.rate,r.formula,r.amount,{paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
     ];
     const wb=XLSX.utils.book_new(),ws1=XLSX.utils.aoa_to_sheet(summary),ws2=XLSX.utils.aoa_to_sheet(details);
-    ws1['!cols']=[{wch:28},{wch:25}];ws2['!cols']=[{wch:12},{wch:25},{wch:14},{wch:22},{wch:26},{wch:18},{wch:16},{wch:12},{wch:36},{wch:16},{wch:16}];
+    ws1['!cols']=[{wch:64},{wch:28}];ws2['!cols']=[{wch:12},{wch:25},{wch:14},{wch:22},{wch:26},{wch:18},{wch:16},{wch:12},{wch:36},{wch:16},{wch:16}];
     XLSX.utils.book_append_sheet(wb,ws1,'Итог');XLSX.utils.book_append_sheet(wb,ws2,'Начисления');
     XLSX.writeFile(wb,'Зарплата_'+name.replace(/[^\p{L}\p{N}_-]+/gu,'_')+'_'+S.month+'.xlsx');
   }
