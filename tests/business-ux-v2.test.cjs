@@ -37,7 +37,7 @@ ok('responsive master detail layout',css.includes('.cb-contract-layout')&&css.in
 ok('user motion setting observed',css.includes('prefers-reduced-motion'));
 ok('RLS schema present',sql.includes('row level security'));
 ok('P0 salary plan-base discrepancy documented',salary.includes("select('min_plan')")&&sql.includes('target_plan integer')&&audit.includes('P0-01'));
-ok('historical salary recalculation risk documented',salary.includes("onConflict:'month'")&&audit.includes('P0-02'));
+ok('historical finalized salary months frozen; initial backfill risk documented',salary.includes('if(existing.data?.finalized){S.dept=existing.data;return}')&&audit.includes('P1-04'));
 ok('debtor balances not presented as fact',ui.includes('Начисления — выставленные суммы.')&&audit.includes('P1-01'));
 ok('only UI preferences stored by design layer',!/\bsb\.from\s*\(|\bsupabase\.from\s*\(|\bfetch\s*\(|\beval\s*\(/.test(ui));
 const fn=salary.match(/function contractorRate\(pct\)\{[^\n]+\}/);
@@ -45,4 +45,4 @@ ok('real contractor rate function extractable',Boolean(fn));
 const rate=new Function(fn[0]+';return contractorRate')();
 [[0,0],[79.99,0],[80,2000],[99.99,2000],[100,5000],[103,5000],[103.01,7000],[130,7000]].forEach(([pct,expected])=>assert.equal(rate(pct),expected,'rate threshold '+pct));
 console.log('PASS '+checks.length+' business and UX integration contracts plus 8 salary rate threshold cases');
-console.warn('OPEN BUSINESS BLOCKERS: P0-01 min_plan vs target_plan; P0-02 historical month upsert. See qa/SALES_BOARD_BUSINESS_QA_20261027.md');
+console.warn('OPEN BUSINESS QA: P0-01 min_plan vs target_plan; P1-04 historical first backfill; P1-05 preliminary salary; P1-06 payment pagination. See qa/SALES_BOARD_BUSINESS_QA_20261027.md');
