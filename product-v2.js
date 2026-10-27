@@ -82,8 +82,13 @@
     overview.classList.add('cb-today-hero');
     var tools=E('div','cb-page-actions');
     tools.append(action('Контрактинг','contracts',null,true));
-    tools.append(action('Поступления','finance','payments'));
-    tools.append(action('Удержание','salary','retention'));
+    tools.append(action('Моя зарплата','salary','mine'));
+    var moneyLink=action('Поступления','finance','payments');
+    moneyLink.classList.add('cb-role-manager');
+    tools.append(moneyLink);
+    var retentionLink=action('Удержание','salary','retention');
+    retentionLink.classList.add('cb-role-manager');
+    tools.append(retentionLink);
     overview.appendChild(tools);
     root.insertBefore(overview,root.firstChild);
 
@@ -343,6 +348,16 @@
     document.documentElement.classList.add(ROOT);
     pageLinkHandlers();
     mountToday();mountMonth();mountFunnel();mountContracts();mountTeam();
+    // These are convenience routes, not access checks; backend RLS remains authoritative.
+    function syncRoleActions() {
+      document.querySelectorAll('.cb-role-manager').forEach(function(b){b.hidden=!isLead();});
+    }
+    syncRoleActions();
+    var main=$('mainApp');
+    if(main){
+      var roleObserver=new MutationObserver(syncRoleActions);
+      roleObserver.observe(main,{attributes:true,attributeFilter:['class']});
+    }
     mountAnalytics();mountReport();mountSummary();
     awaitDynamicModules();
     // Focus selected section if navigation jumps by buttons or existing workflows.
