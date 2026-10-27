@@ -4,7 +4,7 @@ const {Client}=require('pg'),{createClient}=require('@supabase/supabase-js'),{ch
 const api=process.env.API_URL,dburl=process.env.DB_URL,anon=process.env.ANON_KEY,secret=process.env.SERVICE_ROLE_KEY;
 for(const u of [api,dburl])assert.ok(u&&['127.0.0.1','localhost'].includes(new URL(u).hostname),'Only loopback test endpoints allowed');
 assert.ok(anon&&secret);const root=process.cwd(),out='qa/integration-evidence';fs.mkdirSync(out,{recursive:true});
-const checks=[],db=new Client({connectionString:dburl});let browser,server;
+const checks=[],db=new Client({connectionString:dburl});let browser,server,lastPage;const diagnostics=[];
 async function poll(fn){for(let n=0;n<50;n++){if(await fn())return;await new Promise(r=>setTimeout(r,200));}throw Error('Persistence timeout');}
 (async()=>{await db.connect();
  for(const file of ['supabase_setup.sql','finance-ledger.sql','salary_retention_v1_migration.sql'])await db.query(fs.readFileSync(file,'utf8'));
@@ -29,7 +29,7 @@ async function poll(fn){for(let n=0;n<50;n++){if(await fn())return;await new Pro
  server=http.createServer((req,res)=>{const file=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(file==='/'){res.setHeader('content-type','text/html');return res.end(html);}if(file==='/qa-client.js'){res.setHeader('content-type','application/javascript');return res.end(bundled.outputFiles[0].text);}const full=path.resolve(root,'.'+file);if(!full.startsWith(root+path.sep)||!fs.existsSync(full)||!fs.statSync(full).isFile()){res.statusCode=404;return res.end();}res.setHeader('content-type',file.endsWith('.css')?'text/css':file.endsWith('.js')?'application/javascript':'application/octet-stream');res.end(fs.readFileSync(full));});
  await new Promise(r=>server.listen(4179,'127.0.0.1',r));browser=await chromium.launch();
  for(const role of ['employee','manager']){
- const context=await browser.newContext(),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{errors.push(d.message());d.dismiss();});
+ const context=await browser.newContext(),page=await context.newPage();lastPage=page;const errors=[];page.on('response',r=>{if(r.status()>=400)diagnostics.push({path:new URL(r.url()).pathname,status:r.status()});});page.on('console',m=>{if(m.type()==='error')diagnostics.push({error:m.text().slice(0,500)});});page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{errors.push(d.message());d.dismiss();});
  await context.route('**/*',route=>['127.0.0.1','localhost'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort());
  await page.goto('http://127.0.0.1:4179');await page.fill('#loginEmail',users[role].email);await page.fill('#loginPassword',password);await page.locator('#loginForm button.primary').click();
  await page.waitForFunction(()=>typeof currentProfile!=='undefined'&&currentProfile?.active&&!isLoading);await page.evaluate(()=>window.v13Go('today'));
@@ -61,4 +61,4 @@ async function poll(fn){for(let n=0;n<50;n++){if(await fn())return;await new Pro
  await page.screenshot({path:out+'/'+role+'-persisted.png',fullPage:true});assert.deepEqual(errors,[]);await context.close();
  }
  console.log('PASS authenticated persistence:',checks);fs.writeFileSync(out+'/results.json',JSON.stringify({checks,scope:'Local Auth/PostgREST/Postgres; production Sales migrations and CSM function; minimal CSM table fixture; no production writes'},null,2));
-})().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();if(server)await new Promise(r=>server.close(r));await db.end();});
+})().catch(async e=>{if(lastPage){await lastPage.screenshot({path:out+'/failure.png',fullPage:true}).catch(()=>{});diagnostics.push(await lastPage.evaluate(()=>({loginError:document.getElementById('loginError')?.textContent,profile:typeof currentProfile==='undefined'?'undefined':!!currentProfile,loading:typeof isLoading==='undefined'?'undefined':isLoading})).catch(()=>({})));}fs.writeFileSync(out+'/diagnostics.json',JSON.stringify(diagnostics,null,2));console.error(e,diagnostics);process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();if(server)await new Promise(r=>server.close(r));await db.end();});
