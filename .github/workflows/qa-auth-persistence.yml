@@ -2,6 +2,9 @@ name: OS3 authenticated persistence and real handoff
 on:
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   authenticated-integration:
     runs-on: ubuntu-latest

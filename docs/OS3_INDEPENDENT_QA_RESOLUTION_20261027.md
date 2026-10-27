@@ -1,5 +1,7 @@
 # Independent QA follow-up — 27 October 2026
 
+Follow-up implementation: [CSS cleanup and authenticated persistence](OS3_CLEANUP_AND_PERSISTENCE.md). The limits below describe the earlier PR #21; PR #22 retires the runtime CSS layers and adds the disposable authenticated integration and baseline comparison gates. Release acceptance requires green final-head checks.
+
 Source review: `CampBox_Sales_OS_3_Independent_QA_2026-10-27(1).md` supplied by owner. Base: `619e310477abbd5ed476c8b14f92b93620313e78`. Rollback: `backup/sales-board-before-qa-20261027`.
 
 ## Findings and implementation

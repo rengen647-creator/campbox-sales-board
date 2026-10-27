@@ -1,5 +1,6 @@
 /* Real browser CSS parity against immutable reviewed release, same DOM and data. */
-const fs=require('node:fs'),cp=require('node:child_process'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require('playwright'),{PNG}=require('pngjs'),pixelmatch=require('pixelmatch');
+const fs=require('node:fs'),cp=require('node:child_process'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require('playwright'),{PNG}=require('pngjs'),pixelmatchModule=require('pixelmatch');
+const pixelmatch=pixelmatchModule.default||pixelmatchModule;
 const base=require('../docs/css-consolidation.json').baseline;
 const old=cp.execFileSync('git',['show',base+':index.html'],{encoding:'utf8'}).split('</head>')[0];
 let css='';for(const m of old.matchAll(/<link\s+rel="stylesheet"\s+href="(?:\.\/)?([^"?]+)[^"]*"\s*\/?\s*>|<style[^>]*>([\s\S]*?)<\/style>/g))css+='\n'+(m[1]?cp.execFileSync('git',['show',base+':'+m[1]],{encoding:'utf8'}):m[2]);
