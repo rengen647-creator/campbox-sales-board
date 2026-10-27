@@ -1,0 +1,47 @@
+name: OS3 authenticated persistence and real handoff
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  authenticated-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - name: Disposable local Supabase (no linked project or remote credentials)
+        run: |
+          supabase --help
+          supabase init --help
+          supabase start --help
+          supabase status --help
+          supabase init
+          supabase start
+          supabase status -o env > /tmp/campbox-local.env
+      - name: Install pinned test dependencies
+        run: |
+          npm ci --prefix tests/integration --no-audit --no-fund
+          cd tests/integration
+          npx playwright install --with-deps chromium
+      - name: Real login, canonical save, database reload, RLS and handoff
+        run: |
+          set -a
+          source /tmp/campbox-local.env
+          set +a
+          node tests/integration/auth-persistence.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authenticated-persistence-evidence
+          path: qa/integration-evidence/
+          retention-days: 15
+      - name: Destroy disposable environment
+        if: always()
+        run: supabase stop --no-backup

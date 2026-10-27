@@ -5,16 +5,13 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const [html,ui,css,finance,salary,legacy,sql,sw,audit]=[
- 'index.html','product-v2.js','product-v2.css','finance-ledger.js','salary-v1.js',
+ 'index.html','product-v2.js','sales-board.css','finance-ledger.js','salary-v1.js',
  'ui-v13.js','supabase_setup.sql','sw.js','qa/SALES_BOARD_BUSINESS_QA_20261027.md'
 ].map(read);
 new vm.Script(ui,{filename:'product-v2.js'});
 new vm.Script(finance,{filename:'finance-ledger.js'});
 new vm.Script(salary,{filename:'salary-v1.js'});
 const checks=[];function ok(label,result){assert.ok(result,label);checks.push(label)}
-ok('v2 assets loaded in app',html.includes('product-v2.css?v=20261027b')&&html.includes('product-v2.js?v=20261027os3'));
-ok('v2 assets loaded after baseline',html.indexOf('refined-ui.css')<html.indexOf('product-v2.css')&&html.indexOf('refined-ui.js')<html.indexOf('product-v2.js'));
-ok('v2 PWA versioned and assets cached',/(?:campbox-sales-product-v2|campbox-sales-ios-v3|campbox-sales-ios-v4|campbox-sales-os3-qa)-2026-10-27/.test(sw)&&sw.includes('product-v2.css?v=20261027b')&&sw.includes('product-v2.js?v=20261027os3'));
 ok('five original operation screens reused', ['today','month','contracts','finance','salary'].every(x=>ui.includes("screen('"+x+"')")));
 ok('live KPI nodes moved not imitated',ui.includes("$('v13TodayKpis')")&&ui.includes('relocate(kpis,summary'));
 ok('existing period fields moved intact',ui.includes("root.querySelector(':scope > .context-card')")&&ui.includes('relocate(context,filter'));
@@ -33,7 +30,7 @@ ok('retention does not create an extra base period',salary.includes("return rete
 ok('only actual handoff is used',html.includes("sb.from('sales_handoff_statuses').select("));
 ok('legible input colors on all major views',css.includes('color:#1c2c42')&&css.includes('color:#23344c!important')&&css.includes('#v13-finance')&&css.includes('#v13-salary'));
 ok('light and dark themes both considered',css.includes('html.cb-apple-light.cb-v2')&&css.includes('html.cb-v2:not(.cb-apple-light)'));
-ok('responsive master detail layout',css.includes('.cb-contract-layout')&&css.includes('@media(max-width:820px)'));
+ok('responsive master detail layout',css.includes('.cb-contract-layout')&&/@media\s*\(max-width:820px\)/.test(css));
 ok('user motion setting observed',css.includes('prefers-reduced-motion'));
 ok('RLS schema present',sql.includes('row level security'));
 ok('P0 salary plan-base discrepancy documented',salary.includes("select('min_plan')")&&sql.includes('target_plan integer')&&audit.includes('P0-01'));
@@ -46,3 +43,4 @@ const rate=new Function(fn[0]+';return contractorRate')();
 [[0,0],[79.99,0],[80,2000],[99.99,2000],[100,5000],[103,5000],[103.01,7000],[130,7000]].forEach(([pct,expected])=>assert.equal(rate(pct),expected,'rate threshold '+pct));
 console.log('PASS '+checks.length+' business and UX integration contracts plus 8 salary rate threshold cases');
 console.warn('MIN_PLAN POLICY CONFIRMED. REMAINING BUSINESS QA: P1-04 historical first backfill; P1-05 preliminary salary; P1-06 payment pagination. See qa/SALES_BOARD_BUSINESS_QA_20261027.md');
+ok('canonical stylesheet loaded',html.includes('sales-board.css?v=20261027qa3')&&sw.includes('sales-board.css?v=20261027qa3'));

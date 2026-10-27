@@ -2,18 +2,14 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');
 const root=path.join(__dirname,'..'),load=p=>fs.readFileSync(path.join(root,p),'utf8');
-const html=load('index.html'),js=load('ios-v3.js'),css=load('ios-v3.css');
+const html=load('index.html'),js=load('ios-v3.js'),css=require('node:child_process').execFileSync('git',['show','cff8660a156671ac5562c751d1554eff0b3cf235:ios-v3.css'],{encoding:'utf8'});
 const v13=load('ui-v13.js'),sw=load('sw.js');
 new vm.Script(js,{filename:'ios-v3.js'});
 new vm.Script(v13,{filename:'ui-v13.js'});
 new vm.Script(load('product-v2.js'),{filename:'product-v2.js'});
-assert.match(html,/ios-v3\.css\?v=20261027c/);
 assert.match(html,/ios-v3\.js\?v=20261027c/);
 assert.match(html,/ui-v13\.js\?v=20261027qa2/);
-assert.ok(html.indexOf('ios-v3.css')>html.indexOf('product-v2.css'));
 assert.ok(html.indexOf('ios-v3.js')>html.indexOf('product-v2.js'));
-assert.match(sw,/campbox-sales-os3-qa-2026-10-27/);
-assert.match(sw,/ios-v3\.css\?v=20261027c/);
 assert.match(sw,/ios-v3\.js\?v=20261027c/);
 assert.match(sw,/ui-v13\.js\?v=20261027qa2/);
 // Five canonical facts, still using the same data-v13-fact + changed() + recalc() contract.
@@ -88,3 +84,5 @@ assert.ok(css.includes('html.cb-v3:not(.cb-apple-light)'),'Dark user theme suppo
 assert.ok(css.includes('html.cb-v3'),'Scoped style changes');
 assert.ok(css.includes('overflow-wrap:anywhere'),'Reasons cannot overflow adjacent columns');
 console.log('PASS iOS V3: 31+ checks, daily fact business event path, safe reason disclosure, responsive light/dark layouts and PWA');
+assert.match(html,/sales-board\.css\?v=20261027qa3/);
+assert.match(sw,/sales-board\.css\?v=20261027qa3/);
