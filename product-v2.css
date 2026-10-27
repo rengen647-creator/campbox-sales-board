@@ -338,3 +338,80 @@ html.cb-apple-light.cb-v2 .modal-backdrop .modal-actions {background:#fff}
  html.cb-apple-light.cb-v2 .cb-today-hero{background:#fff;color:#172033;box-shadow:none}
  html.cb-apple-light.cb-v2 .cb-today-hero .cb-page-h{color:#172033}
 }
+
+
+/* Full dark-appearance counterpart; never allow a dark background with dark text. */
+html.cb-v2:not(.cb-apple-light){--cb-bg:#081323;--cb-paper:#11213a;--cb-ink:#f1f6ff;--cb-muted:#9cafc8;--cb-border:#2b3f60;--cb-accent:#76adff;--cb-blue-tint:#152d4b}
+html.cb-v2:not(.cb-apple-light) .cb-page-h{color:#f1f6ff}
+html.cb-v2:not(.cb-apple-light) .cb-page-sub{color:#a5b5cb}
+html.cb-v2:not(.cb-apple-light) .cb-eyebrow{color:#91a8c8}
+html.cb-v2:not(.cb-apple-light) .cb-page-intro{color:#eef5ff}
+html.cb-v2:not(.cb-apple-light) .cb-section-name{color:#dfeafa}
+html.cb-v2:not(.cb-apple-light) .cb-section-note{color:#8da0bd}
+html.cb-v2:not(.cb-apple-light) .cb-period-context{background:#111f35;border:1px solid #2d4261}
+html.cb-v2:not(.cb-apple-light) .cb-context-title{color:#c0d0e7}
+html.cb-v2:not(.cb-apple-light) .cb-action{background:#182d49;border:1px solid #355071;color:#e2edff}
+html.cb-v2:not(.cb-apple-light) .cb-action:hover{background:#223b60;border-color:#55769b}
+html.cb-v2:not(.cb-apple-light) .cb-action.primary{background:#2777e6;border-color:#2777e6;color:#fff}
+html.cb-v2:not(.cb-apple-light) .cb-detail-title{color:#f4f8ff}
+html.cb-v2:not(.cb-apple-light) .cb-detail-header .cb-eyebrow{color:#9eb2cc}
+html.cb-v2:not(.cb-apple-light) .cb-detail-content{border-color:#2b4161}
+html.cb-v2:not(.cb-apple-light) .cb-detail-content .cb-contract-copy p{color:#b8c9dc}
+html.cb-v2:not(.cb-apple-light) .cb-detail-content .cb-contract-copy .v13-contract-next{background:#162841;color:#dceafa;border-color:#365174}
+html.cb-v2:not(.cb-apple-light) .cb-contract-detail{background:linear-gradient(180deg,#102138,#0f1b31);border:1px solid #32496a}
+html.cb-v2:not(.cb-apple-light) .cb-detail-empty{color:#a1b1ca}
+html.cb-v2:not(.cb-apple-light) .cb-contract-search{color:#a0b4ce}
+html.cb-v2:not(.cb-apple-light) .cb-list-counter{color:#8fa6c2}
+html.cb-v2:not(.cb-apple-light) .cb-contract-search input{background:#0d1c32;color:#ecf4ff;border:1px solid #2c4364}
+html.cb-v2:not(.cb-apple-light) .cb-contract-list .v13-contract[hidden]{display:none!important}
+html.cb-v2:not(.cb-apple-light) .cb-contract-list .v13-contract{cursor:pointer}
+html.cb-v2:not(.cb-apple-light) .cb-contract-list .v13-contract.cb-selected{background:#142d4b;border-color:#729fea;box-shadow:inset 3px 0 #80b6ff}
+html.cb-v2:not(.cb-apple-light) .cb-team-master .v13-person{cursor:pointer}
+html.cb-v2:not(.cb-apple-light) .cb-team-detail .v13-manager-panel{border-color:#2a4262}
+html.cb-v2:not(.cb-apple-light) .cb-salary-ribbon{color:#94abc8}
+html.cb-v2:not(.cb-apple-light) .cb-salary-ribbon span:before{background:#6babff}
+html.cb-v2:not(.cb-apple-light) .cb-today-hero{background:linear-gradient(130deg,#162f55,#223f6a);border:1px solid #2e5685;padding:25px;border-radius:21px}
+html.cb-v2:not(.cb-apple-light) .cb-today-hero .cb-page-h{color:#fff}
+html.cb-v2:not(.cb-apple-light) .cb-today-hero .cb-page-sub{color:#d1e3ff}
+html.cb-v2:not(.cb-apple-light) .cb-today-hero .cb-page-actions{margin-top:10px}
+html.cb-v2:not(.cb-apple-light) .cb-period-context .context-card{border:0;background:transparent;box-shadow:none}
+html.cb-v2:not(.cb-apple-light) .cb-contract-layout,
+html.cb-v2:not(.cb-apple-light) .cb-team-layout,
+html.cb-v2:not(.cb-apple-light) .cb-month-layout,
+html.cb-v2:not(.cb-apple-light) .cb-command-layout {min-width:0}
+html.cb-v2:not(.cb-apple-light) .cb-live-summary{padding:0}
+html.cb-v2:not(.cb-apple-light) .cb-finance-tabs{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:13px}
+html.cb-v2:not(.cb-apple-light) .cb-finance-tabs .btn{min-height:40px;padding:9px 17px}
+html.cb-v2:not(.cb-apple-light) #v13-salary .cb-salary-tabs{padding:8px;border-radius:14px;background:#122239;border:1px solid #2a3d5b}
+html.cb-v2:not(.cb-apple-light) #v13-salary .cb-salary-tabs button{font-size:12px;min-height:40px}
+html.cb-v2:not(.cb-apple-light) #v13-salary .cb-salary-tabs button.active{background:#2b466b;color:#fff}
+html.cb-v2:not(.cb-apple-light) #mainApp.v13-live .cb-contract-exceptions [data-missing-number]{background:#0d1c32!important;color:#edf6ff!important;border:1px solid #345071!important}
+html.cb-v2:not(.cb-apple-light) #mainApp.v13-live .cb-rail-focus textarea[readonly]{color:#e6eeff!important;background:#0d1e35!important}
+html.cb-v2:not(.cb-apple-light) #mainApp.v13-live .cb-primary-task .v13-my-plan{grid-template-columns:minmax(0,1.3fr) minmax(220px,.7fr)}
+@media(min-width:1351px){
+ html.cb-v2:not(.cb-apple-light) .cb-command-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(315px,1fr);gap:16px}
+ html.cb-v2:not(.cb-apple-light) .cb-command-main,
+ html.cb-v2:not(.cb-apple-light) .cb-command-rail{display:grid;gap:16px}
+ html.cb-v2:not(.cb-apple-light) .cb-contract-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,1fr);gap:16px}
+ html.cb-v2:not(.cb-apple-light) .cb-team-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+ html.cb-v2:not(.cb-apple-light) .cb-month-layout{display:grid;grid-template-columns:minmax(300px,.7fr) minmax(0,1.3fr);gap:16px}
+ html.cb-v2:not(.cb-apple-light) .cb-contract-list .v13-contract-grid,
+ html.cb-v2:not(.cb-apple-light) .cb-team-master .v13-team-grid{grid-template-columns:1fr}
+}
+@media(max-width:1350px){
+ html.cb-v2:not(.cb-apple-light) .cb-command-layout,
+ html.cb-v2:not(.cb-apple-light) .cb-month-layout,
+ html.cb-v2:not(.cb-apple-light) .cb-contract-layout,
+ html.cb-v2:not(.cb-apple-light) .cb-team-layout{display:grid;grid-template-columns:1fr;gap:14px}
+ html.cb-v2:not(.cb-apple-light) .cb-command-main,
+ html.cb-v2:not(.cb-apple-light) .cb-command-rail{display:grid;gap:14px}
+ html.cb-v2:not(.cb-apple-light) .cb-contract-list .v13-contract-grid,
+ html.cb-v2:not(.cb-apple-light) .cb-team-master .v13-team-grid{grid-template-columns:1fr}
+}
+@media(max-width:820px){
+ html.cb-v2:not(.cb-apple-light) .cb-today-hero{padding:21px}
+ html.cb-v2:not(.cb-apple-light) .cb-today-hero .cb-page-h{font-size:25px}
+ html.cb-v2:not(.cb-apple-light) .cb-period-context{padding:15px}
+ html.cb-v2:not(.cb-apple-light) .cb-context-original .control-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ html.cb-v2:not(.cb-apple-light) .cb-detail-footer{flex-direction:column}
+}
