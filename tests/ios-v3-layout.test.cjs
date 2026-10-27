@@ -9,10 +9,10 @@ new vm.Script(v13,{filename:'ui-v13.js'});
 new vm.Script(load('product-v2.js'),{filename:'product-v2.js'});
 assert.match(html,/ios-v3\.css\?v=20261027c/);
 assert.match(html,/ios-v3\.js\?v=20261027c/);
-assert.match(html,/ui-v13\.js\?v=20261027ios3/);
+assert.match(html,/ui-v13\.js\?v=20261027ios4/);
 assert.ok(html.indexOf('ios-v3.css')>html.indexOf('product-v2.css'));
 assert.ok(html.indexOf('ios-v3.js')>html.indexOf('product-v2.js'));
-assert.match(sw,/campbox-sales-ios-v3-2026-10-27/);
+assert.match(sw,/campbox-sales-ios-v4-2026-10-27/);
 assert.match(sw,/ios-v3\.css\?v=20261027c/);
 assert.match(sw,/ios-v3\.js\?v=20261027c/);
 assert.match(sw,/ui-v13\.js\?v=20261027ios3/);
@@ -20,14 +20,14 @@ assert.match(sw,/ui-v13\.js\?v=20261027ios3/);
 const begin=v13.indexOf('  function renderToday(){'),end=v13.indexOf('\n  function renderMonth(){',begin);
 assert.ok(begin>=0&&end>begin,'source daily renderer exists');
 const code=v13.slice(begin,end);
-assert.match(code,/cb-task-grid/);
+assert.match(code,/ios4-activity-grid/);
 assert.match(code,/data-v13-fact/);
 assert.match(code,/addEventListener\('input'/);
 assert.match(code,/changed\(\)/);
 assert.match(code,/addEventListener\('change'/);
 assert.match(code,/recalc\(\)/);
 assert.doesNotMatch(code,/v13-plan-table-desktop|v13-mobile-plan-list/,'No duplicated wide/mobile fact inputs');
-assert.match(code,/<details class="cb-task-why">/,'Plan reasoning is disclosed without overlay');
+assert.match(code,/<details class="ios4-activity-reason">/,'Plan reasoning is disclosed without overlay');
 // Execute real source renderer against five metrics with mocked DOM and real input callbacks.
 const row={user_id:'u1',
  calls_plan:10,calls_fact:3,
@@ -61,9 +61,9 @@ const render=make(document,{id:'u1'},()=> 'u1',[row],['calls','booked','meetings
  ()=>[],()=>({}),()=> 'Контролировать звонки');
 render();
 assert.match(box.innerHTML,/Цель месяца/);
-assert.equal((plan.innerHTML.match(/class="cb-task-item /g)||[]).length,5);
+assert.equal((plan.innerHTML.match(/class="ios4-activity /g)||[]).length,5);
 assert.equal((plan.innerHTML.match(/data-v13-fact=/g)||[]).length,5,'exactly one editable fact per activity');
-assert.match(plan.innerHTML,/cb-task-why/);
+assert.match(plan.innerHTML,/ios4-activity-reason/);
 assert.ok(!plan.innerHTML.includes('<table'),'No width-overflowing plan table');
 assert.ok(plan.innerHTML.indexOf('Рекомендация: 10')>0,'Full explanation remains accessible');
 assert.equal(typeof handlers.input,'function');assert.equal(typeof handlers.change,'function');
