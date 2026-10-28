@@ -8,10 +8,10 @@ new vm.Script(js,{filename:'ios-v3.js'});
 new vm.Script(v13,{filename:'ui-v13.js'});
 new vm.Script(load('product-v2.js'),{filename:'product-v2.js'});
 assert.match(html,/ios-v3\.js\?v=20261027c/);
-assert.match(html,/ui-v13\.js\?v=20261027qa2/);
+assert.match(html,/ui-v13\.js\?v=20261028signed/);
 assert.ok(html.indexOf('ios-v3.js')>html.indexOf('product-v2.js'));
 assert.match(sw,/ios-v3\.js\?v=20261027c/);
-assert.match(sw,/ui-v13\.js\?v=20261027qa2/);
+assert.match(sw,/ui-v13\.js\?v=20261028signed/);
 // Five canonical facts, still using the same data-v13-fact + changed() + recalc() contract.
 const begin=v13.indexOf('  function renderToday(){'),end=v13.indexOf('\n  function renderMonth(){',begin);
 assert.ok(begin>=0&&end>begin,'source daily renderer exists');
@@ -84,5 +84,5 @@ assert.ok(css.includes('html.cb-v3:not(.cb-apple-light)'),'Dark user theme suppo
 assert.ok(css.includes('html.cb-v3'),'Scoped style changes');
 assert.ok(css.includes('overflow-wrap:anywhere'),'Reasons cannot overflow adjacent columns');
 console.log('PASS iOS V3: 31+ checks, daily fact business event path, safe reason disclosure, responsive light/dark layouts and PWA');
-assert.match(html,/sales-board\.css\?v=20261027reqa/);
-assert.match(sw,/sales-board\.css\?v=20261027reqa/);
+assert.match(html,/sales-board\.css\?v=20261028signed/);
+assert.match(sw,/sales-board\.css\?v=20261028signed/);

@@ -43,4 +43,4 @@ const rate=new Function(fn[0]+';return contractorRate')();
 [[0,0],[79.99,0],[80,2000],[99.99,2000],[100,5000],[103,5000],[103.01,7000],[130,7000]].forEach(([pct,expected])=>assert.equal(rate(pct),expected,'rate threshold '+pct));
 console.log('PASS '+checks.length+' business and UX integration contracts plus 8 salary rate threshold cases');
 console.warn('MIN_PLAN POLICY CONFIRMED. REMAINING BUSINESS QA: P1-04 historical first backfill; P1-05 preliminary salary; P1-06 payment pagination. See qa/SALES_BOARD_BUSINESS_QA_20261027.md');
-ok('canonical stylesheet loaded',html.includes('sales-board.css?v=20261027reqa')&&sw.includes('sales-board.css?v=20261027reqa'));
+ok('canonical stylesheet loaded',html.includes('sales-board.css?v=20261028signed')&&sw.includes('sales-board.css?v=20261028signed'));

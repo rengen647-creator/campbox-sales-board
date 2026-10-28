@@ -27,8 +27,8 @@ jobs:
           sudo apt-get install -y poppler-utils
       - name: Generate isolated full application fixture
         run: node tests/build-os3-fixture.cjs
-      - name: Pixel parity against reviewed release
-        run: node tests/os3-css-parity.cjs
+      - name: Signed-fact source and responsive acceptance
+        run: node tests/signed-fact-browser.cjs
       - name: Ten screens, eight widths, two themes, zoom and export
         run: node tests/os3-browser.cjs
       - uses: actions/upload-artifact@v4

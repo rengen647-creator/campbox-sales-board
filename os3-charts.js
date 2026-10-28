@@ -15,7 +15,7 @@ function chart({labels=[],series=[],title='Динамика',unit='',kind='line'
  if(cutoff>=0&&cutoff<labels.length)body+=`<line x1="${x(cutoff)}" y1="${T}" x2="${x(cutoff)}" y2="${H-B}" class="os3-cutoff"/><text x="${x(cutoff)}" y="16" text-anchor="middle">Выбранная дата</text>`;
  series.forEach((s,si)=>{
   let d='',open=false;const color=s.tone||['positive','primary'][si%2];
-  s.values.forEach((v,i)=>{if(!valid(v)){open=false;return;}d+=(open?' L':' M')+x(i)+' '+y(v);open=true;});
+  s.values.forEach((v,i)=>{if(!valid(v)){open=false;return;}d+=open?(s.step?' H'+x(i)+' V'+y(v):' L'+x(i)+' '+y(v)):' M'+x(i)+' '+y(v);open=true;});
   if(kind==='line')body+=`<path d="${d}" class="os3-series os3-${esc(color)}" ${s.dash?'stroke-dasharray="5 5"':''}/>`;
   s.values.forEach((v,i)=>{if(!valid(v))return;const tip=`${labels[i]} · ${s.name}: ${fmt(v)}${unit}${s.bases?' · '+s.bases[i][0]+' из '+s.bases[i][1]:''}`;
    const width=Math.min(24,(W-L-R)/labels.length*.6);

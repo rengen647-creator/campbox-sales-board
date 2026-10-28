@@ -116,7 +116,7 @@
   }
   function statusPill(status){
     const tone=status==='paid'||status==='Выплачено'?'good':status==='confirmed'||status==='Подтверждено'?'good':status==='excluded'?'bad':'warn';
-    const label={paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[status]||status;
+    const label={paid:'Оплата клиента подтверждена',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[status]||status;
     return '<span class="salary-pill '+tone+'">'+esc(label)+'</span>';
   }
   function contractPill(c){
@@ -363,6 +363,12 @@
     events.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
     return '<details class="os3-disclosure"><summary>История договоров, пауз и удержания</summary><ol class="salary-timeline">'+events.map(e=>'<li class="salary-event"><time>'+dateRu(e.date)+'</time><span>'+esc(e.label)+'</span></li>').join('')+'</ol>'+(events.length?'':'<p>Событий пока нет.</p>')+'</details>';
   }
+  function commissionTimeline(prod,c,date){
+    const idx=monthIndexActive(prod,c,date),retained=retentionAt(c.id,date,c.contractor_id),paused=pausedOn(c.id,date);
+    const cells=Array.from({length:12},(_,i)=>'<span class="'+(idx===i+1?'current':idx>i+1?'elapsed':'future')+'" aria-label="Основной период, месяц '+(i+1)+(idx===i+1?', текущий':'')+'">'+(i+1)+'</span>').join('');
+    const retentionCells=Array.from({length:6},(_,i)=>'<span class="'+(retained?'retained':'future')+'" aria-label="Удержание, месяц '+(i+1)+(retained?'':' — ещё не подтверждено')+'">+'+(i+1)+'</span>').join('');
+    return '<div class="salary-commission-timeline"><p>12 месяцев мотивации'+(paused?' · пауза':'')+'</p><div class="salary-month-track">'+cells+'</div><p>6 месяцев после успешного удержания'+(retained?' · до '+dateRu(retentionEnd(retained)):' · пока не подтверждено')+'</p><div class="salary-month-track retention">'+retentionCells+'</div><small>Шкала показывает период мотивации, а не выплату зарплаты. Паузы отражены в истории ниже.</small></div>';
+  }
   function renderMine(){
     const box=q('salaryMine');if(!box)return;if(!S.schemaReady){box.innerHTML='';return}
     const rows=mineRows(),t=totals(rows),amounts=salaryStatusTotals(rows),status=S.month<currentMonth()?'Закрытый период':'Предварительно';
@@ -390,7 +396,7 @@
           '<div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Доп. продукты</span><b>'+money(t.products)+'</b></div><div><span>Сайты / сопровождение</span><b>'+money(t.site)+'</b></div><div><span>1% руководителю</span><b>'+money(t.head)+'</b></div>'+
         '</div></div></div>'+
         '<div class="salary-card"><div class="salary-head"><div><h2>Действующие периоды мотивации</h2><p>12 месяцев с учётом пауз и успешных удержаний.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
-          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),retained=retentionAt(c.id,S.month+'-28',c.contractor_id),end=retained?retentionEnd(retained):commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':retained?'успешное удержание':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
+          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),retained=retentionAt(c.id,S.month+'-28',c.contractor_id),end=retained?retentionEnd(retained):commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':retained?'успешное удержание':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'+commissionTimeline(p,c,S.month+'-28')}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
         '</div></div></div>'+
       '</div>'+
       contractingPanel(currentUser.id)+
@@ -404,7 +410,7 @@
     if(typeof XLSX==='undefined'){alert('Библиотека Excel не загрузилась. Обнови страницу и попробуй ещё раз.');return}
     const summary=[['Отчёт по зарплате CampBox'],['Сотрудник',name],['Период',monthName(S.month)],...salarySummaryRows(rows),['Примечание','Статусы начислений взяты из исходных записей. Подтверждённая сумма не означает остаток к выплате.'],[],['Категория','Расчётная сумма, включая предварительные'],['Контракторство',t.contract],['CampBox · 10%',t.campbox],['Доп. продукты',t.products],['Сайты / сопровождение',t.site],['1% руководителю',t.head]];
     const details=[['Дата','Клиент','Дата договора','Направление','Событие','Поступление с НДС','База расчёта','Ставка','Формула','Начислено','Статус'],
-      ...rows.map(r=>[r.date,r.client,r.contract_signed||'',r.direction,r.event,r.gross??'',r.base,r.rate,r.formula,r.amount,{paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
+      ...rows.map(r=>[r.date,r.client,r.contract_signed||'',r.direction,r.event,r.gross??'',r.base,r.rate,r.formula,r.amount,{paid:'Оплата клиента подтверждена',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
     ];
     const wb=XLSX.utils.book_new(),ws1=XLSX.utils.aoa_to_sheet(summary),ws2=XLSX.utils.aoa_to_sheet(details);
     ws1['!cols']=[{wch:64},{wch:28}];ws2['!cols']=[{wch:12},{wch:25},{wch:14},{wch:22},{wch:26},{wch:18},{wch:16},{wch:12},{wch:36},{wch:16},{wch:16}];
@@ -425,7 +431,7 @@
           '<div class="salary-field"><label>Событие</label><select id="salPayEvent"><option value="payment">Поступление</option><option value="site_live">Выход сайта в ЖР</option></select></div>'+
           '<div class="salary-field"><label>Сумма</label><input id="salPayAmount" type="number" min="0" step="0.01" placeholder="0"></div>'+
           '<div class="salary-field"><label>№ платежа</label><input id="salPayNumber" type="number" min="1" placeholder="1"></div>'+
-          '<div class="salary-field"><label>Статус</label><select id="salPayStatus"><option value="confirmed">Подтверждено</option><option value="preliminary">Предварительно</option><option value="paid">Выплачено</option></select></div>'+
+          '<div class="salary-field"><label>Статус</label><select id="salPayStatus"><option value="confirmed">Подтверждено</option><option value="preliminary">Предварительно</option><option value="paid">Оплата клиента подтверждена</option></select></div>'+
           '<div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="salPayAdd">Добавить</button></div>'+
         '</div><div id="salPayPreview" class="salary-callout good" style="margin-top:10px"></div>':
         '<div class="salary-empty">Сначала добавь активный договор в базе клиентов.</div>')+

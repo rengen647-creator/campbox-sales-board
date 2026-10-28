@@ -28,5 +28,5 @@ for(const forbidden of [/\bsupabase\.from\s*\(/,/\bsb\.from\s*\(/,/\bfetch\s*\(/
 assert.match(sw,/refined-ui\.js\?v=20261027a/);
 assert.equal((html.match(/refined-ui\.js\?v=/g)||[]).length,1);
 console.log('PASS refined Sales UI integration: assets, five groups, theme, no business-data writes');
-assert.match(html,/sales-board\.css\?v=20261027reqa/);
-assert.match(sw,/sales-board\.css\?v=20261027reqa/);
+assert.match(html,/sales-board\.css\?v=20261028signed/);
+assert.match(sw,/sales-board\.css\?v=20261028signed/);

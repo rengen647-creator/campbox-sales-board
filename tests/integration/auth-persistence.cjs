@@ -16,6 +16,8 @@ async function poll(fn){for(let n=0;n<50;n++){if(await fn())return;await new Pro
  revoke all on schema campbox_internal from public,anon,authenticated;`);
  await db.query(fs.readFileSync('tests/integration/csm-function.sql','utf8')+';');
  await db.query(fs.readFileSync('migration_2026-10-14_sales_signed_to_csm.sql','utf8'));
+ await db.query(fs.readFileSync('sql/signed-facts.sql','utf8'));
+ await db.query("insert into sales_fact_periods(month,closed) values(date_trunc('month',current_date)::date,false)");
  const admin=createClient(api,secret,{auth:{persistSession:false,autoRefreshToken:false}}),password='Disposable-Local-QA-2026!';const users={};
  for(const role of ['employee','manager']){const email=role+'@example.invalid';const r=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:'QA '+role}});if(r.error)throw r.error;users[role]={id:r.data.user.id,email};await db.query('update profiles set active=true,role=$1 where id=$2',[role,r.data.user.id]);}
  const date=new Date().toISOString().slice(0,10),month=date.slice(0,7)+'-01';
@@ -45,6 +47,7 @@ async function poll(fn){for(let n=0;n<50;n++){if(await fn())return;await new Pro
  await page.click('#contractSaveBtn');
  await poll(async()=>{const r=await db.query('select state from sales_handoff_statuses where sales_user_id=$1',[users[role].id]);return r.rows.some(x=>x.state==='linked');});
  await page.click('#contractSaveBtn');await page.waitForTimeout(1000);
+ const eventCount=await db.query('select count(*)::int as n from sales_signed_events where sales_user_id=$1',[users[role].id]);assert.equal(eventCount.rows[0].n,1,'One persisted signing event');
  const count=await db.query('select count(*)::int as n from csm_camps where name=$1',['Isolated QA '+role]);assert.equal(count.rows[0].n,1);
  const contractCount=await db.query('select count(*)::int as n from salary_contracts');assert.equal(contractCount.rows[0].n,2,'Handoff must not create salary cycles');
  await page.reload();await page.waitForFunction(()=>typeof currentProfile!=='undefined'&&currentProfile?.active&&!isLoading);await page.evaluate(()=>openContracts(currentUser.id));assert.equal(await page.locator('#contractList input[oninput*="client"]').inputValue(),'Isolated QA '+role);
