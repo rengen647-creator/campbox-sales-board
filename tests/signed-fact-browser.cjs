@@ -11,6 +11,7 @@ assert.equal(await page.evaluate(()=>SalesFactUI.model().value),3);
 assert.equal(await page.locator('#monthFactView').textContent(),'3');
 assert.equal(await page.evaluate(()=>{CampBoxReport.render();return CampBoxReport.snapshot.fact;}),3);
 await page.locator('#sfScope').selectOption('team');
+const roleScope=await page.evaluate(()=>{currentProfile.role='employee';SalesFactUI.refresh();CampBoxReport.render();const result={scope:SalesFactUI.scope(),filter:document.getElementById('sfScope').value,fact:CampBoxReport.snapshot.fact};currentProfile.role='manager';SalesFactUI.setScope('team');return result;});assert.deepEqual(roleScope,{scope:'qa-lead',filter:'qa-lead',fact:3});
 const failure=await page.evaluate(async()=>{const original=sb.from;const before=JSON.stringify(dayRows);sb.from=name=>{const q=original(name);if(name==='sales_signed_events')q.then=(resolve,reject)=>Promise.resolve({data:null,error:{message:'Synthetic registry outage'}}).then(resolve,reject);return q;};const result=await SalesFactUI.load(selectedMonth);recalc();const out={error:!!result.error,value:SalesFactUI.model().value,forecast:coachForecastData('team').forecast,preserved:before===JSON.stringify(dayRows)};sb.from=original;return out;});
 assert.deepEqual(failure,{error:true,value:null,forecast:null,preserved:true});
 assert.equal(await page.locator('#forecastView').textContent(),'—');
