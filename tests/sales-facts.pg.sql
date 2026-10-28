@@ -126,3 +126,12 @@ do $$declare m jsonb:='[{"sales_user_id":"11111111-1111-4111-8111-111111111111",
  n:=pg_temp.import_approved_signed_facts(m,'22222222-2222-4222-8222-222222222222');if n<>0 then raise exception 'Repeat imported twice';end if;
  if (select count(*) from salary_contracts)<>0 then raise exception 'Backfill created salary cycle';end if;
 end$$;
+
+alter table public.daily_sales disable trigger ab_daily_sales_signed_fact;
+insert into daily_sales(report_date,user_id,comment) values('2026-10-25','11111111-1111-4111-8111-111111111111','{"__type":"daily_reflection","contracts":[{"id":"legacy-open","client":"Open Camp","status":"signing","next_action":"Call director","next_contact":"2026-10-29"}]}');
+alter table public.daily_sales enable trigger ab_daily_sales_signed_fact;
+select pg_temp.import_approved_signed_facts('[{"sales_user_id":"11111111-1111-4111-8111-111111111111","contract_key":"legacy-open","camp_name":"Open Camp","status":"signing"}]','22222222-2222-4222-8222-222222222222');
+do $$begin
+ if exists(select 1 from sales_signed_events where contract_key='legacy-open') then raise exception 'Open deal created signature';end if;
+ if not exists(select 1 from sales_deal_registry where contract_key='legacy-open' and next_action='Call director') then raise exception 'Open deal lost next action';end if;
+end$$;

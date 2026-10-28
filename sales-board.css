@@ -2045,3 +2045,4 @@ html.sf-enabled .sf-action-grid>.cb-command-side{display:none!important}
 .salary-month-track span {text-align:center;border:1px solid var(--border);border-radius:5px;padding:6px 0}
 .salary-month-track .current {outline:2px solid #4088ed;font-weight:800}
 .salary-month-track .elapsed,.salary-month-track .retained {background:rgba(35,150,100,.2)}
+html.sf-enabled #v13-contracts .sf-superseded{display:none!important}
