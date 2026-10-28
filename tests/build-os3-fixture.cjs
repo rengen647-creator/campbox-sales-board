@@ -9,7 +9,7 @@ s=s.replace('<head>','<head><base href="../"><meta name="robots" content="noinde
 s=s.replace('</body>',`<script>
 window.fetch=()=>Promise.reject(new Error('QA: network disabled'));
 ${fs.readFileSync('tests/os3-fixture-db.js','utf8')}
-window.addEventListener('DOMContentLoaded',()=>{
+window.addEventListener('DOMContentLoaded',async()=>{
  qaInstallDatabase();
  currentUser={id:'qa-lead',email:'qa@example.invalid'};currentProfile={id:'qa-lead',full_name:'Тестовый руководитель',role:'manager',active:true};
  profiles=[currentProfile,{id:'qa-sales',full_name:'Тестовый менеджер с длинным именем',role:'employee',active:true}];
@@ -25,6 +25,7 @@ window.addEventListener('DOMContentLoaded',()=>{
  showOnly('mainApp');$('currentUserName').textContent='Синтетический тест';$('currentUserRole').textContent='Руководитель';applyRoleUI();
  // Saving only into fixture memory. No network and no production writes.
  saveCurrent=async()=>{setStatus('QA: сохранено только в памяти');};
+ await SalesFactUI.load(selectedMonth);
  renderDayTable();recalc();
  document.querySelector('.v13-brand small').textContent='СИНТЕТИЧЕСКИЕ ДАННЫЕ · НЕ БОЕВАЯ БАЗА';
  window.v13Go('analytics');

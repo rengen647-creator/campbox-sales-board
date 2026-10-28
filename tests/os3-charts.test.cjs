@@ -16,7 +16,9 @@ const html=fs.readFileSync('index.html','utf8'),sw=fs.readFileSync('sw.js','utf8
 for(const [,src] of html.matchAll(/(?:src|href)="((?:\.\/)?(?:os3[^"?]*|ui-v13\.js|product-v2\.js)\?[^\"]+)"/g))assert.ok(sw.includes(src.replace(/^\.\//,'')),'Cache mismatch '+src);
 for(const [,script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(script);
 const base='a6bde851ce10d0bfd315036f00b22698fb62b45d';
-for(const name of ['sales-coach.js','sales-report-v2.js','supabase_setup.sql','salary_v1_migration.sql','salary_retention_v1_migration.sql']){
+for(const name of ['sales-report-v2.js','supabase_setup.sql','salary_v1_migration.sql','salary_retention_v1_migration.sql']){
  assert.equal(fs.readFileSync(name,'utf8'),execFileSync('git',['show',base+':'+name],{encoding:'utf8'}),'Business source changed: '+name);
 }
 console.log('PASS OS3: 0/1/7/30 samples, disconnected missing data, null vs zero, escaping, cache parity, inline syntax and 5 unchanged business sources.');
+
+assert.equal(fs.readFileSync('sales-coach.js','utf8').replace("var fact=SalesFactUI.model(userId).value;","var fact=sum(rows,'connected_fact');"),execFileSync('git',['show',base+':sales-coach.js'],{encoding:'utf8'}),'Only signed fact source may change in coach');

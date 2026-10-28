@@ -20,6 +20,8 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="./sales-facts.js?v=20261028"></script>
+  <script src="./signed-fact-ui.js?v=20261028" defer></script>
   <script src="./sales-coach.js?v=20261019stableplan"></script>
 
 
@@ -349,7 +351,7 @@ function isManager(){return currentProfile?.role==='manager'}
 function statusClass(p){return p>=100?'good':p>=70?'warn':'bad'}
 function newId(){return globalThis.crypto?.randomUUID?crypto.randomUUID():'c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9)}
 function normalizeContract(c={}){
-  return {id:c.id||newId(),client:String(c.client||''),contract_number:String(c.contract_number||''),sent_date:c.sent_date||selectedDate||todayISO(),target_date:c.target_date||'',ball:c.ball==='us'?'us':'client',blocker:String(c.blocker||''),next_action:String(c.next_action||''),next_contact:c.next_contact||'',signed_date:c.signed_date||'',status:['signing','signed','lost'].includes(c.status)?c.status:'signing'};
+  return {id:c.id||newId(),client:String(c.client||''),contract_number:String(c.contract_number||''),document_key:String(c.document_key||''),event_revision:Number(c.event_revision||0),correction_reason:String(c.correction_reason||''),sent_date:c.sent_date||selectedDate||todayISO(),target_date:c.target_date||'',ball:c.ball==='us'?'us':'client',blocker:String(c.blocker||''),next_action:String(c.next_action||''),next_contact:c.next_contact||'',signed_date:c.signed_date||'',status:['signing','signed','lost','terminated'].includes(c.status)?c.status:'signing'};
 }
 function parseReflection(raw){
   const empty={result:'',blockers:'',tomorrow:'',reasons:[],contracts:[]};
@@ -441,7 +443,7 @@ async function loadAll(){
       sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),
       sb.from('daily_sales').select('*').gte('report_date',prevStart).lt('report_date',monthStart(selectedMonth)),
       sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),
-      sb.from('salary_contracts').select('id,signed_date,contractor_id,status').gte('signed_date',monthStart(selectedMonth)).lt('signed_date',nextMonthStart(selectedMonth)).neq('status','terminated')
+      SalesFactUI.load(selectedMonth)
     ]);
     const err=pe||mse||dse||dre||mre||pmre||cpe||se;if(err)throw err;
     profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];monthSignedContracts=signed||[];prevMonthRows=pmr||[];checkpoints=cp||[];
@@ -527,18 +529,18 @@ function activeContractEntries(){
 function monthlyContractEntries(){
   const rows=[...monthRows.filter(r=>String(r.report_date)!==selectedDate),...dayRows.map(r=>({...r,report_date:selectedDate}))].sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date)));
   const map=new Map();
-  rows.forEach(r=>parseReflection(r.comment).contracts.forEach(c=>{const key=c.id||`${r.user_id}|${c.client}|${c.sent_date}`;const prev=map.get(key);map.set(key,{...(prev||{}),...c,user_id:r.user_id,first_seen:prev?.first_seen||r.report_date,last_seen:r.report_date})}));
+  rows.forEach(r=>parseReflection(r.comment).contracts.forEach(c=>{const key=`${r.user_id}|${c.id||c.client+'|'+c.sent_date}`;const prev=map.get(key);map.set(key,{...(prev||{}),...c,user_id:r.user_id,first_seen:prev?.first_seen||r.report_date,last_seen:r.report_date})}));
   return [...map.values()];
 }
-function monthlySigningCount(rows=null){
-  if(!rows)return monthlyContractEntries().length;
-  const map=new Map();rows.forEach(r=>parseReflection(r.comment).contracts.forEach(c=>{const key=c.id||`${r.user_id}|${c.client}|${c.sent_date}`;if(!map.has(key))map.set(key,c)}));return map.size;
-}
+function monthlyOpenDealCount(){return SalesFactUI.pipeline().open.length;}
+function monthlyStartedDealCount(){return SalesFactUI.pipeline().started.length;}
+function monthlySignedEventCount(){return SalesFactUI.model().value;}
+function monthlySigningCount(){return monthlyOpenDealCount();} // compatibility for activity panels; never a conversion denominator
 function contractTone(c){const age=contractAge(c),targetLate=c.target_date&&c.target_date<selectedDate,nextLate=c.next_contact&&c.next_contact<selectedDate;return age>7||targetLate||nextLate?'bad':age>=4?'warn':'good'}
-function contractStatusLabel(v){return v==='signed'?'Подписан':v==='lost'?'Не состоялся':'На подписании'}
+function contractStatusLabel(v){return v==='terminated'?'Расторгнут':v==='signed'?'Подписан':v==='lost'?'Не состоялся':'На подписании'}
 function openContracts(userId){
   const r=dayRows.find(x=>x.user_id===userId);if(!r)return;const pr=profiles.find(p=>p.id===userId)||{full_name:'Сотрудник'},canEdit=isManager()||userId===currentUser.id;
-  contractUserId=userId;contractDraft=parseReflection(r.comment).contracts.map(c=>({...c}));handoffStates=new Map();handoffStatusError='';$('contractUserName').textContent=pr.full_name||pr.email||'Сотрудник';$('contractDateLabel').textContent=selectedDate;$('contractAddBtn').classList.toggle('hidden',!canEdit);$('contractSaveBtn').classList.toggle('hidden',!canEdit);renderContractDraft(canEdit);$('contractModal').classList.remove('hidden');refreshHandoffStates(userId);
+  contractUserId=userId;contractDraft=SalesFactUI.editorContracts(userId,parseReflection(r.comment).contracts);handoffStates=new Map();handoffStatusError='';$('contractUserName').textContent=pr.full_name||pr.email||'Сотрудник';$('contractDateLabel').textContent=selectedDate;$('contractAddBtn').classList.toggle('hidden',!canEdit);$('contractSaveBtn').classList.toggle('hidden',!canEdit);renderContractDraft(canEdit);$('contractModal').classList.remove('hidden');refreshHandoffStates(userId);
 }
 function closeContracts(){$('contractModal').classList.add('hidden');contractUserId=null;contractDraft=[]}
 function addContractRow(){if(!contractUserId)return;contractDraft.push(normalizeContract({sent_date:selectedDate,status:'signing',ball:'client'}));renderContractDraft(true)}
@@ -555,6 +557,7 @@ function handoffStatusLabel(c){
   if(c.status!=='signed')return '';
   const st=handoffStates.get(c.id);
   if(st?.state==='linked')return st.assigned?'КСМ: назначен':'КСМ: в очереди назначения';
+  if(st?.state==='error')return 'КСМ: ошибка синхронизации · факт сохранён';
   if(st?.state==='conflict')return 'КСМ: нужна сверка — '+esc(st.reason||'проверь данные');
   if(handoffStatusError)return 'КСМ: проверка недоступна';
   return 'КСМ: ещё не подтверждена передача';
@@ -576,12 +579,12 @@ function renderContractDraft(canEdit=true){
   box.innerHTML=contractDraft.map((c,i)=>{const tone=contractTone(c),age=contractAge(c);return `<div class="contract-row ${tone}">
     <div class="contract-row-head">
       <div><label>Лагерь / клиент</label><input value="${esc(c.client)}" oninput="updateContractDraft(${i},'client',this.value)" ${canEdit?'':'disabled'} placeholder="Название лагеря"></div>
-      <div><label>Статус</label><select onchange="updateContractDraft(${i},'status',this.value)" ${canEdit?'':'disabled'}><option value="signing" ${c.status==='signing'?'selected':''}>На подписании</option><option value="signed" ${c.status==='signed'?'selected':''}>Подписан</option><option value="lost" ${c.status==='lost'?'selected':''}>Не состоялся</option></select></div>
+      <div><label>Статус</label><select onchange="updateContractDraft(${i},'status',this.value)" ${canEdit?'':'disabled'}><option value="signing" ${c.status==='signing'?'selected':''}>На подписании</option><option value="signed" ${c.status==='signed'?'selected':''}>Подписан</option><option value="terminated" ${c.status==='terminated'?'selected':''}>Расторгнут</option><option value="lost" ${c.status==='lost'?'selected':''}>Не состоялся</option></select></div>
       <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}${c.status==='signed'?'<br><small>'+handoffStatusLabel(c)+'</small>':''}</span>
-      ${canEdit?`<button class="btn danger" onclick="removeContractRow(${i})">Удалить</button>`:''}
+      ${canEdit&&c.status!=='signed'&&c.status!=='terminated'?`<button class="btn danger" onclick="removeContractRow(${i})">Удалить</button>`:''}
     </div>
     <div class="contract-fields">
-      <div><label>Договор отправлен</label><input type="date" value="${esc(c.sent_date)}" onchange="updateContractDraft(${i},'sent_date',this.value)" ${canEdit?'':'disabled'}></div>
+      <div><label>Связь с документом (ID)</label><input value="${esc(c.document_key||c.id)}" onchange="updateContractDraft(${i},'document_key',this.value)" ${canEdit?'':'disabled'}><small>Для нескольких лагерей одного документа укажите одинаковый ID; у каждого лагеря своя строка сделки.</small></div><div><label>Причина исправления подписанного договора</label><input value="${esc(c.correction_reason||'')}" oninput="updateContractDraft(${i},'correction_reason',this.value)" ${canEdit?'':'disabled'}></div><div><label>Договор отправлен</label><input type="date" value="${esc(c.sent_date)}" onchange="updateContractDraft(${i},'sent_date',this.value)" ${canEdit?'':'disabled'}></div>
       <div><label>Плановая подпись</label><input type="date" value="${esc(c.target_date)}" onchange="updateContractDraft(${i},'target_date',this.value)" ${canEdit?'':'disabled'}></div>
       <div><label>Номер договора ${c.status==='signed'?'* ':''}</label><input value="${esc(c.contract_number||'')}" oninput="updateContractDraft(${i},'contract_number',this.value)" placeholder="Номер из подписанного договора" ${canEdit?'':'disabled'} ${c.status==='signed'?'required':'' }></div>
       <div><label>Фактически подписан</label><input type="date" value="${esc(c.signed_date||'')}" onchange="updateContractDraft(${i},'signed_date',this.value)" ${canEdit?'':'disabled'} ${c.status==='signed'?'required':''}></div>
@@ -601,12 +604,19 @@ async function saveContracts(){
     alert('Для подписанного договора укажи фактическую дату подписания.');return;
   }
   if(clean.some(c=>c.status==='signed'&&!String(c.contract_number||'').trim())){alert('Укажи номер подписанного договора.');return;}
-  const numbers=clean.filter(c=>c.status==='signed').map(c=>c.contract_number.trim().toUpperCase().replace(/\s+/g,''));
-  if(new Set(numbers).size!==numbers.length){alert('Номер договора повторяется в текущем списке.');return;}
+  const ids=clean.map(c=>c.id);
+  if(new Set(ids).size!==ids.length){alert('Повторяется ID сделки.');return;}
   const previousComment=r.comment,prev=parseReflection(r.comment);
-  r.comment=packReflection({...prev,contracts:clean});renderTeam();recalc();
-  const ok=await saveCurrent(true);
+  const before=SalesFactUI.model().value;
+  r.comment=packReflection({...prev,contracts:clean});
+  SalesFactUI.saveStatus('Сохранение договора…','loading');
+  clearTimeout(saveTimer);
+  const result=await sb.from('daily_sales').upsert(normalizeSales(r),{onConflict:'report_date,user_id'});
+  const ok=!result.error;
+  if(ok)await loadMonthOnly();
+  else SalesFactUI.saveStatus('Не сохранено: '+result.error.message,'error');
   if(!ok){r.comment=previousComment;renderTeam();recalc();return}
+  await SalesFactUI.afterSave(userId,before);
   await refreshHandoffStates(userId);
   if(clean.some(c=>c.status==='signed')&&handoffStatusError)
     alert('Договор сохранён, но подтверждение передачи в КСМ недоступно. '+handoffStatusError);
@@ -717,7 +727,7 @@ async function saveCurrent(manual=false){
 }
 function normalizeSales(r){const o={report_date:selectedDate,user_id:r.user_id,comment:r.comment||''};metricKeys.forEach(k=>{o[k+'_plan']=num(r[k+'_plan']);o[k+'_fact']=num(r[k+'_fact'])});return o}
 async function loadMonthOnly(){
-  const [{data:mr,error:me},{data:cp,error:ce},{data:signed,error:se}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),sb.from('salary_contracts').select('id,signed_date,contractor_id,status').gte('signed_date',monthStart(selectedMonth)).lt('signed_date',nextMonthStart(selectedMonth)).neq('status','terminated')]);if(me||ce||se){setStatus('Ошибка обновления факта','bad');return;}monthRows=mr||monthRows;monthSignedContracts=signed||[];checkpoints=cp||checkpoints;recalc();renderCheckpoints();
+  const [{data:mr,error:me},{data:cp,error:ce},{data:signed,error:se}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),SalesFactUI.load(selectedMonth)]);if(me||ce||se){setStatus('Ошибка обновления факта','bad');return;}monthRows=mr||monthRows;monthSignedContracts=signed||[];checkpoints=cp||checkpoints;recalc();renderCheckpoints();
 }
 function sum(rows,key){return rows.reduce((s,r)=>s+num(r[key]),0)}
 function renderSalesForecastScenarios(){
@@ -751,7 +761,7 @@ function recalc(){
   const ids={calls:'totCalls',booked:'totBooked',meetings:'totMeetings',offers:'totOffers',follow:'totFollow'};Object.entries(ids).forEach(([k,id])=>$(id).textContent=`${totals[k+'P']} / ${totals[k+'F']}`);
   renderSalesPriorities();renderSalesForecastScenarios();
   const activeSigning=activeContractEntries().length,monthSigning=monthlySigningCount();$('totSigning').textContent=String(activeSigning);$('totConnected').textContent=String(totals.connectedF);
-  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=monthSignedContracts.length;$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=monthSignedContracts.filter(c=>c.signed_date===selectedDate).length;
+  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=SalesFactUI.model().value;$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=SalesFactUI.model().events.filter(c=>c.signed_date===selectedDate).length;
   $('miniCalls').textContent=pct(totals.callsF,totals.callsP)+'%';$('miniMeetings').textContent=pct(totals.meetingsF,totals.meetingsP)+'%';$('miniFollow').textContent=pct(totals.followF,totals.followP)+'%';$('convCallMeet').textContent=pct(totals.bookedF,totals.callsF)+'%';$('convMeetOffer').textContent=pct(totals.offersF,totals.meetingsF)+'%';$('convOfferConnect').textContent=pct(sum(monthRows,'connected_fact'),monthSigning)+'%';
   const scores=activityKeys.filter(k=>totals[k+'P']>0).map(k=>Math.min(100,pct(totals[k+'F'],totals[k+'P'])));const overall=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;const day=$('dayStatus'),ts=$('teamStatus');if(!scores.length){day.className='pill warn';day.textContent='План активностей не заполнен';ts.className='pill warn';ts.textContent='Нет плана'}else{day.className='pill '+statusClass(overall);day.textContent=`Активности выполнены на ${overall}%`;ts.className='pill '+statusClass(overall);ts.textContent=`Активности: ${overall}%`}
   const reflectionDone=dayRows.filter(r=>reflectionState(r.comment).state==='done').length,reflectionAny=dayRows.filter(r=>reflectionState(r.comment).state!=='empty').length,reflectionEl=$('reflectionStatus');
@@ -778,7 +788,7 @@ function exportExcel(){
   const cp=checkpoints.map(x=>({Дата:x.checkpoint_date,'План накопительно':num(x.plan),Факт:num(x.fact),Отклонение:num(x.fact)-num(x.plan),Комментарий:x.comment||''}));
   const reflections=monthRows.slice().sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date))).map(r=>{const p=profiles.find(x=>x.id===r.user_id)||{},ref=parseReflection(r.comment);return {Дата:r.report_date,Менеджер:p.full_name||p.email||r.user_id,'Что получилось':ref.result,'Причины':(ref.reasons||[]).join(', '),'Что не получилось / блокеры':ref.blockers,'План на завтра':ref.tomorrow,'Подключено лагерей':num(r.connected_fact)}}).filter(x=>x['Что получилось']||x['Что не получилось / блокеры']||x['План на завтра']);
   const contracts=monthlyContractEntries().map(c=>{const p=profiles.find(x=>x.id===c.user_id)||{};return {Менеджер:p.full_name||p.email||c.user_id,Лагерь:c.client,'Договор отправлен':c.sent_date,'Плановая подпись':c.target_date,'У кого мяч':c.ball==='us'?'У нас':'У клиента',Блокер:c.blocker,'Следующее действие':c.next_action,'Следующий контакт':c.next_contact,Статус:contractStatusLabel(c.status),'Дней с отправки':contractAge(c),'Первое появление в контрактинге':c.first_seen}});
-  const active=activeContractEntries().length,fact=sum(monthRows,'connected_fact'),summary=[{Месяц:selectedMonth,Руководитель:$('owner').value,'План минимум':num($('monthMin').value),Цель:num($('monthTarget').value),'План максимум':num($('monthMax').value),'Факт подключений':fact,'На подписании сейчас':active,'Потенциал факт + подписание':fact+active,'Осталось до цели':Math.max(num($('monthTarget').value)-fact,0)}];
+  const active=activeContractEntries().length,fact=SalesFactUI.model().value,summary=[{Месяц:selectedMonth,Руководитель:$('owner').value,'План минимум':num($('monthMin').value),Цель:num($('monthTarget').value),'План максимум':num($('monthMax').value),'Подтверждённые подписания':fact,'На подписании сейчас':active,'Потенциал факт + подписание':fact+active,'Осталось до цели':Math.max(num($('monthTarget').value)-fact,0)}];
   const wb=XLSX.utils.book_new();[['Воронка',funnel],['Контрактинг',contracts],['По менеджерам',byManager],['По дням',days],['Итоги сотрудников',reflections],['Контрольные точки',cp],['План месяца',summary]].forEach(([name,data])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data.length?data:[{}]),name));XLSX.writeFile(wb,`CampBox_Воронка_${selectedMonth}.xlsx`);
 }
 

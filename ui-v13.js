@@ -252,7 +252,7 @@
     var uid=currentSelf(),box=document.getElementById('v13TodayKpis');if(!uid||!box)return;
     var f=fd(uid),tone=f.forecast>=f.target?'good':f.risk<=1?'warn':'bad';
     box.innerHTML='<div class="v13-kpi"><span>Цель месяца</span><b>'+f.target+'</b><small>KPI менеджера</small></div>'+
-      '<div class="v13-kpi good"><span>Факт</span><b>'+f.fact+'</b><small>подключённых лагерей</small></div>'+
+      '<div class="v13-kpi good"><span>Факт</span><b>'+f.fact+'</b><small>подтверждённых подписаний</small></div>'+
       '<div class="v13-kpi '+tone+'"><span>Прогноз</span><b>'+f.forecast+'</b><small>при текущем темпе</small></div>'+
       '<div class="v13-kpi '+tone+'"><span>Риск</span><b>'+(f.risk?'-'+f.risk:'0')+'</b><small>'+(f.risk?'ожидаемый недобор':'риск отсутствует')+'</small></div>';
 
@@ -462,7 +462,7 @@
       var cc=d.filter(function(x){return x.type==='conversion';}),cw=cc.filter(function(x){return x.tone!=='good';}).sort(function(a,b){return a.score-b.score;})[0];
       title='Конверсия · где именно теряем клиентов';source='Источник: фактические переходы между этапами воронки за выбранный месяц.';diagnosis=cw?cw.label+': '+cw.fact+' при ориентире '+cw.guide:'Критичных просадок конверсии нет.';what='Смотрим каждый переход отдельно и сравниваем с рабочим ориентиром.';why='Понимаем, на каком конкретном этапе теряется результат.';next=cw?actionFor(cw):'Сохранить текущую механику работы.';
     }else if(V.analytics==='pace'){
-      title='Темп месяца · добегаем ли до цели';source='Источник: фактические подключения и скорость результата по рабочим дням.';diagnosis='Факт '+f.fact+' из '+f.target+', прогноз '+f.forecast+'.';what='Сравниваем факт, ожидаемый темп и прогноз на конец месяца.';why='Связываем ежедневную работу с итоговым KPI месяца.';next=f.risk?'Вернуться к узкому месту воронки и поднять только отстающий показатель.':'Сохранить текущий темп.';
+      title='Темп месяца · добегаем ли до цели';source='Источник: реестр подписаний; темп по рабочим дням.';diagnosis='Факт '+f.fact+' из '+f.target+', прогноз '+f.forecast+'.';what='Сравниваем факт, ожидаемый темп и прогноз на конец месяца.';why='Связываем ежедневную работу с итоговым KPI месяца.';next=f.risk?'Вернуться к узкому месту воронки и поднять только отстающий показатель.':'Сохранить текущий темп.';
     }else{
       var rows=[];try{rows=coachScopeRows(monthRows,uid,true);}catch(e){}
       var dates={};rows.forEach(function(r){if(!dates[r.report_date])dates[r.report_date]=[];dates[r.report_date].push(r);});

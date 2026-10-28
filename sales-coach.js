@@ -24,7 +24,7 @@ function coachPersonName(userId){
 function coachForecastData(userId){
   var rows=coachScopeRows(monthRows,userId,true);
   var target=coachTarget(userId);
-  var fact=sum(rows,'connected_fact');
+  var fact=SalesFactUI.model(userId).value;
   var wdTotal=totalWorkdays(selectedMonth)||1;
   var day=Number(selectedDate.slice(8,10));
   var wdDone=Math.max(1,workdaysThrough(selectedMonth,day));

@@ -116,7 +116,7 @@
   }
   function statusPill(status){
     const tone=status==='paid'||status==='Выплачено'?'good':status==='confirmed'||status==='Подтверждено'?'good':status==='excluded'?'bad':'warn';
-    const label={paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[status]||status;
+    const label={paid:'Оплата клиента подтверждена',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[status]||status;
     return '<span class="salary-pill '+tone+'">'+esc(label)+'</span>';
   }
   function contractPill(c){
@@ -404,7 +404,7 @@
     if(typeof XLSX==='undefined'){alert('Библиотека Excel не загрузилась. Обнови страницу и попробуй ещё раз.');return}
     const summary=[['Отчёт по зарплате CampBox'],['Сотрудник',name],['Период',monthName(S.month)],...salarySummaryRows(rows),['Примечание','Статусы начислений взяты из исходных записей. Подтверждённая сумма не означает остаток к выплате.'],[],['Категория','Расчётная сумма, включая предварительные'],['Контракторство',t.contract],['CampBox · 10%',t.campbox],['Доп. продукты',t.products],['Сайты / сопровождение',t.site],['1% руководителю',t.head]];
     const details=[['Дата','Клиент','Дата договора','Направление','Событие','Поступление с НДС','База расчёта','Ставка','Формула','Начислено','Статус'],
-      ...rows.map(r=>[r.date,r.client,r.contract_signed||'',r.direction,r.event,r.gross??'',r.base,r.rate,r.formula,r.amount,{paid:'Выплачено',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
+      ...rows.map(r=>[r.date,r.client,r.contract_signed||'',r.direction,r.event,r.gross??'',r.base,r.rate,r.formula,r.amount,{paid:'Оплата клиента подтверждена',confirmed:'Подтверждено',preliminary:'Предварительно',excluded:'Исключено'}[r.status]||r.status])
     ];
     const wb=XLSX.utils.book_new(),ws1=XLSX.utils.aoa_to_sheet(summary),ws2=XLSX.utils.aoa_to_sheet(details);
     ws1['!cols']=[{wch:64},{wch:28}];ws2['!cols']=[{wch:12},{wch:25},{wch:14},{wch:22},{wch:26},{wch:18},{wch:16},{wch:12},{wch:36},{wch:16},{wch:16}];
@@ -425,7 +425,7 @@
           '<div class="salary-field"><label>Событие</label><select id="salPayEvent"><option value="payment">Поступление</option><option value="site_live">Выход сайта в ЖР</option></select></div>'+
           '<div class="salary-field"><label>Сумма</label><input id="salPayAmount" type="number" min="0" step="0.01" placeholder="0"></div>'+
           '<div class="salary-field"><label>№ платежа</label><input id="salPayNumber" type="number" min="1" placeholder="1"></div>'+
-          '<div class="salary-field"><label>Статус</label><select id="salPayStatus"><option value="confirmed">Подтверждено</option><option value="preliminary">Предварительно</option><option value="paid">Выплачено</option></select></div>'+
+          '<div class="salary-field"><label>Статус</label><select id="salPayStatus"><option value="confirmed">Подтверждено</option><option value="preliminary">Предварительно</option><option value="paid">Оплата клиента подтверждена</option></select></div>'+
           '<div class="salary-field"><label>&nbsp;</label><button class="btn primary" id="salPayAdd">Добавить</button></div>'+
         '</div><div id="salPayPreview" class="salary-callout good" style="margin-top:10px"></div>':
         '<div class="salary-empty">Сначала добавь активный договор в базе клиентов.</div>')+

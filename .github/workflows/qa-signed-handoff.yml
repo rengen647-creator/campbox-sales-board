@@ -2,6 +2,8 @@ name: Signed Sales handoff checks
 on:
   pull_request:
     paths:
+      - 'sql/signed-facts.sql'
+      - 'tests/sales-facts.pg.sql'
       - 'index.html'
       - 'salary-v1.js'
       - 'migration_2026-10-14_sales_signed_to_csm.sql'
@@ -58,4 +60,7 @@ jobs:
             sudo apt-get install -y -qq postgresql-client
           fi
       - name: Signed Sales → CSM integration fixtures
-        run: psql -v ON_ERROR_STOP=1 -f tests/signed-handoff.pg.sql
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/signed-handoff.pg.sql
+          createdb signed_fact_test
+          PGDATABASE=signed_fact_test psql -v ON_ERROR_STOP=1 -f tests/sales-facts.pg.sql
