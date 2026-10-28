@@ -17,13 +17,14 @@ create table public.sales_deal_registry (
 create table public.sales_signed_events (
  id uuid primary key default gen_random_uuid(), sales_user_id uuid not null, contract_key text not null,
  camp_id uuid not null references public.sales_camp_registry(id), document_key text not null, contract_number text not null,
- signed_date date not null, state text not null default 'confirmed' check(state in ('confirmed','void')),
+ signed_date date not null, plan_eligible boolean not null default true, state text not null default 'confirmed' check(state in ('confirmed','void')),
  recorded_at timestamptz not null default now(), recorded_by uuid not null references public.profiles(id),
  updated_at timestamptz not null default now(), revision integer not null default 1,
  unique(sales_user_id,contract_key), foreign key(sales_user_id,contract_key) references public.sales_deal_registry,
  check(length(btrim(contract_number)) between 1 and 120)
 );
 create unique index sales_signed_camp_document on public.sales_signed_events(camp_id,document_key) where state='confirmed';
+create unique index sales_one_new_camp on public.sales_signed_events(camp_id) where state='confirmed' and plan_eligible;
 create index sales_signed_date_owner on public.sales_signed_events(signed_date,sales_user_id);
 create table public.sales_fact_audit (
  id bigint generated always as identity primary key, sales_user_id uuid not null, contract_key text not null,
@@ -33,7 +34,7 @@ create table public.sales_fact_audit (
 create index sales_fact_audit_deal on public.sales_fact_audit(sales_user_id,contract_key,id);
 create table public.sales_fact_periods (
  month date primary key check(extract(day from month)=1), closed boolean not null default true,
- reconciled boolean not null default false, approved_by uuid references public.profiles(id), approved_at timestamptz,
+ reconciled boolean not null default false, revision integer not null default 1, approved_by uuid references public.profiles(id), approved_at timestamptz,
  check(not reconciled or (approved_by is not null and approved_at is not null))
 );
 -- Absence of a period is CLOSED, including the current month. Release must explicitly
@@ -79,6 +80,34 @@ end $f$;
 revoke all on function public.void_sales_signed_event(uuid,integer,text) from public,anon,authenticated;
 grant execute on function public.void_sales_signed_event(uuid,integer,text) to authenticated;
 
+-- Period administration is separate from ordinary deal saves.
+create table public.sales_period_audit(id bigint generated always as identity primary key,month date not null,actor_id uuid not null references public.profiles(id),changed_at timestamptz not null default now(),reason text not null,before_value jsonb,after_value jsonb not null);
+alter table public.sales_period_audit enable row level security;
+revoke all on public.sales_period_audit from public,anon,authenticated;
+grant select on public.sales_period_audit to authenticated;
+create policy manager_period_history on public.sales_period_audit for select to authenticated using ((select public.is_active_user()) and (select public.is_manager()));
+create function public.set_sales_period(p_month date,p_closed boolean,p_revision integer,p_reason text) returns void
+language plpgsql security definer set search_path='' as $f$
+declare old_period public.sales_fact_periods%rowtype;
+begin
+ if auth.uid() is null or not public.is_active_user() or not public.is_manager() then raise exception 'Active manager required' using errcode='42501';end if;
+ if extract(day from p_month)<>1 or length(btrim(coalesce(p_reason,'')))<8 then raise exception 'Month and explicit reason required';end if;
+ perform pg_advisory_xact_lock(hashtext('sales-period:'||p_month::text));
+ select * into old_period from public.sales_fact_periods where month=p_month for update;
+ if old_period.month is null then
+  if p_revision<>0 or p_month<date_trunc('month',current_date)::date or exists(select 1 from public.sales_signed_events where signed_date>=p_month and signed_date<(p_month+interval '1 month')::date) then raise exception 'Historical period requires reconciliation';end if;
+  if exists(select 1 from public.daily_sales d cross join lateral jsonb_array_elements(case when pg_input_is_valid(d.comment,'jsonb') and jsonb_typeof(d.comment::jsonb->'contracts')='array' then d.comment::jsonb->'contracts' else '[]'::jsonb end) item where item->>'status'='signed' and item->>'signed_date'>=p_month::text and item->>'signed_date'<(p_month+interval '1 month')::date::text) then raise exception 'Legacy signatures require historical reconciliation';end if;
+  insert into public.sales_fact_periods(month,closed,reconciled,approved_by,approved_at) values(p_month,p_closed,true,auth.uid(),now());
+ else
+  if old_period.revision<>p_revision then raise exception 'Period changed. Reload.' using errcode='40001';end if;
+  if not old_period.reconciled and not p_closed then raise exception 'Unreconciled period cannot open';end if;
+  update public.sales_fact_periods set closed=p_closed,revision=revision+1 where month=p_month;
+ end if;
+ insert into public.sales_period_audit(month,actor_id,reason,before_value,after_value) values(p_month,auth.uid(),btrim(p_reason),case when old_period.month is null then null else to_jsonb(old_period) end,(select to_jsonb(p) from public.sales_fact_periods p where month=p_month));
+end $f$;
+revoke all on function public.set_sales_period(date,boolean,integer,text) from public,anon,authenticated;
+grant execute on function public.set_sales_period(date,boolean,integer,text) to authenticated;
+
 create function campbox_internal.sync_sales_fact() returns trigger
 language plpgsql security definer set search_path='' as $f$
 declare doc jsonb; prevdoc jsonb; item jsonb; previtem jsonb; ky text; st text; nm text; no text; dk text; why text;
@@ -115,12 +144,23 @@ begin
    if payload <@ before_json and nm=(select name from public.sales_camp_registry where id=existing.camp_id) then continue; end if;
    if coalesce((item->>'event_revision')::integer,0)<>existing.revision then raise exception 'Deal changed in another session. Reload before saving.' using errcode='40001'; end if;
    cid:=existing.camp_id;
+   if nullif(item->>'camp_id','') is not null and (item->>'camp_id')::uuid<>cid then raise exception 'Existing deal camp identity cannot change';end if;
   else
    before_json:=null;
-   insert into public.sales_camp_registry(sales_user_id,name) values(new.user_id,nm) returning id into cid;
+   if nullif(item->>'camp_id','') is not null then
+    select id into cid from public.sales_camp_registry where id=(item->>'camp_id')::uuid and (sales_user_id=new.user_id or public.is_manager());
+    if cid is null then raise exception 'Camp selection not permitted' using errcode='42501';end if;
+    nm:=(select name from public.sales_camp_registry where id=cid);
+   else
+    perform pg_advisory_xact_lock(hashtext('sales-camp-name:'||lower(nm)));
+    if exists(select 1 from public.sales_camp_registry where lower(btrim(name))=lower(nm)) then raise exception 'Possible duplicate camp: select existing camp';end if;
+    insert into public.sales_camp_registry(sales_user_id,name) values(new.user_id,nm) returning id into cid;
+   end if;
   end if;
+  perform pg_advisory_xact_lock(hashtext('sales-camp:'||cid::text));
   select * into ev from public.sales_signed_events where sales_user_id=new.user_id and contract_key=ky for update;
   if ev.id is not null and (dt is distinct from ev.signed_date or no is distinct from ev.contract_number or dk is distinct from ev.document_key or nm is distinct from (select name from public.sales_camp_registry where id=cid)) then
+   if not public.is_manager() then raise exception 'Manager required for signing corrections' using errcode='42501';end if;
    if st<>'signed' then raise exception 'Signing corrections require signed status'; end if;
    if not campbox_internal.sales_fact_open(ev.signed_date) or not campbox_internal.sales_fact_open(dt) then raise exception 'Closed signing period: approved correction required'; end if;
    if length(why)<8 then raise exception 'Describe the correction reason (at least 8 characters)'; end if;
@@ -131,8 +171,8 @@ begin
   values(new.user_id,ky,cid,dk,no,st,dt,(payload->>'sent_date')::date,(payload->>'target_date')::date,(payload->>'next_contact')::date,payload->>'next_action',payload->>'blocker',payload->>'ball',new.report_date,auth.uid())
   on conflict(sales_user_id,contract_key) do update set document_key=excluded.document_key,contract_number=excluded.contract_number,status=excluded.status,signed_date=excluded.signed_date,sent_date=excluded.sent_date,target_date=excluded.target_date,next_contact=excluded.next_contact,next_action=excluded.next_action,blocker=excluded.blocker,ball=excluded.ball,source_report_date=excluded.source_report_date,updated_by=auth.uid(),updated_at=now(),revision=sales_deal_registry.revision+1 returning * into saved;
   if st='signed' then
-   insert into public.sales_signed_events(sales_user_id,contract_key,camp_id,document_key,contract_number,signed_date,recorded_by)
-   values(new.user_id,ky,cid,dk,no,dt,auth.uid())
+   insert into public.sales_signed_events(sales_user_id,contract_key,camp_id,document_key,contract_number,signed_date,recorded_by,plan_eligible)
+   values(new.user_id,ky,cid,dk,no,dt,auth.uid(),not exists(select 1 from public.sales_signed_events where camp_id=cid and state='confirmed' and plan_eligible))
    on conflict(sales_user_id,contract_key) do update set signed_date=excluded.signed_date,contract_number=excluded.contract_number,document_key=excluded.document_key,updated_at=now(),revision=sales_signed_events.revision+1
    where (sales_signed_events.signed_date,sales_signed_events.contract_number,sales_signed_events.document_key) is distinct from (excluded.signed_date,excluded.contract_number,excluded.document_key);
   end if;

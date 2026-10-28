@@ -5,4 +5,17 @@ await page.setViewportSize({width,height:900});await page.evaluate(({theme,scree
 await page.evaluate(()=>{v13Go('today');SalesFactUI.refresh();});assert.match(await page.locator('#sfHero').innerText(),/Подписано за месяц/);await page.locator('#sfHero [data-sf-facts]').focus();await page.keyboard.press('Enter');await page.locator('#sfInspector[open]').waitFor();assert.equal(await page.locator('#sfInspector tbody tr').count(),6);await page.keyboard.press('Escape');
 const before=await page.evaluate(()=>SalesFactUI.model().value);await page.evaluate(()=>{dayRows[0].connected_fact=999;recalc();});assert.equal(await page.evaluate(()=>SalesFactUI.model().value),before,'Launch fact cannot change signed sales');
 await page.evaluate(()=>document.documentElement.style.zoom=2);const size=await page.evaluate(()=>[document.documentElement.clientWidth,document.documentElement.scrollWidth]);assert.ok(size[1]<=size[0]+3,'200% overflow');
+await page.evaluate(()=>document.documentElement.style.zoom=1);
+await page.locator('#sfScope').selectOption('qa-sales');
+assert.equal(await page.evaluate(()=>SalesFactUI.model().value),3);
+assert.equal(await page.locator('#monthFactView').textContent(),'3');
+assert.equal(await page.evaluate(()=>{CampBoxReport.render();return CampBoxReport.snapshot.fact;}),3);
+await page.locator('#sfScope').selectOption('team');
+const failure=await page.evaluate(async()=>{const original=sb.from;const before=JSON.stringify(dayRows);sb.from=name=>{const q=original(name);if(name==='sales_signed_events')q.then=(resolve,reject)=>Promise.resolve({data:null,error:{message:'Synthetic registry outage'}}).then(resolve,reject);return q;};const result=await SalesFactUI.load(selectedMonth);recalc();const out={error:!!result.error,value:SalesFactUI.model().value,forecast:coachForecastData('team').forecast,preserved:before===JSON.stringify(dayRows)};sb.from=original;return out;});
+assert.deepEqual(failure,{error:true,value:null,forecast:null,preserved:true});
+assert.equal(await page.locator('#forecastView').textContent(),'—');
+assert.equal(await page.locator('#funnelSigning').textContent(),'—');
+assert.match(await page.locator('#funnelConv5').textContent(),/Не измеряется/);
+const incomplete=await page.evaluate(async()=>{const original=sb.from;sb.from=name=>{const q=original(name);if(name==='sales_fact_periods')q.then=(resolve,reject)=>Promise.resolve({data:[],error:null}).then(resolve,reject);return q;};await SalesFactUI.load(selectedMonth);recalc();CampBoxReport.render();const out={fact:SalesFactUI.model().value,report:CampBoxReport.snapshot.fact,forecast:CampBoxReport.snapshot.forecast};sb.from=original;return out;});
+assert.deepEqual(incomplete,{fact:null,report:null,forecast:null});
 console.log('PASS signed-fact browser:',checks.length,'states, keyboard drill-down, source isolation and 200% zoom');}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

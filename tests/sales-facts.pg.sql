@@ -61,6 +61,8 @@ do $$begin
 end$$;
 update daily_sales set comment=comment where report_date='2026-10-28';
 do $$begin if (select count(*) from sales_signed_events)<>2 or (select count(*) from sales_fact_audit)<>2 then raise exception 'Repeat not idempotent';end if;end$$;
+-- Cross-period corrections require the manager.
+select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
 -- Cross-period change, with optimistic revision and correction reason.
 update daily_sales set comment=jsonb_set(jsonb_set(jsonb_set(comment::jsonb,'{contracts,0,signed_date}','"2026-09-30"'),'{contracts,0,event_revision}','1'),'{contracts,0,correction_reason}','"Correct actual signature date"')::text where report_date='2026-10-28';
 do $$begin if (select count(*) from sales_signed_events where signed_date='2026-09-30')<>1 or (select count(*) from sales_signed_events where signed_date='2026-10-28')<>1 then raise exception 'Date move wrong';end if;end$$;
@@ -135,3 +137,27 @@ do $$begin
  if exists(select 1 from sales_signed_events where contract_key='legacy-open') then raise exception 'Open deal created signature';end if;
  if not exists(select 1 from sales_deal_registry where contract_key='legacy-open' and next_action='Call director') then raise exception 'Open deal lost next action';end if;
 end$$;
+-- Same camp under another deal id is a repeat, not another new-camp achievement.
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
+do $$declare cid uuid; begin
+ select camp_id into cid from sales_deal_registry where contract_key='legacy-approved';
+ insert into daily_sales(report_date,user_id,comment) values('2026-10-24',auth.uid(),jsonb_build_object('__type','daily_reflection','contracts',jsonb_build_array(jsonb_build_object('id','repeat-camp','camp_id',cid,'client','Legacy Camp','status','signed','signed_date','2026-10-24','contract_number','NEW-DOC')))::text);
+ if not exists(select 1 from sales_signed_events where contract_key='repeat-camp' and not plan_eligible) then raise exception 'Repeat increased new-camp plan';end if;
+ begin
+ insert into daily_sales(report_date,user_id,comment) values('2026-10-23',auth.uid(),'{"__type":"daily_reflection","contracts":[{"id":"duplicate-camp","client":"Legacy Camp","status":"signing"}]}');raise exception 'FAIL duplicate camp accepted';
+ exception when others then if sqlerrm like 'FAIL%' then raise;end if;end;
+end$$;
+-- Next month operations are manager-only and audited; stale updates fail.
+set role authenticated;
+do $$begin
+ begin perform public.set_sales_period((date_trunc('month',current_date)+interval '1 month')::date,false,0,'Open next month for work');raise exception 'FAIL employee opens month';exception when insufficient_privilege then null;end;
+end$$;
+select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
+do $$declare next_month date:=(date_trunc('month',current_date)+interval '1 month')::date;begin
+ perform public.set_sales_period(next_month,false,0,'Open next month for work');
+ if not exists(select 1 from sales_fact_periods where month=next_month and not closed and reconciled) then raise exception 'Next month not open';end if;
+ perform public.set_sales_period(next_month,true,1,'Close after reconciliation');
+ begin perform public.set_sales_period(next_month,false,1,'Stale concurrent opening');raise exception 'FAIL stale period update accepted';exception when serialization_failure then null;end;
+ if (select count(*) from sales_period_audit where month=next_month)<>2 then raise exception 'Period audit missing';end if;
+end$$;
+reset role;

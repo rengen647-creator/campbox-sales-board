@@ -29,8 +29,8 @@ function coachForecastData(userId){
   var day=Number(selectedDate.slice(8,10));
   var wdDone=Math.max(1,workdaysThrough(selectedMonth,day));
   var need=Math.ceil(target*wdDone/wdTotal);
-  var forecast=Math.round(fact/wdDone*wdTotal);
-  var risk=Math.max(target-forecast,0);
+  var forecast=fact===null?null:Math.round(fact/wdDone*wdTotal);
+  var risk=forecast===null?null:Math.max(target-forecast,0);
   return {target:target,fact:fact,wdTotal:wdTotal,wdDone:wdDone,need:need,forecast:forecast,risk:risk};
 }
 function coachConversionRows(rows){
@@ -106,7 +106,7 @@ function coachReasonsData(userId){
   return Array.from(map.entries()).sort(function(a,b){return b[1]-a[1];});
 }
 function coachContractRisk(userId){
-  var all=activeContractEntries().filter(function(c){return userId==='team'||c.user_id===userId;});
+  var all=SalesFactUI.pipeline(userId).open.map(function(c){return Object.assign({},c,{id:c.contract_key,user_id:c.sales_user_id,client:SalesFactUI.campName(c.camp_id),age:contractAge(c)});});
   var over7=all.filter(function(c){return c.age>7;}).length;
   var over3=all.filter(function(c){return c.age>=4&&c.age<=7;}).length;
   var late=all.filter(function(c){return (c.next_contact&&c.next_contact<selectedDate)||(c.target_date&&c.target_date<selectedDate);}).length;
@@ -198,7 +198,7 @@ function coachAutoPlan(userId){
     var plan=baseline;
     var uplift=0,pressure=baseline?1:0;
     var shortReason='база '+baseline+(backlog?', отставание '+backlog+' отдельно':'');
-    var reason='Рабочий дневной план: '+baseline+' ('+base.src+'). За прошедшие рабочие дни по стабильной базе '+plannedBefore+', факт '+factBefore+', отставание '+backlog+'. Рекомендуемый темп восстановления '+goalRate+' в день и дополнительно '+backlogAdd+' в день для компенсации долга показываются справочно, но не увеличивают обязательный план. Месячная цель подключений '+target+' учитывается отдельно.';
+    var reason='Рабочий дневной план: '+baseline+' ('+base.src+'). За прошедшие рабочие дни по стабильной базе '+plannedBefore+', факт '+factBefore+', отставание '+backlog+'. Рекомендуемый темп восстановления '+goalRate+' в день и дополнительно '+backlogAdd+' в день для компенсации долга показываются справочно, но не увеличивают обязательный план. Месячная цель новых лагерей '+target+' учитывается отдельно.';
     metrics[k]={plan:plan,requiredMonth:baseline*wdTotal,factBefore:factBefore,plannedBefore:plannedBefore,backlog:backlog,remainingNeed:remainingNeed,remainingDays:remaining,baseline:baseline,uplift:uplift,pressure:pressure,shortReason:shortReason,reason:reason,advisoryRate:goalRate};
   });
   return {userId:userId,target:target,remainingDays:remaining,source:'стабильный дневной норматив (без переноса долга в план)',ratios:ratios,metrics:metrics};
@@ -264,7 +264,7 @@ function coachPriorityData(userId,diag,fd,cr){
       text:'Активных договоров '+cr.all.length+'; старше 7 дней — '+cr.over7+'; с просроченной датой — '+cr.late+'.'
     });
   }
-  if(out.length<3&&fd.forecast<fd.target){
+  if(out.length<3&&fd.forecast!==null&&fd.forecast<fd.target){
     out.push({
       tone:fd.risk>1?'bad':'warn',
       title:'Риск месяца: '+fd.forecast+' из '+fd.target,
@@ -307,12 +307,12 @@ function renderSalesCoach(){
   var prio=coachPriorityData(uid,diag,fd,cr);
   $('coachTarget').textContent=fd.target;
   $('coachTargetNote').textContent=uid==='team'?'цель команды':'KPI менеджера';
-  $('coachFact').textContent=fd.fact;
+  $('coachFact').textContent=fd.fact??'—';
   $('coachNeed').textContent=fd.need;
-  $('coachForecast').textContent=fd.forecast;
-  $('coachRisk').textContent=fd.risk?'-'+fd.risk:'0';
-  $('coachRiskNote').textContent=fd.risk?'ожидаемый недобор при текущем темпе':'по текущему темпу риска нет';
-  var tone=fd.forecast>=fd.target?'good':fd.risk<=1?'warn':'bad';
+  $('coachForecast').textContent=fd.forecast??'—';
+  $('coachRisk').textContent=fd.risk===null?'—':fd.risk?'-'+fd.risk:'0';
+  $('coachRiskNote').textContent=fd.risk===null?'Нет сверенных данных':fd.risk?'ожидаемый недобор при текущем темпе':'по текущему темпу риска нет';
+  var tone=fd.forecast===null?'warn':fd.forecast>=fd.target?'good':fd.risk<=1?'warn':'bad';
   $('coachForecastCard').className='coach-kpi '+tone;
   $('coachRiskCard').className='coach-kpi '+tone;
   var weak=diag.filter(function(x){return x.tone!=='good';}).sort(function(a,b){return a.score-b.score;})[0];
@@ -343,10 +343,10 @@ function renderSalesCoach(){
   if(isManager()){
     $('coachTeam').innerHTML=profiles.map(function(p){
       var d=coachForecastData(p.id);
-      var pt=d.forecast>=d.target?'good':d.risk<=1?'warn':'bad';
+      var pt=d.forecast===null?'warn':d.forecast>=d.target?'good':d.risk<=1?'warn':'bad';
       return '<div class="coach-person" data-coach-user="'+esc(p.id)+'" onclick="setCoachUser(this.dataset.coachUser)">'+
-        '<div class="coach-person-head"><div><h3>'+esc(p.full_name||p.email||'Сотрудник')+'</h3><small>нажми для диагностики</small></div><span class="pill '+pt+'">'+(d.forecast>=d.target?'по плану':'риск')+'</span></div>'+
-        '<div class="coach-person-kpis"><div><span>Факт</span><b>'+d.fact+'/'+d.target+'</b></div><div><span>Прогноз</span><b>'+d.forecast+'/'+d.target+'</b></div><div><span>До цели</span><b>'+Math.max(d.target-d.fact,0)+'</b></div></div>'+
+        '<div class="coach-person-head"><div><h3>'+esc(p.full_name||p.email||'Сотрудник')+'</h3><small>нажми для диагностики</small></div><span class="pill '+pt+'">'+(d.forecast===null?'Нет сверенных данных':d.forecast>=d.target?'по плану':'риск')+'</span></div>'+
+        '<div class="coach-person-kpis"><div><span>Факт</span><b>'+(d.fact??'—')+'/'+d.target+'</b></div><div><span>Прогноз</span><b>'+(d.forecast??'—')+'/'+d.target+'</b></div><div><span>До цели</span><b>'+(d.fact===null?'—':Math.max(d.target-d.fact,0))+'</b></div></div>'+
         '<div class="coach-person-diagnosis">'+esc(coachWorstLabel(p.id))+'</div></div>';
     }).join('');
   }

@@ -229,7 +229,7 @@
     screen('report').appendChild(rep);
     ['v13ReportPeriod','v13ReportType'].forEach(function(id){document.getElementById(id).addEventListener('change',renderReport);});
     document.getElementById('v13BuildReport').addEventListener('click',renderReport);
-    document.getElementById('v13PdfReport').addEventListener('click',function(){renderReport();document.body.classList.add('v13-print-report');window.print();setTimeout(function(){document.body.classList.remove('v13-print-report');},300);});
+    document.getElementById('v13PdfReport').addEventListener('click',function(){renderReport();if(window.SalesFactUI&&SalesFactUI.model().value===null){alert('PDF недоступен: факт подписаний не загружен или период не сверён.');return;}document.body.classList.add('v13-print-report');window.print();setTimeout(function(){document.body.classList.remove('v13-print-report');},300);});
     document.getElementById('v13ExcelReport').textContent='Excel · дашборд';
     document.getElementById('v13ExcelReport').addEventListener('click',function(){
       if(window.CampBoxReport) return window.CampBoxReport.excel();
