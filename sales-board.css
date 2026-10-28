@@ -2035,3 +2035,13 @@ html.sf-enabled .sf-action-grid{display:grid!important;grid-template-columns:min
 html.sf-enabled .sf-action-grid>.cb-command-side{display:none!important}
 .sf-deal-workspace{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:24px;margin-top:20px}.sf-master{display:flex;flex-direction:column;gap:1px}.sf-master button{background:var(--os-raised);color:var(--os-text);padding:16px;border:0;border-bottom:1px solid var(--os-border);display:flex;flex-direction:column;gap:6px;text-align:left}.sf-master button[aria-pressed=true]{border-left:4px solid #2879ba}.sf-dossier{border-left:1px solid var(--os-border);padding-left:24px;min-width:0}.sf-dossier>.primary{position:sticky;top:12px}.sf-surface select{max-width:100%}
 @media(max-width:768px){html.sf-enabled .sf-action-grid,.sf-deal-workspace{grid-template-columns:minmax(0,1fr)!important}.sf-dossier{border-left:0;border-top:1px solid var(--os-border);padding:16px 0}.sf-master{max-height:320px;overflow:auto}}
+/* Let the chart's own scroll viewport shrink inside the monthly CSS grid. */
+.sf-studio > *, .sf-diagnostics > *, .sf-deal-workspace > * {min-width:0;max-width:100%}
+.sf-surface .os3-chart-scroll {max-width:100%;overflow-x:auto}
+.sf-surface {overflow-wrap:anywhere}
+.salary-commission-timeline {padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px}
+.salary-month-track {display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin:8px 0}
+.salary-month-track.retention {grid-template-columns:repeat(6,minmax(0,1fr))}
+.salary-month-track span {text-align:center;border:1px solid var(--border);border-radius:5px;padding:6px 0}
+.salary-month-track .current {outline:2px solid #4088ed;font-weight:800}
+.salary-month-track .elapsed,.salary-month-track .retained {background:rgba(35,150,100,.2)}

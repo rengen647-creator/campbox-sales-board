@@ -363,6 +363,12 @@
     events.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
     return '<details class="os3-disclosure"><summary>История договоров, пауз и удержания</summary><ol class="salary-timeline">'+events.map(e=>'<li class="salary-event"><time>'+dateRu(e.date)+'</time><span>'+esc(e.label)+'</span></li>').join('')+'</ol>'+(events.length?'':'<p>Событий пока нет.</p>')+'</details>';
   }
+  function commissionTimeline(prod,c,date){
+    const idx=monthIndexActive(prod,c,date),retained=retentionAt(c.id,date,c.contractor_id),paused=pausedOn(c.id,date);
+    const cells=Array.from({length:12},(_,i)=>'<span class="'+(idx===i+1?'current':idx>i+1?'elapsed':'future')+'" aria-label="Основной период, месяц '+(i+1)+(idx===i+1?', текущий':'')+'">'+(i+1)+'</span>').join('');
+    const retentionCells=Array.from({length:6},(_,i)=>'<span class="'+(retained?'retained':'future')+'" aria-label="Удержание, месяц '+(i+1)+(retained?'':' — ещё не подтверждено')+'">+'+(i+1)+'</span>').join('');
+    return '<div class="salary-commission-timeline"><p>12 месяцев мотивации'+(paused?' · пауза':'')+'</p><div class="salary-month-track">'+cells+'</div><p>6 месяцев после успешного удержания'+(retained?' · до '+dateRu(retentionEnd(retained)):' · пока не подтверждено')+'</p><div class="salary-month-track retention">'+retentionCells+'</div><small>Шкала показывает период мотивации, а не выплату зарплаты. Паузы отражены в истории ниже.</small></div>';
+  }
   function renderMine(){
     const box=q('salaryMine');if(!box)return;if(!S.schemaReady){box.innerHTML='';return}
     const rows=mineRows(),t=totals(rows),amounts=salaryStatusTotals(rows),status=S.month<currentMonth()?'Закрытый период':'Предварительно';
@@ -390,7 +396,7 @@
           '<div><span>Контракторство</span><b>'+money(t.contract)+'</b></div><div><span>CampBox</span><b>'+money(t.campbox)+'</b></div><div><span>Доп. продукты</span><b>'+money(t.products)+'</b></div><div><span>Сайты / сопровождение</span><b>'+money(t.site)+'</b></div><div><span>1% руководителю</span><b>'+money(t.head)+'</b></div>'+
         '</div></div></div>'+
         '<div class="salary-card"><div class="salary-head"><div><h2>Действующие периоды мотивации</h2><p>12 месяцев с учётом пауз и успешных удержаний.</p></div></div><div class="salary-body"><div class="salary-timeline">'+
-          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),retained=retentionAt(c.id,S.month+'-28',c.contractor_id),end=retained?retentionEnd(retained):commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':retained?'успешное удержание':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
+          (activeProducts.length?activeProducts.map(p=>{const c=contract(p.contract_id),cc=contractClient(c),retained=retentionAt(c.id,S.month+'-28',c.contractor_id),end=retained?retentionEnd(retained):commissionEnd(p.first_payment_date,c.id),idx=monthIndexActive(p,c,S.month+'-28');return '<div class="salary-event"><time>'+dateRu(p.first_payment_date)+'</time><div><b>'+esc(cc?.client_name||'')+' · '+esc(PRODUCTS[p.product_type]?.short||p.product_type)+'</b><small>договор '+dateRu(c.signed_date)+' · '+(c.status==='paused'?'мотивация на паузе':retained?'успешное удержание':'месяц '+(idx||1)+' из 12')+'</small></div><span class="salary-pill '+(c.status==='paused'?'warn':'good')+'">до '+dateRu(end)+'</span></div>'+commissionTimeline(p,c,S.month+'-28')}).join(''):'<div class="salary-empty">Нет активных 12-месячных периодов.</div>')+
         '</div></div></div>'+
       '</div>'+
       contractingPanel(currentUser.id)+
