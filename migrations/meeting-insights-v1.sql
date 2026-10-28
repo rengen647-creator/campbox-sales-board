@@ -46,20 +46,24 @@ alter table public.meeting_analyses enable row level security;
 revoke all on public.meeting_analyses from anon, authenticated;
 grant select, insert, update, delete on public.meeting_analyses to authenticated;
 
+drop policy if exists meeting_analyses_read on public.meeting_analyses;
 create policy meeting_analyses_read on public.meeting_analyses
 for select to authenticated using (
   public.is_active_user() and (manager_id=auth.uid() or public.is_manager())
 );
+drop policy if exists meeting_analyses_insert on public.meeting_analyses;
 create policy meeting_analyses_insert on public.meeting_analyses
 for insert to authenticated with check (
   public.is_active_user() and (manager_id=auth.uid() or public.is_manager())
   and created_by=auth.uid()
 );
+drop policy if exists meeting_analyses_update on public.meeting_analyses;
 create policy meeting_analyses_update on public.meeting_analyses
 for update to authenticated using (
   public.is_active_user() and (manager_id=auth.uid() or public.is_manager())
 ) with check (
   public.is_active_user() and (manager_id=auth.uid() or public.is_manager())
 );
+drop policy if exists meeting_analyses_delete on public.meeting_analyses;
 create policy meeting_analyses_delete on public.meeting_analyses
 for delete to authenticated using (public.is_manager());
