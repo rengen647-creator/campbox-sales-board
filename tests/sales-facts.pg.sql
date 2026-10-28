@@ -95,3 +95,23 @@ do $$begin
  if not exists(select 1 from sales_handoff_statuses where contract_key='outage' and state='error') then raise exception 'CSM failure not visible';end if;
 end$$;
 select 'PASS signed registry, cross-month correction, idempotency, common document, termination, closed period, role boundaries, CSM outage and no salary writes';
+
+-- Explicit void is manager-only, audited, revision guarded and period guarded.
+select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',false);
+set role authenticated;
+do $$begin
+ begin perform public.void_sales_signed_event('00000000-0000-4000-8000-000000000000',1,'Testing employee restriction');raise exception 'FAIL employee correction allowed';exception when insufficient_privilege then null;end;
+end$$;
+reset role;
+update profiles set role='manager' where id='22222222-2222-4222-8222-222222222222';
+set role authenticated;
+do $$declare e public.sales_signed_events%rowtype; begin
+ select * into e from sales_signed_events where signed_date='2026-09-30';
+ begin perform public.void_sales_signed_event(e.id,e.revision,'Wrong camp signed in September');raise exception 'FAIL closed void accepted';exception when others then if sqlerrm like 'FAIL%' then raise;end if;end;
+ select * into e from sales_signed_events where contract_key='outage';
+ begin perform public.void_sales_signed_event(e.id,0,'Wrong camp signed in October');raise exception 'FAIL stale void accepted';exception when serialization_failure then null;end;
+ perform public.void_sales_signed_event(e.id,e.revision,'Wrong camp signed in October');
+ if not exists(select 1 from sales_signed_events where id=e.id and state='void') then raise exception 'Void did not persist';end if;
+ if not exists(select 1 from sales_fact_audit where contract_key=e.contract_key and after_value->>'state'='void' and actor_id=auth.uid()) then raise exception 'Void audit missing';end if;
+end$$;
+reset role;

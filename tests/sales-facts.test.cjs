@@ -9,3 +9,7 @@ assert.equal(aggregate({...args,events:[e('terminated','2026-10-03',{deal_status
 assert.equal(pipeline([],{start:'2026-10-01',end:'2026-10-28',asOf:'2026-10-28'}).conversion,null);
 const p=pipeline([{sales_user_id:'a',contract_key:'a',sent_date:'2026-10-01',source_report_date:'2026-10-01',status:'signed',revision:1},{sales_user_id:'a',contract_key:'b',sent_date:'2026-09-01',source_report_date:'2026-10-01',status:'signing',revision:1}],{start:'2026-10-01',end:'2026-10-28',asOf:'2026-10-28',events});assert.equal(p.open.length,1);assert.equal(p.started.length,1);
 console.log('PASS signed sales: identity, common document number, corrected dates, termination, void, future cutoff, scope, missing source and cohorts');
+
+assert.equal(p.cohortSigned.length,1);assert.equal(p.conversion,100);
+assert.equal(pipeline([],{start:"2026-10-01",end:"2026-10-31",asOf:"2026-10-28",events}).signed.length,2);
+assert.equal(pipeline([],{start:"2026-10-01",end:"2026-10-31",asOf:"2026-10-28",events:[...events,e("a","2026-10-01",{revision:2,state:"void"})]}).signed.length,1);

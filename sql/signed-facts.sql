@@ -57,6 +57,28 @@ language sql stable security definer set search_path='' as $f$
 $f$;
 revoke all on function campbox_internal.sales_fact_open(date) from public,anon,authenticated;
 
+-- Explicit correction only: never delete the event or silently reopen a period.
+create function public.void_sales_signed_event(event_id uuid, expected_revision integer, correction_reason text)
+returns void language plpgsql security definer set search_path='' as $f$
+declare ev public.sales_signed_events%rowtype;
+begin
+ if auth.uid() is null or not public.is_active_user() or not public.is_manager() then
+  raise exception 'Active manager required' using errcode='42501';
+ end if;
+ if length(btrim(coalesce(correction_reason,'')))<8 then raise exception 'Correction reason required'; end if;
+ select * into ev from public.sales_signed_events where id=event_id for update;
+ if ev.id is null then raise exception 'Signing event not found'; end if;
+ if ev.revision<>expected_revision then raise exception 'Event changed. Reload before correcting.' using errcode='40001'; end if;
+ if ev.state='void' then return; end if;
+ if not campbox_internal.sales_fact_open(ev.signed_date) then raise exception 'Closed signing period: approved correction required'; end if;
+ update public.sales_signed_events set state='void',revision=revision+1,updated_at=now() where id=event_id;
+ insert into public.sales_fact_audit(sales_user_id,contract_key,actor_id,reason,before_value,after_value)
+ values(ev.sales_user_id,ev.contract_key,auth.uid(),btrim(correction_reason),to_jsonb(ev),
+ (select to_jsonb(e) from public.sales_signed_events e where id=event_id));
+end $f$;
+revoke all on function public.void_sales_signed_event(uuid,integer,text) from public,anon,authenticated;
+grant execute on function public.void_sales_signed_event(uuid,integer,text) to authenticated;
+
 create function campbox_internal.sync_sales_fact() returns trigger
 language plpgsql security definer set search_path='' as $f$
 declare doc jsonb; prevdoc jsonb; item jsonb; previtem jsonb; ky text; st text; nm text; no text; dk text; why text;
