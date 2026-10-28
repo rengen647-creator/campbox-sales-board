@@ -11,6 +11,8 @@ select l.user_id,l.item->>'id' contract_key,l.item->>'client' camp_name,l.item->
  l.item->>'signed_date' sales_signed_date,l.item->>'contract_number' document_number,
  h.salary_client_id,h.state handoff_state,sc.id salary_cycle_id,sc.signed_date salary_signed_date,
  sc.contractor_id salary_owner,sc.status salary_status,
+ cl.client_name finance_client_name,cl.signed_date client_signed_date,c.name csm_name,c.contract_number csm_document,
+ (select sum(coalesce(d.connected_fact,0)) from public.daily_sales d where d.user_id=l.user_id and date_trunc('month',d.report_date)=date_trunc('month',case when pg_input_is_valid(l.item->>'signed_date','date') then (l.item->>'signed_date')::date end)) manual_launches_same_month,
  case when coalesce(l.item->>'id','')='' then 'missing_deal_id'
  when not pg_input_is_valid(l.item->>'signed_date','date') then 'invalid_signed_date'
  when sc.id is null then 'no_financial_cycle__not_an_error_for_sales'
@@ -22,5 +24,7 @@ select l.user_id,l.item->>'id' contract_key,l.item->>'client' camp_name,l.item->
 from latest l
 left join campbox_internal.sales_signed_handoffs h on h.sales_user_id=l.user_id and h.contract_key=l.item->>'id'
 left join public.salary_contracts sc on sc.sales_source_user_id=l.user_id and sc.sales_source_contract_key=l.item->>'id'
+left join public.salary_clients cl on cl.id=h.salary_client_id
+left join public.csm_camps c on c.sales_client_id=cl.id
 where l.item->>'status'='signed'
 order by l.user_id,l.item->>'id',sc.id;

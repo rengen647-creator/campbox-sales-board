@@ -115,3 +115,14 @@ do $$declare e public.sales_signed_events%rowtype; begin
  if not exists(select 1 from sales_fact_audit where contract_key=e.contract_key and after_value->>'state'='void' and actor_id=auth.uid()) then raise exception 'Void audit missing';end if;
 end$$;
 reset role;
+-- Reviewed historical mapping: source drift rejected; repeat imports no extra fact.
+\ir ../sql/approved-signed-backfill.sql
+alter table public.daily_sales disable trigger ab_daily_sales_signed_fact;
+insert into daily_sales(report_date,user_id,comment) values('2026-10-26','11111111-1111-4111-8111-111111111111','{"__type":"daily_reflection","contracts":[{"id":"legacy-approved","client":"Legacy Camp","status":"signed","signed_date":"2026-10-26","contract_number":"LEGACY-1"}]}');
+alter table public.daily_sales enable trigger ab_daily_sales_signed_fact;
+do $$declare m jsonb:='[{"sales_user_id":"11111111-1111-4111-8111-111111111111","contract_key":"legacy-approved","camp_name":"Legacy Camp","signed_date":"2026-10-26","contract_number":"LEGACY-1"}]';n integer; begin
+ begin perform pg_temp.import_approved_signed_facts(jsonb_set(m,'{0,signed_date}','"2026-10-25"'),'22222222-2222-4222-8222-222222222222');raise exception 'FAIL changed source accepted';exception when others then if sqlerrm like 'FAIL%' then raise;end if;end;
+ n:=pg_temp.import_approved_signed_facts(m,'22222222-2222-4222-8222-222222222222');if n<>1 then raise exception 'Import count wrong';end if;
+ n:=pg_temp.import_approved_signed_facts(m,'22222222-2222-4222-8222-222222222222');if n<>0 then raise exception 'Repeat imported twice';end if;
+ if (select count(*) from salary_contracts)<>0 then raise exception 'Backfill created salary cycle';end if;
+end$$;
