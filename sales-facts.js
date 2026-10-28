@@ -15,8 +15,10 @@ function aggregate({events=[],month,cutoff,scope='team',target=0,min=0,max=0,ava
 function pipeline(deals,{start,end,asOf,events=[]}){
  const latest=new Map();for(const d of deals){if(d.source_report_date>asOf)continue;const k=d.sales_user_id+'|'+d.contract_key;const p=latest.get(k);if(!p||+d.revision>+p.revision)latest.set(k,d);}
  const eventMap=new Map();for(const e of events){const k=e.sales_user_id+'|'+e.contract_key,p=eventMap.get(k);if(!p||Number(e.revision||0)>Number(p.revision||0))eventMap.set(k,e);}
- const all=[...latest.values()],open=all.filter(d=>d.status==='signing'),started=all.filter(d=>d.sent_date>=start&&d.sent_date<=end),keys=new Set(started.map(d=>d.sales_user_id+'|'+d.contract_key)),signed=[...eventMap.values()].filter(e=>e.state==='confirmed'&&e.plan_eligible!==false&&validDate(e.signed_date)&&e.signed_date>=start&&e.signed_date<=end&&e.signed_date<=asOf),cohortSigned=signed.filter(e=>keys.has(e.sales_user_id+'|'+e.contract_key));
- return {open,started,signed,cohortSigned,conversion:started.length?100*cohortSigned.length/started.length:null,formula:'Подписанные из начатых в периоде / все начатые в периоде',start,end,asOf};
+ const knownCamps=new Set([...eventMap.values()].filter(e=>e.camp_id&&e.state==='confirmed'&&e.plan_eligible!==false&&e.signed_date<=asOf).map(e=>e.camp_id));
+ const isNewCamp=d=>{const e=eventMap.get(d.sales_user_id+'|'+d.contract_key);return e?e.plan_eligible!==false:!knownCamps.has(d.camp_id);};
+ const all=[...latest.values()],open=all.filter(d=>d.status==='signing'),newCampOpen=open.filter(isNewCamp),started=all.filter(d=>d.sent_date>=start&&d.sent_date<=end&&isNewCamp(d)),keys=new Set(started.map(d=>d.sales_user_id+'|'+d.contract_key)),signed=[...eventMap.values()].filter(e=>e.state==='confirmed'&&e.plan_eligible!==false&&validDate(e.signed_date)&&e.signed_date>=start&&e.signed_date<=end&&e.signed_date<=asOf),cohortSigned=signed.filter(e=>keys.has(e.sales_user_id+'|'+e.contract_key));
+ return {open,newCampOpen,started,signed,cohortSigned,conversion:started.length?100*cohortSigned.length/started.length:null,formula:'Подписанные из начатых в периоде / все начатые в периоде',start,end,asOf};
 }
 root.CampBoxSalesFacts={aggregate,pipeline,validDate,workdays};if(typeof module!=='undefined')module.exports=root.CampBoxSalesFacts;
 })(typeof window==='undefined'?globalThis:window);

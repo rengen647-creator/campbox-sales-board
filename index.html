@@ -326,7 +326,7 @@ const metricKeys=['calls','booked','meetings','offers','follow','connected'];
 const activityKeys=['calls','booked','meetings','offers','follow'];
 const metricLabels={calls:'Звонки',booked:'Назначено встреч',meetings:'Проведено встреч',offers:'КП / расчёты',follow:'Повторные контакты',connected:'Подключено лагерей'};
 let sb=null,currentUser=null,currentProfile=null,selectedMonth='',selectedDate='',profiles=[],dayRows=[],monthRows=[],monthSignedContracts=[],prevMonthRows=[],checkpoints=[],monthSettings={},daySettings={};
-let saveTimer=null,isLoading=false,reflectionUserId=null,reflectionReasons=[],activeActivityMetric='calls',contractUserId=null,contractDraft=[],handoffStates=new Map(),handoffStatusError='',coachUserId='team';
+let saveTimer=null,dailyDraftDirty=false,isLoading=false,reflectionUserId=null,reflectionReasons=[],activeActivityMetric='calls',contractUserId=null,contractDraft=[],handoffStates=new Map(),handoffStatusError='',coachUserId='team';
 const PERSONAL_MONTH_TARGET=5;
 const reasonOptions=['Нет блокеров','Не дозвонился','Перенесли','Нет ЛПР','Ждём решение','Цена','Тех. вопрос','Договор у юристов','Нет времени / ресурса','Другое'];
 const tomorrowActions=['Позвонить','Назначить встречу','Провести встречу','Отправить КП','Повторный контакт','Дожать договор','Дожать решение'];
@@ -447,7 +447,8 @@ async function loadAll(){
     ]);
     const err=pe||mse||dse||dre||mre||pmre||cpe;if(err)throw err;
     profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];monthSignedContracts=signed||[];prevMonthRows=pmr||[];checkpoints=cp||[];
-    const byUser=Object.fromEntries((dr||[]).map(r=>[r.user_id,r]));
+    const retainedDrafts=dailyDraftDirty?dayRows.filter(r=>r.report_date===selectedDate):[];
+    const byUser=Object.fromEntries([...(dr||[]),...retainedDrafts].map(r=>[r.user_id,r]));
     dayRows=profiles.map(pr=>byUser[pr.id]||blankSales(pr.id,selectedDate,carryForwardContracts(pr.id,selectedDate)));
     if(!isManager())coachUserId=currentUser.id;else if(coachUserId!=='team'&&!profiles.some(p=>p.id===coachUserId))coachUserId='team';
     renderAll();setStatus(se?'Дневные данные загружены; факт подписаний недоступен':SalesFactUI.model().reconciled?'Все данные актуальны':'Дневные данные загружены; период не сверён',se?'bad':SalesFactUI.model().reconciled?'good':'warn');
@@ -708,7 +709,7 @@ function renderAttention(totals,overall){
 }
 function renderAnalytics(totals,overall){renderPersonal();renderPace();renderActivityChart();renderConversionChart();renderCalendarHeatmap();renderAttention(totals,overall);renderSalesCoach()}
 
-function changed(){if(isLoading)return;recalc();setStatus('Есть несохранённые изменения');clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveCurrent(false),900)}
+function changed(){if(isLoading)return;dailyDraftDirty=true;recalc();setStatus('Есть несохранённые изменения');clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveCurrent(false),900)}
 async function saveCurrent(manual=false){
   if(!currentProfile?.active)return;clearTimeout(saveTimer);setStatus('Сохранение…');
   try{
@@ -722,7 +723,7 @@ async function saveCurrent(manual=false){
       for(const cp of checkpoints){const payload={month:monthStart(selectedMonth),checkpoint_date:cp.checkpoint_date,plan:num(cp.plan),fact:num(cp.fact),comment:cp.comment||'',updated_by:currentUser.id};tasks.push(cp.id?sb.from('checkpoints').update(payload).eq('id',cp.id):sb.from('checkpoints').insert(payload));}
     }
     const results=await Promise.all(tasks);const bad=results.find(r=>r.error);if(bad?.error)throw bad.error;
-    setStatus(manual?'Сохранено вручную':'Автосохранение','good');await loadMonthOnly();return true;
+    dailyDraftDirty=false;setStatus(manual?'Сохранено вручную':'Автосохранение','good');await loadMonthOnly();return true;
   }catch(e){console.error(e);setStatus('Ошибка сохранения','bad');if(manual)alert('Не удалось сохранить: '+e.message);return false}
 }
 function normalizeSales(r){const o={report_date:selectedDate,user_id:r.user_id,comment:r.comment||''};metricKeys.forEach(k=>{o[k+'_plan']=num(r[k+'_plan']);o[k+'_fact']=num(r[k+'_fact'])});return o}
@@ -733,7 +734,7 @@ function sum(rows,key){return rows.reduce((s,r)=>s+num(r[key]),0)}
 function renderSalesForecastScenarios(){
   const el=$('salesForecastScenarios');if(!el)return;
   const model=SalesFactUI.model(),fact=model.value;
-  const open=SalesFactUI.pipeline().open;
+  const open=SalesFactUI.pipeline().newCampOpen;
   const near=open.filter(c=>c.next_contact&&c.next_contact>=selectedDate&&c.next_action&&(!c.target_date||String(c.target_date).startsWith(selectedMonth)));
   const labels=[
     ['Подписано в месяце',fact??'Нет сверенных данных','Подтверждённый договор'],
@@ -761,7 +762,7 @@ function recalc(){
   const ids={calls:'totCalls',booked:'totBooked',meetings:'totMeetings',offers:'totOffers',follow:'totFollow'};Object.entries(ids).forEach(([k,id])=>$(id).textContent=`${totals[k+'P']} / ${totals[k+'F']}`);
   renderSalesPriorities();renderSalesForecastScenarios();
   const activeSigning=SalesFactUI.state.available?SalesFactUI.pipeline().open.length:null,monthSigning=SalesFactUI.model().value;$('totSigning').textContent=activeSigning===null?'—':String(activeSigning);$('totConnected').textContent=String(totals.connectedF);
-  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=SalesFactUI.model().value;$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact??'—';$('signingNowView').textContent=activeSigning??'—';$('forecastView').textContent=fact===null||activeSigning===null?'—':fact+activeSigning;const mp=fact===null?null:pct(fact,target);$('monthPercent').textContent=mp===null?'Нет сверенных данных':mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=fact===null?'—':Math.max(target-fact,0);$('todayFactView').textContent=fact===null?'—':SalesFactUI.model().events.filter(c=>c.signed_date===selectedDate).length;
+  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=SalesFactUI.model().value;$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact??'—';$('signingNowView').textContent=activeSigning??'—';$('forecastView').textContent=fact===null||activeSigning===null?'—':fact+SalesFactUI.pipeline().newCampOpen.length;const mp=fact===null?null:pct(fact,target);$('monthPercent').textContent=mp===null?'Нет сверенных данных':mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=fact===null?'—':Math.max(target-fact,0);$('todayFactView').textContent=fact===null?'—':SalesFactUI.model().events.filter(c=>c.signed_date===selectedDate).length;
   $('miniCalls').textContent=pct(totals.callsF,totals.callsP)+'%';$('miniMeetings').textContent=pct(totals.meetingsF,totals.meetingsP)+'%';$('miniFollow').textContent=pct(totals.followF,totals.followP)+'%';$('convCallMeet').textContent=pct(totals.bookedF,totals.callsF)+'%';$('convMeetOffer').textContent=pct(totals.offersF,totals.meetingsF)+'%';$('convOfferConnect').textContent='Не измеряется: запуски не связаны со сделками';
   const scores=activityKeys.filter(k=>totals[k+'P']>0).map(k=>Math.min(100,pct(totals[k+'F'],totals[k+'P'])));const overall=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;const day=$('dayStatus'),ts=$('teamStatus');if(!scores.length){day.className='pill warn';day.textContent='План активностей не заполнен';ts.className='pill warn';ts.textContent='Нет плана'}else{day.className='pill '+statusClass(overall);day.textContent=`Активности выполнены на ${overall}%`;ts.className='pill '+statusClass(overall);ts.textContent=`Активности: ${overall}%`}
   const reflectionDone=dayRows.filter(r=>reflectionState(r.comment).state==='done').length,reflectionAny=dayRows.filter(r=>reflectionState(r.comment).state!=='empty').length,reflectionEl=$('reflectionStatus');
@@ -770,8 +771,8 @@ function recalc(){
   renderAnalytics(totals,overall);
 }
 
-async function onMonthChange(){if(!isManager()){ $('reportMonth').value=selectedMonth;return }selectedMonth=$('reportMonth').value||monthISO();selectedDate=selectedMonth===monthISO()?todayISO():selectedMonth+'-01';$('reportDate').value=selectedDate;await loadAll()}
-async function onDateChange(){const d=$('reportDate').value;if(!d)return;if(!isManager()&&monthISO(d)!==monthISO()){alert('Сотрудник работает только с текущим месяцем.');$('reportDate').value=selectedDate;return}if(isManager()&&monthISO(d)!==selectedMonth){selectedMonth=monthISO(d);$('reportMonth').value=selectedMonth}selectedDate=d;await loadAll()}
+async function onMonthChange(){if(dailyDraftDirty&&!(await saveCurrent(true)))return;if(!isManager()){ $('reportMonth').value=selectedMonth;return }selectedMonth=$('reportMonth').value||monthISO();selectedDate=selectedMonth===monthISO()?todayISO():selectedMonth+'-01';$('reportDate').value=selectedDate;await loadAll()}
+async function onDateChange(){if(dailyDraftDirty&&!(await saveCurrent(true)))return;const d=$('reportDate').value;if(!d)return;if(!isManager()&&monthISO(d)!==monthISO()){alert('Сотрудник работает только с текущим месяцем.');$('reportDate').value=selectedDate;return}if(isManager()&&monthISO(d)!==selectedMonth){selectedMonth=monthISO(d);$('reportMonth').value=selectedMonth}selectedDate=d;await loadAll()}
 
 async function openAccess(){if(!isManager())return;$('accessModal').classList.remove('hidden');$('accessList').innerHTML='<div class="hint">Загрузка пользователей…</div>';const {data,error}=await sb.from('profiles').select('*').order('created_at');if(error){$('accessList').innerHTML='<div class="error">'+esc(error.message)+'</div>';return}renderAccess(data||[])}
 function closeAccess(){$('accessModal').classList.add('hidden')}

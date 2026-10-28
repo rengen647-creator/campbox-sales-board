@@ -16,6 +16,8 @@ assert.deepEqual(failure,{error:true,value:null,forecast:null,preserved:true});
 assert.equal(await page.locator('#forecastView').textContent(),'—');
 assert.equal(await page.locator('#funnelSigning').textContent(),'—');
 assert.match(await page.locator('#funnelConv5').textContent(),/Не измеряется/);
+const partial=await page.evaluate(async()=>{const original=sb.from,people=[...profiles];dailyDraftDirty=true;dayRows[0].calls_fact=137;sb.from=name=>{const q=original(name);if(name==='profiles')q.then=(resolve,reject)=>Promise.resolve({data:people,error:null}).then(resolve,reject);if(name==='sales_signed_events')q.then=(resolve,reject)=>Promise.resolve({data:null,error:{message:'Synthetic partial reload failure'}}).then(resolve,reject);return q;};await loadAll();const result={draft:dayRows[0].calls_fact,status:document.getElementById('saveStatus').textContent};sb.from=original;dailyDraftDirty=false;return result;});
+assert.equal(partial.draft,137);assert.match(partial.status,/факт подписаний недоступен/);
 const incomplete=await page.evaluate(async()=>{const original=sb.from;sb.from=name=>{const q=original(name);if(name==='sales_fact_periods')q.then=(resolve,reject)=>Promise.resolve({data:[],error:null}).then(resolve,reject);return q;};await SalesFactUI.load(selectedMonth);recalc();CampBoxReport.render();const out={fact:SalesFactUI.model().value,report:CampBoxReport.snapshot.fact,forecast:CampBoxReport.snapshot.forecast};sb.from=original;return out;});
 assert.deepEqual(incomplete,{fact:null,report:null,forecast:null});
 console.log('PASS signed-fact browser:',checks.length,'states, keyboard drill-down, source isolation and 200% zoom');}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
