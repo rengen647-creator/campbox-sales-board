@@ -1,13 +1,13 @@
 const CACHE = 'campbox-sales-signed-fact-2026-10-28';
 const SHELL = [
-  './sales-facts.js?v=20261028',
-  './signed-fact-ui.js?v=20261028',
-  './sales-board.css?v=20261027reqa',
+  './sales-facts.js?v=20261028signed',
+  './signed-fact-ui.js?v=20261028signed',
+  './sales-board.css?v=20261028signed',
   './', './index.html', './manifest.webmanifest', './icon.svg',
-  './sales-coach.js?v=20261019stableplan',
-  './os3-report.js?v=20261027qa2',
-  './ui-v13.js?v=20261027qa2',
-  './salary-v1.js?v=20261027reqa',
+  './sales-coach.js?v=20261028signed',
+  './os3-report.js?v=20261028signed',
+  './ui-v13.js?v=20261028signed',
+  './salary-v1.js?v=20261028signed',
   './finance-ledger.js?v=20261027qa2',
   './sales-visual-charts.js?v=20261027qa2',
   './sales-report-v2.js?v=20261013excelcheck',
@@ -16,7 +16,7 @@ const SHELL = [
   './ios-v3.js?v=20261027c',
   './ios-v4.js?v=20261027d',
   './os3-components.js?v=20261027qa2',
-  './os3-charts.js?v=20261027qa2',
+  './os3-charts.js?v=20261028signed',
   './os3-ui.js?v=20261027qa2',
 ];
 

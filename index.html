@@ -20,9 +20,9 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="./sales-facts.js?v=20261028"></script>
-  <script src="./signed-fact-ui.js?v=20261028" defer></script>
-  <script src="./sales-coach.js?v=20261019stableplan"></script>
+  <script src="./sales-facts.js?v=20261028signed"></script>
+  <script src="./signed-fact-ui.js?v=20261028signed" defer></script>
+  <script src="./sales-coach.js?v=20261028signed"></script>
 
 
 
@@ -35,9 +35,9 @@
 
 
 <script src="os3-components.js?v=20261027qa2"></script>
-<script src="os3-charts.js?v=20261027qa2"></script>
+<script src="os3-charts.js?v=20261028signed"></script>
 
-<link rel="stylesheet" href="sales-board.css?v=20261027reqa">
+<link rel="stylesheet" href="sales-board.css?v=20261028signed">
 </head>
 <body>
 
@@ -584,7 +584,7 @@ function renderContractDraft(canEdit=true){
       ${canEdit&&c.status!=='signed'&&c.status!=='terminated'?`<button class="btn danger" onclick="removeContractRow(${i})">Удалить</button>`:''}
     </div>
     <div class="contract-fields">
-      <div><label>Связь с документом (ID)</label><input value="${esc(c.document_key||c.id)}" onchange="updateContractDraft(${i},'document_key',this.value)" ${canEdit?'':'disabled'}><small>Для нескольких лагерей одного документа укажите одинаковый ID; у каждого лагеря своя строка сделки.</small></div><div><label>Причина исправления подписанного договора</label><input value="${esc(c.correction_reason||'')}" oninput="updateContractDraft(${i},'correction_reason',this.value)" ${canEdit?'':'disabled'}></div><div><label>Договор отправлен</label><input type="date" value="${esc(c.sent_date)}" onchange="updateContractDraft(${i},'sent_date',this.value)" ${canEdit?'':'disabled'}></div>
+      <div><label>Документ для лагеря</label><select onchange="updateContractDraft(${i},'document_key',this.value)" ${canEdit?'':'disabled'}>${SalesFactUI.documentOptions(c,contractDraft,contractUserId)}</select><small>Один документ может включать несколько самостоятельных лагерей.</small></div><div><label>Причина исправления подписанного договора</label><input value="${esc(c.correction_reason||'')}" oninput="updateContractDraft(${i},'correction_reason',this.value)" ${canEdit?'':'disabled'}></div><div><label>Договор отправлен</label><input type="date" value="${esc(c.sent_date)}" onchange="updateContractDraft(${i},'sent_date',this.value)" ${canEdit?'':'disabled'}></div>
       <div><label>Плановая подпись</label><input type="date" value="${esc(c.target_date)}" onchange="updateContractDraft(${i},'target_date',this.value)" ${canEdit?'':'disabled'}></div>
       <div><label>Номер договора ${c.status==='signed'?'* ':''}</label><input value="${esc(c.contract_number||'')}" oninput="updateContractDraft(${i},'contract_number',this.value)" placeholder="Номер из подписанного договора" ${canEdit?'':'disabled'} ${c.status==='signed'?'required':'' }></div>
       <div><label>Фактически подписан</label><input type="date" value="${esc(c.signed_date||'')}" onchange="updateContractDraft(${i},'signed_date',this.value)" ${canEdit?'':'disabled'} ${c.status==='signed'?'required':''}></div>
@@ -855,9 +855,9 @@ initPWA();
 })();
 </script>
 
-  <script src="./os3-report.js?v=20261027qa2"></script>
-  <script src="./ui-v13.js?v=20261027qa2"></script>
-  <script src="./salary-v1.js?v=20261027reqa"></script>
+  <script src="./os3-report.js?v=20261028signed"></script>
+  <script src="./ui-v13.js?v=20261028signed"></script>
+  <script src="./salary-v1.js?v=20261028signed"></script>
   <script src="./finance-ledger.js?v=20261027qa2"></script>
   <script src="./sales-visual-charts.js?v=20261027qa2"></script>
   <script src="./sales-report-v2.js?v=20261013excelcheck"></script>
