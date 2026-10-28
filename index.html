@@ -36,6 +36,7 @@
 <script src="os3-charts.js?v=20261027qa2"></script>
 
 <link rel="stylesheet" href="sales-board.css?v=20261027reqa">
+<link rel="stylesheet" href="./meeting-insights.css?v=20261028v1">
 </head>
 <body>
 
@@ -422,7 +423,7 @@ async function handleSession(session){
   $('currentUserRole').textContent=isManager()?'Руководитель':'Сотрудник';
   document.querySelectorAll('.manager-only').forEach(el=>el.classList.toggle('hidden',!isManager()));
   selectedMonth=monthISO();selectedDate=todayISO();$('reportMonth').value=selectedMonth;$('reportDate').value=selectedDate;
-  applyRoleUI();await loadAll();
+  applyRoleUI();await loadAll();if(window.MeetingInsights)await window.MeetingInsights.mount();
 }
 function applyRoleUI(){
   $('reportMonth').disabled=!isManager();
@@ -856,6 +857,7 @@ initPWA();
   <script src="./ios-v3.js?v=20261027c"></script>
   <script src="./ios-v4.js?v=20261027d"></script>
   <script src="./os3-ui.js?v=20261027qa2"></script>
+  <script src="./meeting-insights.js?v=20261028v1"></script>
 
 </body>
 </html>
