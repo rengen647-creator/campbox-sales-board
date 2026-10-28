@@ -131,9 +131,9 @@ function focus(comp){
 }
 function marketing(data){
  var themes=new Map();
- data.forEach(function(r){asArray(r.marketing_insights).forEach(function(x){
+ data.forEach(function(r){var seen=new Set();asArray(r.marketing_insights).forEach(function(x){
   if(!x||typeof x!=='object')return;
-  var topic=String(x.topic||'Другое').trim().slice(0,120),key=topic.toLowerCase();
+  var topic=String(x.topic||'Другое').trim().slice(0,120),key=topic.toLowerCase();if(seen.has(key))return;seen.add(key);
   if(!themes.has(key))themes.set(key,{topic:topic,n:0,example:''});
   var item=themes.get(key);item.n++;
   if(!item.example)item.example=String(x.signal||x.use||'').slice(0,250);
@@ -167,8 +167,8 @@ function paint(){
  ['Сопоставимые',comp.length,'один тип, одна версия, надёжные'],
  ['Средний балл · последние 3',avg(latest)==null?'—':number(avg(latest)),'из 100'],
  ['Изменение',delta==null?'BASELINE':(delta>=0?'+':'')+number(delta),'к предыдущим 3'],
- ['Подписано',data.filter(function(r){return r.outcome==='SIGNED';}).length,'из '+data.length+' встреч (не конверсия)'],
- ['Конверсия закрытых',outcomePct(data),'подписано / (подписано + потеряно)']
+ ['Встреч с итогом «подписано»',data.filter(function(r){return r.outcome==='SIGNED';}).length,'возможны несколько встреч по одной сделке'],
+ ['Доля положительных исходов',outcomePct(data),'среди встреч с финальным исходом']
  ].map(function(x){return '<div class="mi-kpi"><small>'+esc(x[0])+'</small><b>'+esc(x[1])+'</b><span>'+esc(x[2])+'</span></div>';}).join('');
  var title=comp.length?(TYPES[comp[comp.length-1].meeting_type]||'')+' · версия '+comp[comp.length-1].assessment_version:'';
  get('mi-comparison').textContent=title+'. Для честной динамики берём только RELIABLE, покрытие от 70%, одинаковые тип и версия шкалы. Δ показывается с 6 встреч.';
@@ -190,6 +190,7 @@ function normalized(packet){
  var coverage=a.coverage==null?null:Number(a.coverage);
  if(coverage!==null&&(!Number.isFinite(coverage)||coverage<0||coverage>100))throw Error('Неверное покрытие');
  var skills={};RUBRIC.forEach(function(item){var value=a.skills&&a.skills[item[0]];if(value===undefined||value===null)return;if(!Number.isFinite(Number(value))||Number(value)<0||Number(value)>item[2])throw Error('Неверная оценка '+item[0]);skills[item[0]]=Number(value);});
+ if(Object.keys(skills).length===RUBRIC.length){var scored=Object.values(skills).reduce(function(sum,x){return sum+x;},0);if(Math.abs(scored-Number(a.total))>1)throw Error('Сумма баллов по навыкам не совпадает с итогом');}
  var insights=asArray(packet.marketing).slice(0,25).map(function(x){
   return {topic:String(x.topic||'Другое').slice(0,120),signal:String(x.signal||'').slice(0,500),use:String(x.use||'').slice(0,500)};
  });
