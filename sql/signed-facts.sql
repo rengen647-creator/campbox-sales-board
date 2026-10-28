@@ -47,6 +47,7 @@ do $b$ declare t text; begin
   execute format('create policy read_own_sales on public.%I for select to authenticated using ((select public.is_active_user()) and (sales_user_id=(select auth.uid()) or (select public.is_manager())))',t);
  end loop;
 end $b$;
+create policy read_related_camp on public.sales_camp_registry for select to authenticated using ((select public.is_active_user()) and exists(select 1 from public.sales_deal_registry d where d.camp_id=sales_camp_registry.id and d.sales_user_id=(select auth.uid())));
 alter table public.sales_fact_periods enable row level security;
 revoke all on public.sales_fact_periods from public,anon,authenticated;
 grant select on public.sales_fact_periods to authenticated;
