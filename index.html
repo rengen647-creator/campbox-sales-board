@@ -349,7 +349,7 @@ function isManager(){return currentProfile?.role==='manager'}
 function statusClass(p){return p>=100?'good':p>=70?'warn':'bad'}
 function newId(){return globalThis.crypto?.randomUUID?crypto.randomUUID():'c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9)}
 function normalizeContract(c={}){
-  return {id:c.id||newId(),client:String(c.client||''),contract_number:String(c.contract_number||''),sent_date:c.sent_date||selectedDate||todayISO(),target_date:c.target_date||'',ball:c.ball==='us'?'us':'client',blocker:String(c.blocker||''),next_action:String(c.next_action||''),next_contact:c.next_contact||'',signed_date:c.signed_date||'',status:['signing','signed','lost'].includes(c.status)?c.status:'signing'};
+  return {id:c.id||newId(),client:String(c.client||''),contract_number:String(c.contract_number||''),sent_date:c.sent_date||selectedDate||todayISO(),target_date:c.target_date||'',ball:c.ball==='us'?'us':'client',blocker:String(c.blocker||''),next_action:String(c.next_action||''),next_contact:c.next_contact||'',signed_date:c.signed_date||'',training_date:c.training_date||'',training_attendee:String(c.training_attendee||''),training_customer_confirmed:c.training_customer_confirmed===true,status:['signing','signed','lost'].includes(c.status)?c.status:'signing'};
 }
 function parseReflection(raw){
   const empty={result:'',blockers:'',tomorrow:'',reasons:[],contracts:[]};
@@ -577,7 +577,7 @@ function renderContractDraft(canEdit=true){
     <div class="contract-row-head">
       <div><label>Лагерь / клиент</label><input value="${esc(c.client)}" oninput="updateContractDraft(${i},'client',this.value)" ${canEdit?'':'disabled'} placeholder="Название лагеря"></div>
       <div><label>Статус</label><select onchange="updateContractDraft(${i},'status',this.value)" ${canEdit?'':'disabled'}><option value="signing" ${c.status==='signing'?'selected':''}>На подписании</option><option value="signed" ${c.status==='signed'?'selected':''}>Подписан</option><option value="lost" ${c.status==='lost'?'selected':''}>Не состоялся</option></select></div>
-      <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}${c.status==='signed'?'<br><small>'+handoffStatusLabel(c)+'</small>':''}</span>
+      <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}${c.status==='signed'?'<br><small>'+handoffStatusLabel(c)+'</small><br><small>Проверь дату обучения, ответственного и подтверждение клиента в КСМ</small>':''}</span>
       ${canEdit?`<button class="btn danger" onclick="removeContractRow(${i})">Удалить</button>`:''}
     </div>
     <div class="contract-fields">
@@ -589,6 +589,9 @@ function renderContractDraft(canEdit=true){
       <div><label>Что блокирует</label><input value="${esc(c.blocker)}" oninput="updateContractDraft(${i},'blocker',this.value)" ${canEdit?'':'disabled'} placeholder="Юристы / цена / реквизиты"></div>
       <div><label>Следующее действие</label><input value="${esc(c.next_action)}" oninput="updateContractDraft(${i},'next_action',this.value)" ${canEdit?'':'disabled'} placeholder="Позвонить ЛПР / получить правки"></div>
       <div><label>Следующий контакт</label><input type="date" value="${esc(c.next_contact)}" onchange="updateContractDraft(${i},'next_contact',this.value)" ${canEdit?'':'disabled'}></div>
+      <div><label>Плановая дата обучения</label><input type="date" value="${esc(c.training_date||'')}" onchange="updateContractDraft(${i},'training_date',this.value)" ${canEdit?'':'disabled'}></div>
+      <div><label>Участник обучения со стороны клиента</label><input value="${esc(c.training_attendee||'')}" oninput="updateContractDraft(${i},'training_attendee',this.value)" placeholder="Имя / роль" ${canEdit?'':'disabled'}></div>
+      <div><label>Подтверждение клиента</label><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" ${c.training_customer_confirmed?'checked':''} onchange="updateContractDraft(${i},'training_customer_confirmed',this.checked)" ${canEdit?'':'disabled'}> Дата и участие подтверждены клиентом</label></div>
     </div>
   </div>`}).join('');renderContractSummary();
 }
@@ -601,8 +604,9 @@ async function saveContracts(){
     alert('Для подписанного договора укажи фактическую дату подписания.');return;
   }
   if(clean.some(c=>c.status==='signed'&&!String(c.contract_number||'').trim())){alert('Укажи номер подписанного договора.');return;}
-  const numbers=clean.filter(c=>c.status==='signed').map(c=>c.contract_number.trim().toUpperCase().replace(/\s+/g,''));
-  if(new Set(numbers).size!==numbers.length){alert('Номер договора повторяется в текущем списке.');return;}
+  // One signed document may cover several camps. Reject duplicate camp/document pairs, not document numbers.
+  const pairs=clean.filter(c=>c.status==='signed').map(c=>c.contract_number.trim().toUpperCase().replace(/\s+/g,'')+'|'+c.client.trim().toLocaleLowerCase('ru-RU').replace(/\s+/g,' '));
+  if(new Set(pairs).size!==pairs.length){alert('Этот лагерь с данным номером договора уже добавлен.');return;}
   const previousComment=r.comment,prev=parseReflection(r.comment);
   r.comment=packReflection({...prev,contracts:clean});renderTeam();recalc();
   const ok=await saveCurrent(true);
