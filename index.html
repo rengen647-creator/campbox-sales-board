@@ -604,8 +604,9 @@ async function saveContracts(){
     alert('Для подписанного договора укажи фактическую дату подписания.');return;
   }
   if(clean.some(c=>c.status==='signed'&&!String(c.contract_number||'').trim())){alert('Укажи номер подписанного договора.');return;}
-  const numbers=clean.filter(c=>c.status==='signed').map(c=>c.contract_number.trim().toUpperCase().replace(/\s+/g,''));
-  if(new Set(numbers).size!==numbers.length){alert('Номер договора повторяется в текущем списке.');return;}
+  // One signed document may cover several camps. Reject duplicate camp/document pairs, not document numbers.
+  const pairs=clean.filter(c=>c.status==='signed').map(c=>c.contract_number.trim().toUpperCase().replace(/\s+/g,'')+'|'+c.client.trim().toLocaleLowerCase('ru-RU').replace(/\s+/g,' '));
+  if(new Set(pairs).size!==pairs.length){alert('Этот лагерь с данным номером договора уже добавлен.');return;}
   const previousComment=r.comment,prev=parseReflection(r.comment);
   r.comment=packReflection({...prev,contracts:clean});renderTeam();recalc();
   const ok=await saveCurrent(true);
