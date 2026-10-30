@@ -577,7 +577,7 @@ function renderContractDraft(canEdit=true){
     <div class="contract-row-head">
       <div><label>Лагерь / клиент</label><input value="${esc(c.client)}" oninput="updateContractDraft(${i},'client',this.value)" ${canEdit?'':'disabled'} placeholder="Название лагеря"></div>
       <div><label>Статус</label><select onchange="updateContractDraft(${i},'status',this.value)" ${canEdit?'':'disabled'}><option value="signing" ${c.status==='signing'?'selected':''}>На подписании</option><option value="signed" ${c.status==='signed'?'selected':''}>Подписан</option><option value="lost" ${c.status==='lost'?'selected':''}>Не состоялся</option></select></div>
-      <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}${c.status==='signed'?'<br><small>'+handoffStatusLabel(c)+'</small>':''}</span>
+      <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}${c.status==='signed'?'<br><small>'+handoffStatusLabel(c)+'</small><br><small>Проверь дату обучения, ответственного и подтверждение клиента в КСМ</small>':''}</span>
       ${canEdit?`<button class="btn danger" onclick="removeContractRow(${i})">Удалить</button>`:''}
     </div>
     <div class="contract-fields">
