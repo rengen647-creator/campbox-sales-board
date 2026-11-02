@@ -446,7 +446,14 @@ async function loadAll(){
     const err=pe||mse||dse||dre||mre||pmre||cpe||se;if(err)throw err;
     profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];monthSignedContracts=signed||[];prevMonthRows=pmr||[];checkpoints=cp||[];
     const byUser=Object.fromEntries((dr||[]).map(r=>[r.user_id,r]));
-    dayRows=profiles.map(pr=>byUser[pr.id]||blankSales(pr.id,selectedDate,carryForwardContracts(pr.id,selectedDate)));
+    dayRows=profiles.map(pr=>{
+      const saved=byUser[pr.id]||blankSales(pr.id,selectedDate);
+      const reflection=parseReflection(saved.comment),carry=carryForwardContracts(pr.id,selectedDate);
+      if(!carry.length)return saved;
+      const known=new Set(reflection.contracts.map(c=>c.id));
+      const missing=carry.filter(c=>!known.has(c.id));
+      return missing.length?{...saved,comment:packReflection({...reflection,contracts:[...reflection.contracts,...missing]})}:saved;
+    });
     if(!isManager())coachUserId=currentUser.id;else if(coachUserId!=='team'&&!profiles.some(p=>p.id===coachUserId))coachUserId='team';
     renderAll();setStatus('Все данные актуальны','good');
   }catch(e){console.error(e);setStatus('Ошибка загрузки','bad');alert('Не удалось загрузить данные. Проверь подключение к Supabase и политики доступа.');}
@@ -516,7 +523,7 @@ async function saveReflection(){
   renderTeam();recalc();closeReflection();await saveCurrent(true);
 }
 function carryForwardContracts(userId,date){
-  const prev=monthRows.filter(r=>r.user_id===userId&&String(r.report_date)<date).sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date))).pop();
+  const prev=[...prevMonthRows,...monthRows].filter(r=>r.user_id===userId&&String(r.report_date)<date).sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date))).pop();
   return prev?parseReflection(prev.comment).contracts.filter(c=>c.status==='signing').map(c=>({...c})):[];
 }
 function contractAge(c,ref=selectedDate){if(!c?.sent_date)return 0;const a=new Date(c.sent_date+'T12:00:00'),b=new Date(ref+'T12:00:00');return Math.max(0,Math.floor((b-a)/86400000))}
