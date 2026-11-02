@@ -1,0 +1,17 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {signingKey,classifyCamp,onboardingState,daysBetween} = require('./lifecycle');
+const dealId='11111111-1111-4111-8111-111111111111', campA='22222222-2222-4222-8222-222222222222', campB='33333333-3333-4333-8333-333333333333';
+test('same deal/camp replay uses same key',()=>assert.equal(signingKey({dealId,campId:campA}),signingKey({dealId,campId:campA})));
+test('same deal different camps distinct keys',()=>assert.notEqual(signingKey({dealId,campId:campA}),signingKey({dealId,campId:campB})));
+test('reject invalid ID',()=>assert.throws(()=>signingKey({dealId:'x',campId:campA})));
+test('signed not launched distinct',()=>assert.equal(classifyCamp({contractSigned:true,launchConfirmed:false}),'signed_not_launched'));
+test('launch without bookings distinct',()=>assert.equal(classifyCamp({contractSigned:true,launchConfirmed:true}),'launched_no_bookings'));
+test('bookings without confirmed revenue distinct',()=>assert.equal(classifyCamp({contractSigned:true,launchConfirmed:true,realBookings:2}),'bookings_no_confirmed_revenue'));
+test('confirmed revenue active',()=>assert.equal(classifyCamp({contractSigned:true,launchConfirmed:true,realBookings:2,confirmedRevenue:100}),'revenue_active'));
+test('training needs customer confirmation',()=>assert.equal(onboardingState({trainingDate:'2026-11-07',trainingConfirmedByCustomer:false,attendees:['A']}),'awaiting_customer_confirmation'));
+test('training needs participants',()=>assert.equal(onboardingState({trainingDate:'2026-11-07',trainingConfirmedByCustomer:true,attendees:[]}),'attendees_missing'));
+test('training confirmed',()=>assert.equal(onboardingState({trainingDate:'2026-11-07',trainingConfirmedByCustomer:true,attendees:['A']}),'training_confirmed'));
+test('duration counts elapsed days',()=>assert.equal(daysBetween('2026-10-30','2026-11-02'),3));
+test('negative durations rejected',()=>assert.equal(daysBetween('2026-11-02','2026-10-30'),null));

@@ -1,0 +1,11 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {transferEvent,canApplyEvent}=require('./transfer-contract');
+const base={salesUserId:'11111111-1111-4111-8111-111111111111',campId:'22222222-2222-4222-8222-222222222222',contractKey:'deal-42',revision:1,trainingDate:'2026-11-07',trainingAttendee:'Administrator',confirmedByCustomer:true};
+test('explicitly confirmed event is eligible',()=>assert.equal(transferEvent(base).confirmedByCustomer,true));
+test('unchecked date never becomes confirmation',()=>assert.equal(transferEvent({...base,confirmedByCustomer:false}).requiresReview,true));
+test('missing participant cannot be confirmed',()=>assert.equal(transferEvent({...base,trainingAttendee:''}).confirmedByCustomer,false));
+test('revision replay rejected',()=>{const a=transferEvent(base);assert.equal(canApplyEvent(a,a),false)});
+test('newer revision eligible',()=>assert.equal(canApplyEvent(transferEvent({...base,revision:2}),transferEvent(base)),true));
+test('different contract cannot overwrite record',()=>assert.equal(canApplyEvent(transferEvent({...base,revision:2,contractKey:'other'}),transferEvent(base)),false));
+test('invalid camp id refused',()=>assert.throws(()=>transferEvent({...base,campId:'none'})));
