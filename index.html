@@ -536,9 +536,38 @@ function monthlySigningCount(rows=null){
 }
 function contractTone(c){const age=contractAge(c),targetLate=c.target_date&&c.target_date<selectedDate,nextLate=c.next_contact&&c.next_contact<selectedDate;return age>7||targetLate||nextLate?'bad':age>=4?'warn':'good'}
 function contractStatusLabel(v){return v==='signed'?'Подписан':v==='lost'?'Не состоялся':'На подписании'}
-function openContracts(userId){
-  const r=dayRows.find(x=>x.user_id===userId);if(!r)return;const pr=profiles.find(p=>p.id===userId)||{full_name:'Сотрудник'},canEdit=isManager()||userId===currentUser.id;
-  contractUserId=userId;contractDraft=parseReflection(r.comment).contracts.map(c=>({...c}));handoffStates=new Map();handoffStatusError='';$('contractUserName').textContent=pr.full_name||pr.email||'Сотрудник';$('contractDateLabel').textContent=selectedDate;$('contractAddBtn').classList.toggle('hidden',!canEdit);$('contractSaveBtn').classList.toggle('hidden',!canEdit);renderContractDraft(canEdit);$('contractModal').classList.remove('hidden');refreshHandoffStates(userId);
+async function openContracts(userId){
+  const r=dayRows.find(x=>x.user_id===userId);if(!r)return;
+  const pr=profiles.find(p=>p.id===userId)||{full_name:'Сотрудник'},canEdit=isManager()||userId===currentUser.id;
+  contractUserId=userId;
+  const openedDate=selectedDate;
+  const todayContracts=parseReflection(r.comment).contracts.map(c=>({...c}));
+  contractDraft=todayContracts;
+  handoffStates=new Map();handoffStatusError='';
+  $('contractUserName').textContent=pr.full_name||pr.email||'Сотрудник';
+  $('contractDateLabel').textContent=selectedDate;
+  $('contractAddBtn').classList.toggle('hidden',!canEdit);
+  $('contractSaveBtn').classList.toggle('hidden',!canEdit);
+  renderContractDraft(canEdit);
+  $('contractModal').classList.remove('hidden');
+  refreshHandoffStates(userId);
+  // Contracting is a continuing pipeline, not a single daily report.
+  // Pull the latest historical snapshot ONLY for still-signing records missing today.
+  if(!sb)return;
+  const {data,error}=await sb.from('daily_sales').select('report_date,comment')
+    .eq('user_id',userId).lt('report_date',openedDate).like('comment','%"contracts"%')
+    .order('report_date',{ascending:false}).limit(1);
+  if(contractUserId!==userId||selectedDate!==openedDate||$('contractModal').classList.contains('hidden'))return;
+  if(error){console.warn('Contract carry-forward lookup failed:',error.message);return;}
+  const older=(data||[])[0];if(!older)return;
+  const oldContracts=parseReflection(older.comment).contracts.filter(c=>c.status==='signing');
+  const known=new Set(contractDraft.map(c=>c.id));
+  const carry=oldContracts.filter(c=>!known.has(c.id));
+  if(!carry.length)return;
+  contractDraft=[...contractDraft,...carry.map(c=>({...c}))];
+  renderContractDraft(canEdit);
+  const label=$('contractDateLabel');
+  label.textContent=openedDate+' · перенесены открытые договоры из '+older.report_date+' ('+carry.length+'). Сохраните, чтобы закрепить их за текущим днём.';
 }
 function closeContracts(){$('contractModal').classList.add('hidden');contractUserId=null;contractDraft=[]}
 function addContractRow(){if(!contractUserId)return;contractDraft.push(normalizeContract({sent_date:selectedDate,status:'signing',ball:'client'}));renderContractDraft(true)}
