@@ -591,8 +591,13 @@ async function syncTrainingEvents(userId,contracts){
   if(!sb)return;
   const signed=contracts.filter(c=>c.status==='signed'&&c.id);
   if(!signed.length)return;
+  const {data:linked,error:linkError}=await sb.from('salary_contracts')
+    .select('id,sales_source_contract_key').eq('sales_source_user_id',userId)
+    .in('sales_source_contract_key',signed.map(c=>c.id));
+  if(linkError)throw linkError;
+  const linkedMap=new Map((linked||[]).map(c=>[c.sales_source_contract_key,c.id]));
   const {data:old,error:readError}=await sb.from('sales_training_handoff_events')
-    .select('contract_key,source_revision,training_date,training_attendee,customer_confirmed,camp_name,contract_number,signed_date')
+    .select('contract_key,source_revision,training_date,training_attendee,customer_confirmed,camp_name,contract_number,signed_date,salary_contract_id')
     .eq('sales_user_id',userId).order('source_revision',{ascending:false}).limit(1000);
   if(readError)throw readError;
   const latest=new Map();
@@ -605,11 +610,12 @@ async function syncTrainingEvents(userId,contracts){
       p.customer_confirmed!==(c.training_customer_confirmed===true) ||
       (p.camp_name||'')!==c.client ||
       (p.contract_number||'')!==c.contract_number ||
-      (p.signed_date||'')!==(c.signed_date||'');
+      (p.signed_date||'')!==(c.signed_date||'') || (p.salary_contract_id||null)!==(linkedMap.get(c.id)||null);
   }).map(c=>{
     const prev=latest.get(c.id);
     revision=Math.max(revision+1,Number(prev?.source_revision||0)+1);
     return {sales_user_id:userId,contract_key:c.id,source_revision:revision,
+      salary_contract_id:linkedMap.get(c.id)||null,
       camp_name:c.client,contract_number:c.contract_number,signed_date:c.signed_date||null,
       training_date:c.training_date||null,training_attendee:c.training_attendee||'',
       customer_confirmed:c.training_customer_confirmed===true && !!c.training_date && !!String(c.training_attendee||'').trim()};
