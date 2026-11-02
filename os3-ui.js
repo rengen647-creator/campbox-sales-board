@@ -23,6 +23,19 @@ function mount(){
   groups.forEach(([title,ids])=>{nav.append(E('div','os3-nav-group',title));ids.forEach(id=>{const n=nodes.get(id);if(n)nav.append(n);});});
  }
  nav?.querySelectorAll('.cb-group').forEach(n=>n.remove());
+ // OS3 owns the final sidebar. Add Retention AFTER deleting legacy navigation groups.
+ if(nav&&!nav.querySelector('#retentionSidebarNav')){
+   const label=E('div','os3-nav-group','Удержание клиентов');
+   const button=E('button','', '◇  Удержание');
+   button.type='button';button.id='retentionSidebarNav';
+   button.setAttribute('aria-label','Открыть удержание клиентов');
+   button.addEventListener('click',()=>{
+     if(typeof window.openRetentionView==='function')window.openRetentionView();
+     nav.querySelectorAll('[data-v13-view]').forEach(b=>b.classList.remove('active'));
+     button.classList.add('active');
+   });
+   nav.append(label,button);
+ }
  document.querySelector('.v13-brand small')?.replaceChildren(document.createTextNode('Sales OS 3.0'));
  document.querySelectorAll('.cb-eyebrow').forEach(n=>{n.textContent=n.textContent.replace(/^\d+\s*\/\s*/, '');});
  const a=$('v13-analytics');a.classList.add('show-legacy');
