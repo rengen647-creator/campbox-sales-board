@@ -324,7 +324,7 @@ const metricKeys=['calls','booked','meetings','offers','follow','connected'];
 const activityKeys=['calls','booked','meetings','offers','follow'];
 const metricLabels={calls:'Звонки',booked:'Назначено встреч',meetings:'Проведено встреч',offers:'КП / расчёты',follow:'Повторные контакты',connected:'Подключено лагерей'};
 let sb=null,currentUser=null,currentProfile=null,selectedMonth='',selectedDate='',profiles=[],dayRows=[],monthRows=[],monthSignedContracts=[],prevMonthRows=[],checkpoints=[],monthSettings={},daySettings={};
-let saveTimer=null,isLoading=false,reflectionUserId=null,reflectionReasons=[],activeActivityMetric='calls',contractUserId=null,contractDraft=[],handoffStates=new Map(),handoffStatusError='',coachUserId='team';
+let saveTimer=null,isLoading=false,reflectionUserId=null,reflectionReasons=[],activeActivityMetric='calls',contractUserId=null,contractDraft=[],handoffStates=new Map(),trainingAckStates=new Map(),handoffStatusError='',coachUserId='team';
 const PERSONAL_MONTH_TARGET=5;
 const reasonOptions=['Нет блокеров','Не дозвонился','Перенесли','Нет ЛПР','Ждём решение','Цена','Тех. вопрос','Договор у юристов','Нет времени / ресурса','Другое'];
 const tomorrowActions=['Позвонить','Назначить встречу','Провести встречу','Отправить КП','Повторный контакт','Дожать договор','Дожать решение'];
@@ -580,6 +580,44 @@ function updateContractDraft(i,field,value){
     renderContractDraft(isManager()||contractUserId===currentUser.id);
   }else renderContractSummary();
 }
+function trainingAckLabel(c){
+  const state=trainingAckStates.get(c.id);
+  if(!state)return 'Обучение: пока нет события передачи';
+  if(state.accepted)return 'Обучение: принято КСМ';
+  if(!state.confirmed)return 'Обучение: требуется подтверждение клиента';
+  return 'Обучение: ожидает принятия КСМ';
+}
+async function syncTrainingEvents(userId,contracts){
+  if(!sb)return;
+  const signed=contracts.filter(c=>c.status==='signed'&&c.id);
+  if(!signed.length)return;
+  const {data:old,error:readError}=await sb.from('sales_training_handoff_events')
+    .select('contract_key,source_revision,training_date,training_attendee,customer_confirmed,camp_name,contract_number,signed_date')
+    .eq('sales_user_id',userId).order('source_revision',{ascending:false}).limit(1000);
+  if(readError)throw readError;
+  const latest=new Map();
+  (old||[]).forEach(e=>{if(!latest.has(e.contract_key))latest.set(e.contract_key,e)});
+  let revision=Date.now()*1000;
+  const pending=signed.filter(c=>{
+    const p=latest.get(c.id);
+    return !p || (p.training_date||'')!==(c.training_date||'') ||
+      (p.training_attendee||'')!==(c.training_attendee||'') ||
+      p.customer_confirmed!==(c.training_customer_confirmed===true) ||
+      (p.camp_name||'')!==c.client ||
+      (p.contract_number||'')!==c.contract_number ||
+      (p.signed_date||'')!==(c.signed_date||'');
+  }).map(c=>{
+    const prev=latest.get(c.id);
+    revision=Math.max(revision+1,Number(prev?.source_revision||0)+1);
+    return {sales_user_id:userId,contract_key:c.id,source_revision:revision,
+      camp_name:c.client,contract_number:c.contract_number,signed_date:c.signed_date||null,
+      training_date:c.training_date||null,training_attendee:c.training_attendee||'',
+      customer_confirmed:c.training_customer_confirmed===true && !!c.training_date && !!String(c.training_attendee||'').trim()};
+  });
+  if(!pending.length)return;
+  const {error}=await sb.from('sales_training_handoff_events').insert(pending);
+  if(error)throw error;
+}
 function handoffStatusLabel(c){
   if(c.status!=='signed')return '';
   const st=handoffStates.get(c.id);
@@ -594,7 +632,22 @@ async function refreshHandoffStates(userId){
   if(contractUserId!==userId)return;
   if(error){handoffStatusError=error.message||'Ошибка проверки';handoffStates=new Map();}
   else{handoffStatusError='';handoffStates=new Map((data||[]).map(x=>[x.contract_key,x]));}
-  renderContractDraft(isManager()||contractUserId===currentUser.id);
+  trainingAckStates=new Map();
+  const e=await sb.from('sales_training_handoff_events')
+    .select('id,contract_key,source_revision,customer_confirmed')
+    .eq('sales_user_id',userId).order('source_revision',{ascending:false}).limit(1000);
+  if(!e.error && contractUserId===userId){
+    const latest=new Map();
+    (e.data||[]).forEach(x=>{if(!latest.has(x.contract_key))latest.set(x.contract_key,x)});
+    const ids=[...latest.values()].map(x=>x.id);
+    let accepted=new Set();
+    if(ids.length){
+      const a=await sb.from('csm_training_handoff_acks').select('event_id').in('event_id',ids);
+      if(!a.error)accepted=new Set((a.data||[]).map(x=>x.event_id));
+    }
+    if(contractUserId===userId)trainingAckStates=new Map([...latest.entries()].map(([key,x])=>[key,{confirmed:x.customer_confirmed,accepted:accepted.has(x.id)}]));
+  }
+  if(contractUserId===userId)renderContractDraft(isManager()||contractUserId===currentUser.id);
 }
 function renderContractSummary(){
   const active=contractDraft.filter(c=>c.status==='signing'),fresh=active.filter(c=>contractAge(c)<=3).length,mid=active.filter(c=>{const a=contractAge(c);return a>=4&&a<=7}).length,old=active.filter(c=>contractAge(c)>7).length;
@@ -606,7 +659,7 @@ function renderContractDraft(canEdit=true){
     <div class="contract-row-head">
       <div><label>Лагерь / клиент</label><input value="${esc(c.client)}" oninput="updateContractDraft(${i},'client',this.value)" ${canEdit?'':'disabled'} placeholder="Название лагеря"></div>
       <div><label>Статус</label><select onchange="updateContractDraft(${i},'status',this.value)" ${canEdit?'':'disabled'}><option value="signing" ${c.status==='signing'?'selected':''}>На подписании</option><option value="signed" ${c.status==='signed'?'selected':''}>Подписан</option><option value="lost" ${c.status==='lost'?'selected':''}>Не состоялся</option></select></div>
-      <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}${c.status==='signed'?'<br><small>'+handoffStatusLabel(c)+'</small><br><small>Проверь дату обучения, ответственного и подтверждение клиента в КСМ</small>':''}</span>
+      <span class="pill ${tone} age">${c.status==='signing'?age+' дн.':'Статус: '+contractStatusLabel(c.status)}${c.status==='signed'?'<br><small>'+handoffStatusLabel(c)+'</small><br><small>'+esc(trainingAckLabel(c))+'</small>':''}</span>
       ${canEdit?`<button class="btn danger" onclick="removeContractRow(${i})">Удалить</button>`:''}
     </div>
     <div class="contract-fields">
@@ -640,6 +693,7 @@ async function saveContracts(){
   r.comment=packReflection({...prev,contracts:clean});renderTeam();recalc();
   const ok=await saveCurrent(true);
   if(!ok){r.comment=previousComment;renderTeam();recalc();return}
+  try{await syncTrainingEvents(userId,clean)}catch(e){console.error('Training sync:',e);alert('Договор сохранён, но передача обучения в КСМ не удалась: '+e.message)}
   await refreshHandoffStates(userId);
   if(clean.some(c=>c.status==='signed')&&handoffStatusError)
     alert('Договор сохранён, но подтверждение передачи в КСМ недоступно. '+handoffStatusError);
