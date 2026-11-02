@@ -86,9 +86,6 @@
     var moneyLink=action('Поступления','finance','payments');
     moneyLink.classList.add('cb-role-manager');
     tools.append(moneyLink);
-    var retentionLink=action('Удержание','salary','retention');
-    retentionLink.classList.add('cb-role-manager');
-    tools.append(retentionLink);
     overview.appendChild(tools);
     root.insertBefore(overview,root.firstChild);
 
