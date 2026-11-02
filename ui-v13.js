@@ -30,6 +30,11 @@
     };return m[id]||m.today;
   }
   function go(id){
+    if(document.getElementById('mainApp')?.classList.contains('retention-mode')){
+      document.getElementById('mainApp').classList.remove('retention-mode');
+      const panel=document.getElementById('retentionView');if(panel){panel.hidden=true;panel.classList.add('hidden')}
+    }
+    document.getElementById('retentionSidebarNav')?.classList.remove('active');
     if(!screen(id))id='today';
     closeMore();
     if(id!=='team')V.managerOpen=false;
