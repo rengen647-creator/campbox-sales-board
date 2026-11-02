@@ -523,7 +523,7 @@ async function saveReflection(){
   renderTeam();recalc();closeReflection();await saveCurrent(true);
 }
 function carryForwardContracts(userId,date){
-  const prev=[...prevMonthRows,...monthRows].filter(r=>r.user_id===userId&&String(r.report_date)<date).sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date))).pop();
+  const prev=[...prevMonthRows,...monthRows].filter(r=>r.user_id===userId&&String(r.report_date)<date&&String(r.comment||'').includes('"contracts"')).sort((a,b)=>String(a.report_date).localeCompare(String(b.report_date))).pop();
   return prev?parseReflection(prev.comment).contracts.filter(c=>c.status==='signing').map(c=>({...c})):[];
 }
 function contractAge(c,ref=selectedDate){if(!c?.sent_date)return 0;const a=new Date(c.sent_date+'T12:00:00'),b=new Date(ref+'T12:00:00');return Math.max(0,Math.floor((b-a)/86400000))}
