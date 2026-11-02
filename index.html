@@ -607,7 +607,7 @@ async function syncTrainingEvents(userId,contracts){
     const p=latest.get(c.id);
     return !p || (p.training_date||'')!==(c.training_date||'') ||
       (p.training_attendee||'')!==(c.training_attendee||'') ||
-      p.customer_confirmed!==(c.training_customer_confirmed===true) ||
+      p.customer_confirmed!==(c.training_customer_confirmed===true&&!!c.training_date&&!!String(c.training_attendee||'').trim()) ||
       (p.camp_name||'')!==c.client ||
       (p.contract_number||'')!==c.contract_number ||
       (p.signed_date||'')!==(c.signed_date||'') || (p.salary_contract_id||null)!==(linkedMap.get(c.id)||null);
