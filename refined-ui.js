@@ -41,6 +41,21 @@
     var topbar = document.querySelector('#mainApp.v13-live>.topbar .actions');
     if (!sidebar || !nav || !topbar || nav.dataset.cbRefined === 'true') return;
     nav.dataset.cbRefined = 'true';
+    // Retention is a native navigation group, never a detached fixed sidebar.
+    if (!nav.querySelector('#retentionSidebarNav')) {
+      var retentionGroup = document.createElement('div');
+      retentionGroup.className = 'cb-group cb-retention-group';
+      retentionGroup.innerHTML = '<div class="cb-group-head" style="pointer-events:none"><span>УДЕРЖАНИЕ КЛИЕНТОВ</span></div><div class="cb-group-body" style="display:block"><button type="button" id="retentionSidebarNav" class="cb-retention-nav">◇ &nbsp; Удержание</button></div>';
+      nav.appendChild(retentionGroup);
+      retentionGroup.querySelector('button').addEventListener('click', function () {
+        if (typeof window.openRetentionView === 'function') window.openRetentionView();
+        nav.querySelectorAll('[data-v13-view]').forEach(function (b) { b.classList.remove('active'); });
+        retentionGroup.querySelector('button').classList.add('active');
+      });
+      nav.querySelectorAll('[data-v13-view]').forEach(function (b) {
+        b.addEventListener('click', function () { retentionGroup.querySelector('button').classList.remove('active'); });
+      });
+    }
 
     // Theme is a UI preference only. Toggle cannot save or modify records.
     var appearance = document.createElement('button');
