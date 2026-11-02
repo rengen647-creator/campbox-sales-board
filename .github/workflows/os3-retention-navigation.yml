@@ -1,0 +1,24 @@
+name: Sales retention sidebar regression
+on:
+  pull_request:
+    paths:
+      - os3-ui.js
+      - salary-v1.js
+      - qa/os3-retention-navigation.test.cjs
+      - .github/workflows/os3-retention-navigation.yml
+  push:
+    branches: [main]
+    paths:
+      - os3-ui.js
+      - salary-v1.js
+      - qa/os3-retention-navigation.test.cjs
+jobs:
+  sidebar:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check os3-ui.js
+      - run: node --test qa/os3-retention-navigation.test.cjs
