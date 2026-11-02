@@ -144,7 +144,7 @@
       '<div class="salary-tabs" id="salaryTabs">'+
         '<button data-salary-tab="mine" class="active">Моя зарплата</button>'+
         '<button data-salary-tab="payments" class="salary-manager-only">Поступления</button>'+
-        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button><button data-salary-tab="retention" class="salary-manager-only">🛟 Удержание</button>'+
+        '<button data-salary-tab="clients" class="salary-manager-only">База клиентов</button>'+
         '<button data-salary-tab="team" class="salary-manager-only">Команда</button>'+
         '<button data-salary-tab="rules" class="salary-manager-only">Настройки мотивации</button>'+
         '<button data-salary-tab="history" class="salary-manager-only">История изменений</button>'+
@@ -153,7 +153,6 @@
       '<div id="salaryMine" class="salary-panel active"></div>'+
       '<div id="salaryPayments" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryClients" class="salary-panel salary-manager-only"></div>'+
-      '<div id="salaryRetention" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryTeam" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryRules" class="salary-panel salary-manager-only"></div>'+
       '<div id="salaryHistory" class="salary-panel salary-manager-only"></div>';
@@ -176,7 +175,7 @@
     if(S.tab==='mine')renderMine();
     if(S.tab==='payments')renderPayments();
     if(S.tab==='clients')renderClients();
-    if(S.tab==='retention')renderRetention();
+    // Retention case management lives in the dedicated Sales sidebar workspace.
     if(S.tab==='team')renderTeam();
     if(S.tab==='rules')renderRules();
     if(S.tab==='history')renderHistory();
