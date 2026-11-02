@@ -16,6 +16,7 @@ async function poll(fn){for(let n=0;n<50;n++){if(await fn())return;await new Pro
  revoke all on schema campbox_internal from public,anon,authenticated;`);
  await db.query(fs.readFileSync('tests/integration/csm-function.sql','utf8')+';');
  await db.query(fs.readFileSync('migration_2026-10-14_sales_signed_to_csm.sql','utf8'));
+ await db.query(fs.readFileSync('tests/integration/training-handoff-fixture.sql','utf8'));
  const admin=createClient(api,secret,{auth:{persistSession:false,autoRefreshToken:false}}),password='Disposable-Local-QA-2026!';const users={};
  for(const role of ['employee','manager']){const email=role+'@example.invalid';const r=await admin.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:'QA '+role}});if(r.error)throw r.error;users[role]={id:r.data.user.id,email};await db.query('update profiles set active=true,role=$1 where id=$2',[role,r.data.user.id]);}
  const date=new Date().toISOString().slice(0,10),month=date.slice(0,7)+'-01';
