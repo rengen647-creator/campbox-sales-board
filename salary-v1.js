@@ -21,6 +21,7 @@
   function money(v){return Number(v||0).toLocaleString('ru-RU',{minimumFractionDigits:Number(v||0)%1?2:0,maximumFractionDigits:2})+' ₽'}
   function round2(v){return Math.round((Number(v||0)+Number.EPSILON)*100)/100}
   function isoMonth(v){return /^\d{4}-\d{2}$/.test(v||'')?v:(typeof selectedMonth!=='undefined'&&selectedMonth?selectedMonth:new Date().toISOString().slice(0,7))}
+  function isCreditedInMonth(c,month){return String(c.credited_date||c.signed_date||'').slice(0,7)===month}
   function monthStartIso(m){return m+'-01'}
   function nextMonthIso(m){const [y,mo]=m.split('-').map(Number);return new Date(Date.UTC(y,mo,1)).toISOString().slice(0,10)}
   function currentMonth(){const d=new Date(),z=d.getTimezoneOffset()*60000;return new Date(d-z).toISOString().slice(0,7)}
@@ -203,10 +204,10 @@
     if(existing.data?.finalized){S.dept=existing.data;return}
     const [ms,ds]=await Promise.all([
       sb.from('month_settings').select('min_plan').eq('month',first).maybeSingle(),
-      sb.from('salary_contracts').select('id').gte('signed_date',first).lt('signed_date',next).neq('status','terminated')
+      sb.from('salary_contracts').select('id,signed_date,credited_date,status').neq('status','terminated')
     ]);
     if(ms.error||ds.error)return;
-    const target=Number(ms.data?.min_plan||0),actual=(ds.data||[]).length;
+    const target=Number(ms.data?.min_plan||0),actual=(ds.data||[]).filter(c=>isCreditedInMonth(c,S.month)).length;
     const pct=target?Math.round(actual/target*10000)/100:0,rate=contractorRate(pct),finalized=S.month<currentMonth();
     const row={month:first,target_plan:target,actual_sales:actual,completion_pct:pct,contractor_rate:rate,finalized,updated_by:currentUser?.id||null,updated_at:new Date().toISOString()};
     const old=existing.data;
@@ -284,9 +285,9 @@
   function salaryFor(userId){
     const rows=[],dept=S.dept||{contractor_rate:0,completion_pct:0,finalized:false};
 
-    S.contracts.filter(c=>c.contractor_id===userId&&c.signed_date&&c.signed_date.slice(0,7)===S.month).forEach(c=>{
+    S.contracts.filter(c=>c.contractor_id===userId&&isCreditedInMonth(c,S.month)).forEach(c=>{
       const rate=Number(dept.contractor_rate||0),cc=contractClient(c);
-      if(rate>0&&cc)rows.push({date:c.signed_date,client:cc.client_name,direction:'Контракторство',event:'Договор подписан',base:0,rate:money(rate),formula:'1 договор × '+money(rate),amount:rate,status:dept.finalized?'confirmed':'preliminary',note:'Выполнение отдела '+Number(dept.completion_pct||0).toLocaleString('ru-RU')+'% · договорный цикл '+dateRu(c.signed_date),contract_id:c.id,contract_signed:c.signed_date});
+      if(cc)rows.push({date:c.credited_date||c.signed_date,client:cc.client_name,direction:'Контракторство',event:'Договор подписан',base:0,rate:money(rate),formula:'1 договор × '+money(rate),amount:rate,status:dept.finalized?'confirmed':'preliminary',note:'Выполнение отдела '+Number(dept.completion_pct||0).toLocaleString('ru-RU')+'% · зачёт '+dateRu(c.credited_date||c.signed_date)+(rate===0?' · премия после выполнения порога плана':''),contract_id:c.id,contract_signed:c.signed_date});
     });
 
     S.payments.forEach(p=>{
@@ -329,7 +330,7 @@
   }
 
   function contractingSummary(userId){
-    const contracts=S.contracts.filter(c=>c.contractor_id===userId&&c.signed_date&&c.signed_date.slice(0,7)===S.month);
+    const contracts=S.contracts.filter(c=>c.contractor_id===userId&&isCreditedInMonth(c,S.month));
     const rate=Number(S.dept?.contractor_rate||0);
     const items=contracts.map(c=>({c,name:contractClient(c)?.client_name||'Клиент не найден',rate,amount:rate}));
     return {items,count:items.length,rate,total:items.reduce((n,x)=>n+x.amount,0)};
@@ -338,8 +339,8 @@
     const x=contractingSummary(userId);
     return '<div class="salary-card"><div class="salary-head"><div><h2>Контрактинг · подписанные договоры</h2><p>Кто законтрактован за выбранный месяц и сколько начислено за каждый договор. Ставка зависит от выполнения плана отдела.</p></div><span class="salary-pill blue">'+x.count+' договоров</span></div>'+
       '<div class="salary-body"><div class="salary-report-preview"><div><span>Законтрактовано</span><b>'+x.count+'</b></div><div><span>Ставка за договор</span><b>'+money(x.rate)+'</b></div><div><span>Начислено за контрактинг</span><b>'+money(x.total)+'</b></div></div>'+
-      (x.items.length?'<div class="salary-table-wrap"><table class="salary-table"><thead><tr><th>Лагерь</th><th>Номер договора</th><th>Дата подписания</th><th>Ставка</th><th>Начислено</th></tr></thead><tbody>'+
-       x.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.c.contract_number||'Не указан')+'</td><td>'+dateRu(x.c.signed_date)+'</td><td>'+money(x.rate)+'</td><td><b>'+money(x.amount)+'</b></td></tr>').join('')+
+      (x.items.length?'<div class="salary-table-wrap"><table class="salary-table"><thead><tr><th>Лагерь</th><th>Номер договора</th><th>Дата договора</th><th>Дата зачёта</th><th>Ставка</th><th>Начислено</th></tr></thead><tbody>'+
+       x.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.c.contract_number||'Не указан')+'</td><td>'+dateRu(x.c.signed_date)+'</td><td>'+dateRu(x.c.credited_date||x.c.signed_date)+'</td><td>'+money(x.rate)+'</td><td><b>'+money(x.amount)+'</b></td></tr>').join('')+
        '</tbody></table></div>':'<div class="salary-empty">В этом месяце подписанных договоров нет. Начислено 0 ₽.</div>')+
       '</div></div>';
   }
