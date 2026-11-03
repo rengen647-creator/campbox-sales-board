@@ -31,7 +31,8 @@ assert.equal(synthetic.fact,1,'Report must count one November signature despite 
 assert.equal(synthetic.members[0].fact,1);
 assert.equal(synthetic.metrics.find(m=>m.key==='connected').fact,1);
 assert.equal(synthetic.series[0].values[2],1);
-assert.equal(synthetic.series[0].values[1],null,'Future/unobserved dates should not fabricate actual values');
+assert.equal(synthetic.series[0].values[1],0,'Elapsed days before signing should show zero');
+assert.equal(synthetic.series[0].values[3],null,'Future dates should not fabricate actual values');
 assert.ok(fs.readFileSync('sw.js','utf8').includes('signed-fact-2026-11-03b'));
 assert.ok(index.includes('sales-coach.js?v=20261103signedfact'));
 console.log('PASS: November Sales OS fact and reports use credited signed contracts; old daily zero ignored');
