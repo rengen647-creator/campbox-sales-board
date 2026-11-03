@@ -200,19 +200,26 @@
     if(!manager()||!S.schemaReady)return;
     const first=monthStartIso(S.month),next=nextMonthIso(S.month);
     const existing=await sb.from('salary_department_months').select('*').eq('month',first).maybeSingle();
-    if(existing.data?.finalized){S.dept=existing.data;return}
+    if(existing.error){S.lastError=existing.error.message;return}
+    const old=existing.data;
     const [ms,ds]=await Promise.all([
       sb.from('month_settings').select('min_plan').eq('month',first).maybeSingle(),
       sb.from('salary_contracts').select('id').gte('signed_date',first).lt('signed_date',next).neq('status','terminated')
     ]);
-    if(ms.error||ds.error)return;
-    const target=Number(ms.data?.min_plan||0),actual=(ds.data||[]).length;
-    const pct=target?Math.round(actual/target*10000)/100:0,rate=contractorRate(pct),finalized=S.month<currentMonth();
+    if(ms.error||ds.error){S.lastError=(ms.error||ds.error).message;return}
+    // Keep the agreed plan of a finalized month, but reconcile late signatures
+    // against the actual signed_date. The existing DB audit trigger records corrections.
+    const target=old?.finalized?Number(old.target_plan||0):Number(ms.data?.min_plan||0);
+    const actual=(ds.data||[]).length;
+    const pct=target?Math.round(actual/target*10000)/100:0,rate=contractorRate(pct);
+    const finalized=!!old?.finalized||S.month<currentMonth();
     const row={month:first,target_plan:target,actual_sales:actual,completion_pct:pct,contractor_rate:rate,finalized,updated_by:currentUser?.id||null,updated_at:new Date().toISOString()};
-    const old=existing.data;
     const changed=!old||Number(old.target_plan)!==target||Number(old.actual_sales)!==actual||Number(old.completion_pct)!==pct||Number(old.contractor_rate)!==rate||!!old.finalized!==finalized;
-    if(changed)await sb.from('salary_department_months').upsert(row,{onConflict:'month'});
-    S.dept=row;
+    if(changed){
+      const saved=await sb.from('salary_department_months').upsert(row,{onConflict:'month'});
+      if(saved.error){S.lastError=saved.error.message;S.dept=old;return}
+    }
+    S.dept=changed?row:old;
   }
 
   async function load(){
