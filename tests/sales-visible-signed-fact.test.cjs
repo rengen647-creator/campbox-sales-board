@@ -6,7 +6,7 @@ const source=coach.slice(coach.indexOf('function coachSignedCount('),coach.index
 assert.ok(source.startsWith('function coachSignedCount('),'Signed count helper missing');
 const contracts=[
  {id:'nov',contractor_id:'user-1',signed_date:'2026-10-28',credited_date:'2026-11-03'},
- {id:'oct',contractor_id:'user-1',signed_date:'2026-10-19',credited_date:null},
+ {id:'legacy-nov',contractor_id:'user-1',signed_date:'2026-11-01',credited_date:null},
  {id:'another',contractor_id:'user-2',signed_date:'2026-11-02',credited_date:'2026-11-02'}
 ];
 const count=new Function('monthSignedContracts','selectedDate',source+';return coachSignedCount;')(contracts,'2026-11-03');
