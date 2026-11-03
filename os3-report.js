@@ -22,7 +22,7 @@ function build(o){
  const wdTotal=work(days),wdDone=cutoff<start?0:work(Number(cutoff.slice(8)));
  const target=scope==='team'?n(o.target):n(o.personalTarget);
  let cumulative=0;
- for(let d=1;d<=days;d++){const iso=o.month+'-'+String(d).padStart(2,'0'),rs=rows.filter(r=>r.report_date===iso);cumulative+=signedEvents?signedOn(iso,scope):rs.reduce((s,r)=>s+n(r.connected_fact),0);labels.push(String(d));fact.push(rs.length&&iso<=cutoff?cumulative:null);plan.push(target*work(d)/(wdTotal||1));}
+ for(let d=1;d<=days;d++){const iso=o.month+'-'+String(d).padStart(2,'0'),rs=rows.filter(r=>r.report_date===iso);cumulative+=signedEvents?signedOn(iso,scope):rs.reduce((s,r)=>s+n(r.connected_fact),0);labels.push(String(d));fact.push(iso<=cutoff&&(signedEvents||rs.length)?cumulative:null);plan.push(target*work(d)/(wdTotal||1));}
  const actual=signedEvents?signedEvents.length:rows.reduce((s,r)=>s+n(r.connected_fact),0),forecast=wdDone?Math.round(actual/wdDone*wdTotal):null;
  const metrics=['calls','booked','meetings','offers','follow','connected'].map(key=>({key,fact:key==='connected'?actual:rows.reduce((s,r)=>s+n(r[key+'_fact']),0),plan:rows.reduce((s,r)=>s+n(r[key+'_plan']),0)}));
  const members=o.members.filter(p=>scope==='team'||p.id===scope).map(p=>{const f=signedEvents?signedEvents.filter(c=>c.contractor_id===p.id).length:rows.filter(r=>r.user_id===p.id).reduce((s,r)=>s+n(r.connected_fact),0);return {name:p.full_name||p.email||'Сотрудник',fact:f,target:n(o.personalTarget),forecast:wdDone?Math.round(f/wdDone*wdTotal):null};});
