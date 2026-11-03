@@ -3,6 +3,6 @@ for(const [file,names] of [['salary-v1.js',['paymentAccrual','retentionAt','rete
 console.log('PASS salary and payment calculation functions unchanged; minimum-plan policy preserved');
 
 const creditSalary=fs.readFileSync('salary-v1.js','utf8'),creditSales=fs.readFileSync('index.html','utf8');
-for(const src of [creditSalary,creditSales])assert.match(src,/function isCreditedInMonth\\(c,month\\)/);
-assert.match(creditSalary,/if\\(existing.data\\?\\.finalized\\)/);
+for(const src of [creditSalary,creditSales])assert.match(src,/function isCreditedInMonth\(c,month\)/);
+assert.match(creditSalary,/if\(existing.data\?\.finalized\)/);
 console.log('PASS historical month frozen; signing credit-month logic explicitly audited');
