@@ -270,10 +270,11 @@
 
   function buildReport(wb, info) {
     const {rows, members, contracts, activeContracts, min, target, max, dates, cutoff, month} = info;
+    const credited=(info.signedContracts||[]).filter(c=>(c.credited_date||c.signed_date)<=cutoff);
     const overview=wb.addWorksheet('Обзор',{properties:{tabColor:{argb:C.green}}});
     const home=wb.addWorksheet('Главная',{properties:{tabColor:{argb:C.blue}}});
     const totals = key => rows.reduce((n,r)=>n+asNum(r[key]),0);
-    const connected=totals('connected_fact');
+    const connected=credited.length;
     const activeIDs=new Set(activeContracts.map(c=>String(c.id||'')));
     const inProgress=activeContracts.length;
     const daysInMonth=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate();
@@ -298,7 +299,7 @@
         dayRows.reduce((n,r)=>n+asNum(r.meetings_fact),0),
         dayRows.reduce((n,r)=>n+asNum(r.offers_fact),0),
         dayRows.reduce((n,r)=>n+asNum(r.follow_fact),0),
-        dayRows.reduce((n,r)=>n+asNum(r.connected_fact),0),
+        credited.filter(c=>(c.credited_date||c.signed_date)===iso).length,
         null,null,null,
         dayRows.length?dayRows.reduce((n,r)=>n+contractRowStats(r).active,0):null
       ]);
@@ -330,7 +331,7 @@
       return [p.full_name||p.email||String(p.id),get('calls_plan'),get('calls_fact'),
         get('booked_plan'),get('booked_fact'),get('meetings_plan'),get('meetings_fact'),
         get('offers_plan'),get('offers_fact'),get('follow_plan'),get('follow_fact'),
-        active,get('connected_fact'),ownGoal,null,null];
+        active,credited.filter(c=>c.contractor_id===p.id).length,ownGoal,null,null];
     });
     const memberWS=section(wb,'Менеджеры','КОМАНДА · выполнение и узкие места',
       'План / факт взяты из ежедневных отчётов. Цель 5 подключений на менеджера — действующий ориентир доски; не замещает командную цель.',
@@ -425,7 +426,7 @@
       const p=profiles.find(x=>x.id===r.user_id)||{};
       const ref=parseReflection(r.comment);
       return [shortDate(r.report_date),p.full_name||p.email||r.user_id,
-        ref.result||'',(ref.reasons||[]).join(', '),ref.blockers||'',ref.tomorrow||'',asNum(r.connected_fact)];
+        ref.result||'',(ref.reasons||[]).join(', '),ref.blockers||'',ref.tomorrow||'',credited.filter(c=>c.contractor_id===r.user_id&&(c.credited_date||c.signed_date)===r.report_date).length];
     }).filter(r=>filled(r[2])||filled(r[3])||filled(r[4])||filled(r[5]));
     section(wb,'Итоги сотрудников','КОММЕНТАРИИ · управленческий контекст',
       'Что получилось, почему не получилось и что команда делает дальше. Отфильтруй менеджера или дату в заголовках.',
@@ -556,9 +557,9 @@
       workbook.lastModifiedBy='CampBox Sales Board';
       workbook.created=new Date();
       workbook.calcProperties.fullCalcOnLoad=true;
-      const relevant=profiles.filter(p=>rows.some(r=>r.user_id===p.id)||active.some(c=>c.user_id===p.id));
+      const relevant=profiles.filter(p=>rows.some(r=>r.user_id===p.id)||active.some(c=>c.user_id===p.id)||monthSignedContracts.some(c=>c.contractor_id===p.id));
       const visuals=buildReport(workbook,{
-        month,rows,members:relevant,contracts:entries,activeContracts:active,
+        month,rows,members:relevant,contracts:entries,activeContracts:active,signedContracts:monthSignedContracts,
         min:asNum(document.getElementById('monthMin').value),
         target:asNum(document.getElementById('monthTarget').value),
         max:asNum(document.getElementById('monthMax').value),
