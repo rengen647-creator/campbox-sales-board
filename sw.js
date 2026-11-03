@@ -1,14 +1,14 @@
-const CACHE = 'campbox-sales-os3-credit-2026-11-03';
+const CACHE = 'campbox-sales-os3-signed-fact-2026-11-03b';
 const SHELL = [
   './sales-board.css?v=20261027reqa',
   './', './index.html', './manifest.webmanifest', './icon.svg',
-  './sales-coach.js?v=20261019stableplan',
-  './os3-report.js?v=20261027qa2',
+  './sales-coach.js?v=20261103signedfact',
+  './os3-report.js?v=20261103signedfact',
   './ui-v13.js?v=20261027qa2',
   './salary-v1.js?v=20261103credit',
   './finance-ledger.js?v=20261027qa2',
   './sales-visual-charts.js?v=20261027qa2',
-  './sales-report-v2.js?v=20261013excelcheck',
+  './sales-report-v2.js?v=20261103signedfact',
   './refined-ui.js?v=20261027a',
   './product-v2.js?v=20261027os3',
   './ios-v3.js?v=20261027c',
