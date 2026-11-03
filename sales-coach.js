@@ -21,10 +21,17 @@ function coachPersonName(userId){
   var p=profiles.find(function(x){return x.id===userId;});
   return p?(p.full_name||p.email||'Менеджер'):'Менеджер';
 }
+// Monthly signing count is sourced from the signed contract registry, not daily manual inputs.
+function coachSignedCount(userId,cutoff=selectedDate){
+  var contracts=typeof monthSignedContracts!=='undefined'&&Array.isArray(monthSignedContracts)?monthSignedContracts:[];
+  return contracts.filter(function(c){
+    return (userId==='team'||c.contractor_id===userId)&&String(c.credited_date||c.signed_date||'')<=cutoff;
+  }).length;
+}
 function coachForecastData(userId){
   var rows=coachScopeRows(monthRows,userId,true);
   var target=coachTarget(userId);
-  var fact=sum(rows,'connected_fact');
+  var fact=coachSignedCount(userId);
   var wdTotal=totalWorkdays(selectedMonth)||1;
   var day=Number(selectedDate.slice(8,10));
   var wdDone=Math.max(1,workdaysThrough(selectedMonth,day));
