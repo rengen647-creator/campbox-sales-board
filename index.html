@@ -350,6 +350,7 @@ function visibleMonthDays(){const total=daysInMonth(selectedMonth),cm=monthISO()
 function isManager(){return currentProfile?.role==='manager'}
 function statusClass(p){return p>=100?'good':p>=70?'warn':'bad'}
 function newId(){return globalThis.crypto?.randomUUID?crypto.randomUUID():'c_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9)}
+function isCreditedInMonth(c,month){return String(c.credited_date||c.signed_date||'').slice(0,7)===month}
 function normalizeContract(c={}){
   return {id:c.id||newId(),client:String(c.client||''),contract_number:String(c.contract_number||''),sent_date:c.sent_date||selectedDate||todayISO(),target_date:c.target_date||'',ball:c.ball==='us'?'us':'client',blocker:String(c.blocker||''),next_action:String(c.next_action||''),next_contact:c.next_contact||'',signed_date:c.signed_date||'',training_date:c.training_date||'',training_attendee:String(c.training_attendee||''),training_customer_confirmed:c.training_customer_confirmed===true,status:['signing','signed','lost'].includes(c.status)?c.status:'signing'};
 }
@@ -443,10 +444,10 @@ async function loadAll(){
       sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),
       sb.from('daily_sales').select('*').gte('report_date',prevStart).lt('report_date',monthStart(selectedMonth)),
       sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),
-      sb.from('salary_contracts').select('id,signed_date,contractor_id,status').gte('signed_date',monthStart(selectedMonth)).lt('signed_date',nextMonthStart(selectedMonth)).neq('status','terminated')
+      sb.from('salary_contracts').select('id,signed_date,credited_date,contractor_id,status').neq('status','terminated')
     ]);
     const err=pe||mse||dse||dre||mre||pmre||cpe||se;if(err)throw err;
-    profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];monthSignedContracts=signed||[];prevMonthRows=pmr||[];checkpoints=cp||[];
+    profiles=p||[];monthSettings=ms||{month:monthStart(selectedMonth),owner:'',min_plan:5,target_plan:10,max_plan:15};daySettings=ds||{report_date:selectedDate,day_summary:'',focus1:'',focus2:'',focus3:'',result_text:'',blockers_text:'',tomorrow_text:''};monthRows=mr||[];monthSignedContracts=(signed||[]).filter(c=>isCreditedInMonth(c,selectedMonth));prevMonthRows=pmr||[];checkpoints=cp||[];
     const byUser=Object.fromEntries((dr||[]).map(r=>[r.user_id,r]));
     dayRows=profiles.map(pr=>{
       const saved=byUser[pr.id]||blankSales(pr.id,selectedDate);
@@ -714,8 +715,8 @@ async function saveContracts(){
   try{await syncTrainingEvents(userId,clean)}catch(e){console.error('Training sync:',e);alert('Договор сохранён, но передача обучения в КСМ не удалась: '+e.message)}
   await refreshHandoffStates(userId);
   if(newlySignedInOtherMonth.length){
-    const periods=[...new Set(newlySignedInOtherMonth.map(c=>new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(new Date(c.signed_date+'T12:00:00'))))];
-    alert('Подписанный договор засчитан в «Факт месяца» за '+periods.join(', ')+' по дате подписания, а не за '+selectedMonth+'.');
+    const period=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric',timeZone:'Europe/Moscow'}).format(new Date());
+    alert('Подписанный договор засчитывается в факт и зарплату за '+period+' по дате перехода в «Подписано». Дата документа не меняется.');
   }
   if(clean.some(c=>c.status==='signed')&&handoffStatusError)
     alert('Договор сохранён, но подтверждение передачи в КСМ недоступно. '+handoffStatusError);
@@ -826,13 +827,13 @@ async function saveCurrent(manual=false){
 }
 function normalizeSales(r){const o={report_date:selectedDate,user_id:r.user_id,comment:r.comment||''};metricKeys.forEach(k=>{o[k+'_plan']=num(r[k+'_plan']);o[k+'_fact']=num(r[k+'_fact'])});return o}
 async function loadMonthOnly(){
-  const [{data:mr,error:me},{data:cp,error:ce},{data:signed,error:se}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),sb.from('salary_contracts').select('id,signed_date,contractor_id,status').gte('signed_date',monthStart(selectedMonth)).lt('signed_date',nextMonthStart(selectedMonth)).neq('status','terminated')]);if(me||ce||se){setStatus('Ошибка обновления факта','bad');return;}monthRows=mr||monthRows;monthSignedContracts=signed||[];checkpoints=cp||checkpoints;recalc();renderCheckpoints();
+  const [{data:mr,error:me},{data:cp,error:ce},{data:signed,error:se}]=await Promise.all([sb.from('daily_sales').select('*').gte('report_date',monthStart(selectedMonth)).lt('report_date',nextMonthStart(selectedMonth)),sb.from('checkpoints').select('*').eq('month',monthStart(selectedMonth)).order('checkpoint_date'),sb.from('salary_contracts').select('id,signed_date,credited_date,contractor_id,status').neq('status','terminated')]);if(me||ce||se){setStatus('Ошибка обновления факта','bad');return;}monthRows=mr||monthRows;monthSignedContracts=(signed||[]).filter(c=>isCreditedInMonth(c,selectedMonth));checkpoints=cp||checkpoints;recalc();renderCheckpoints();
 }
 function sum(rows,key){return rows.reduce((s,r)=>s+num(r[key]),0)}
 function renderSalesForecastScenarios(){
   const el=$('salesForecastScenarios');if(!el)return;
   const entries=monthlyContractEntries();
-  const signed=entries.filter(c=>c.status==='signed'&&String(c.signed_date||'').startsWith(selectedMonth));
+  const signed=monthSignedContracts;
   const open=entries.filter(c=>c.status==='signing');
   const near=open.filter(c=>c.next_contact&&c.next_contact>=selectedDate&&c.next_action&&(!c.target_date||String(c.target_date).startsWith(selectedMonth)));
   const labels=[
@@ -860,7 +861,7 @@ function recalc(){
   const ids={calls:'totCalls',booked:'totBooked',meetings:'totMeetings',offers:'totOffers',follow:'totFollow'};Object.entries(ids).forEach(([k,id])=>$(id).textContent=`${totals[k+'P']} / ${totals[k+'F']}`);
   renderSalesPriorities();renderSalesForecastScenarios();
   const activeSigning=activeContractEntries().length,monthSigning=monthlySigningCount();$('totSigning').textContent=String(activeSigning);$('totConnected').textContent=String(totals.connectedF);
-  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=monthSignedContracts.length;$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=monthSignedContracts.filter(c=>c.signed_date===selectedDate).length;
+  const min=num($('monthMin').value),target=num($('monthTarget').value),max=num($('monthMax').value),fact=monthSignedContracts.length;$('minPlanView').textContent=min;$('targetPlanView').textContent=target;$('maxPlanView').textContent=max;$('monthFactView').textContent=fact;$('signingNowView').textContent=activeSigning;$('forecastView').textContent=fact+activeSigning;const mp=pct(fact,target);$('monthPercent').textContent=mp+'%';$('monthProgress').style.width=Math.min(mp,100)+'%';$('gapView').textContent=Math.max(target-fact,0);$('todayFactView').textContent=monthSignedContracts.filter(c=>(c.credited_date||c.signed_date)===selectedDate).length;
   $('miniCalls').textContent=pct(totals.callsF,totals.callsP)+'%';$('miniMeetings').textContent=pct(totals.meetingsF,totals.meetingsP)+'%';$('miniFollow').textContent=pct(totals.followF,totals.followP)+'%';$('convCallMeet').textContent=pct(totals.bookedF,totals.callsF)+'%';$('convMeetOffer').textContent=pct(totals.offersF,totals.meetingsF)+'%';$('convOfferConnect').textContent=pct(sum(monthRows,'connected_fact'),monthSigning)+'%';
   const scores=activityKeys.filter(k=>totals[k+'P']>0).map(k=>Math.min(100,pct(totals[k+'F'],totals[k+'P'])));const overall=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;const day=$('dayStatus'),ts=$('teamStatus');if(!scores.length){day.className='pill warn';day.textContent='План активностей не заполнен';ts.className='pill warn';ts.textContent='Нет плана'}else{day.className='pill '+statusClass(overall);day.textContent=`Активности выполнены на ${overall}%`;ts.className='pill '+statusClass(overall);ts.textContent=`Активности: ${overall}%`}
   const reflectionDone=dayRows.filter(r=>reflectionState(r.comment).state==='done').length,reflectionAny=dayRows.filter(r=>reflectionState(r.comment).state!=='empty').length,reflectionEl=$('reflectionStatus');
@@ -956,7 +957,7 @@ initPWA();
 
   <script src="./os3-report.js?v=20261027qa2"></script>
   <script src="./ui-v13.js?v=20261027qa2"></script>
-  <script src="./salary-v1.js?v=20261027reqa"></script>
+  <script src="./salary-v1.js?v=20261103credit"></script>
   <script src="./finance-ledger.js?v=20261027qa2"></script>
   <script src="./sales-visual-charts.js?v=20261027qa2"></script>
   <script src="./sales-report-v2.js?v=20261013excelcheck"></script>
