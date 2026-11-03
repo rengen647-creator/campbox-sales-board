@@ -705,11 +705,18 @@ async function saveContracts(){
   const pairs=clean.filter(c=>c.status==='signed').map(c=>c.contract_number.trim().toUpperCase().replace(/\s+/g,'')+'|'+c.client.trim().toLocaleLowerCase('ru-RU').replace(/\s+/g,' '));
   if(new Set(pairs).size!==pairs.length){alert('Этот лагерь с данным номером договора уже добавлен.');return;}
   const previousComment=r.comment,prev=parseReflection(r.comment);
+  const newlySignedInOtherMonth=clean.filter(c=>c.status==='signed'&&
+    String(c.signed_date||'').slice(0,7)!==selectedMonth&&
+    !prev.contracts.some(p=>p.id===c.id&&p.status==='signed'));
   r.comment=packReflection({...prev,contracts:clean});renderTeam();recalc();
   const ok=await saveCurrent(true);
   if(!ok){r.comment=previousComment;renderTeam();recalc();return}
   try{await syncTrainingEvents(userId,clean)}catch(e){console.error('Training sync:',e);alert('Договор сохранён, но передача обучения в КСМ не удалась: '+e.message)}
   await refreshHandoffStates(userId);
+  if(newlySignedInOtherMonth.length){
+    const periods=[...new Set(newlySignedInOtherMonth.map(c=>new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(new Date(c.signed_date+'T12:00:00'))))];
+    alert('Подписанный договор засчитан в «Факт месяца» за '+periods.join(', ')+' по дате подписания, а не за '+selectedMonth+'.');
+  }
   if(clean.some(c=>c.status==='signed')&&handoffStatusError)
     alert('Договор сохранён, но подтверждение передачи в КСМ недоступно. '+handoffStatusError);
 
