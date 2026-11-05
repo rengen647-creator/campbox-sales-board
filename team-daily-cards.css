@@ -84,3 +84,103 @@ html.os3:not(.cb-apple-light) #teamDailyCards{
 @media(max-width:960px){.tdc-results{grid-template-columns:1fr 1fr}.tdc-result:last-child{grid-column:1/-1}}
 @media(max-width:720px){.tdc-overview{grid-template-columns:1fr}.tdc-person{padding:18px 16px}.tdc-grid{grid-template-columns:1fr}.tdc-metric:nth-child(5){grid-column:auto}.tdc-results{grid-template-columns:1fr}.tdc-result:last-child{grid-column:auto}}
 @media(max-width:470px){.tdc-person-head{gap:10px}.tdc-heading h3{font-size:20px}.tdc-ring{flex-basis:76px;width:76px;height:76px}.tdc-ring strong{font-size:19px}.tdc-metric{padding:15px}.tdc-metric-values{grid-template-columns:minmax(0,1fr) 74px}.tdc-fact{width:74px}}
+
+/* 2026-11-05 — compact two-manager comparison: both employees on one screen. */
+#teamDailyCards{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  align-items:start;
+}
+#teamDailyCards > .tdc-overview{grid-column:1/-1;gap:8px}
+#teamDailyCards > .tdc-person:only-of-type{grid-column:1/-1}
+#teamDailyCards .tdc-overview>div{padding:9px 12px;border-radius:11px}
+#teamDailyCards .tdc-overview span{font-size:11px}
+#teamDailyCards .tdc-overview strong{font-size:17px}
+#teamDailyCards .tdc-person{
+  padding:14px 15px 15px;
+  border-radius:17px;
+  box-shadow:none;
+}
+#teamDailyCards .tdc-person-head{gap:10px;padding-bottom:10px}
+#teamDailyCards .tdc-kicker{font-size:9px;letter-spacing:.08em}
+#teamDailyCards .tdc-heading h3{font-size:19px;margin:5px 0 2px;letter-spacing:-.035em}
+#teamDailyCards .tdc-heading p{font-size:10px;line-height:1.3}
+#teamDailyCards .tdc-ring{flex:0 0 64px;width:64px;height:64px;padding:6px}
+#teamDailyCards .tdc-ring strong{font-size:18px}
+#teamDailyCards .tdc-ring small{font-size:9px;margin-top:2px}
+#teamDailyCards .tdc-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  padding:11px 0;
+}
+#teamDailyCards .tdc-metric{
+  min-height:0;
+  padding:9px 10px;
+  gap:7px;
+  border-radius:12px;
+}
+#teamDailyCards .tdc-metric:nth-child(5){grid-column:1/-1}
+#teamDailyCards .tdc-metric-head{gap:7px;flex:0 0 auto}
+#teamDailyCards .tdc-symbol{
+  flex:0 0 30px;width:30px;height:30px;
+  border-radius:9px;
+}
+#teamDailyCards .tdc-symbol svg{width:17px;height:17px}
+#teamDailyCards .tdc-metric-info strong{font-size:12px;line-height:1.2}
+#teamDailyCards .tdc-metric-info small{
+  font-size:9px;
+  margin-top:2px;
+  line-height:1.2;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#teamDailyCards .tdc-metric-values{grid-template-columns:minmax(0,1fr) 64px;gap:6px}
+#teamDailyCards .tdc-metric-values :is(span,small){font-size:9px;margin-bottom:2px}
+#teamDailyCards .tdc-plan{gap:5px}
+#teamDailyCards .tdc-plan b{font-size:18px}
+#teamDailyCards .tdc-fact{width:64px}
+#mainApp #teamDailyCards .tdc-fact input,
+#mainApp #teamDailyCards .tdc-connected input{
+  height:33px;
+  min-height:33px;
+  padding:3px 5px;
+  border-radius:9px;
+  font-size:15px;
+}
+#teamDailyCards .tdc-metric-bottom{gap:6px}
+#teamDailyCards .tdc-track{height:4px;min-width:25px;flex-basis:45px}
+#teamDailyCards .tdc-reason summary{font-size:9px;gap:3px}
+#teamDailyCards .tdc-reason summary:before{font-size:14px}
+#teamDailyCards .tdc-reason p{font-size:11px;margin-top:5px!important;padding:8px}
+#teamDailyCards .tdc-results{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+#teamDailyCards .tdc-result,
+#teamDailyCards .tdc-result:last-child{
+  grid-column:auto;
+  padding:9px;
+  gap:5px;
+  border-radius:11px;
+}
+#teamDailyCards .tdc-result-label{font-size:10px;line-height:1.25}
+#teamDailyCards .tdc-result>small{font-size:9px;line-height:1.3}
+#mainApp #teamDailyCards .tdc-link-action{
+  min-height:34px;
+  padding:6px 7px;
+  gap:3px;
+  border-radius:8px;
+}
+#teamDailyCards .tdc-link-action strong{font-size:14px}
+#teamDailyCards .tdc-link-action span{font-size:9px}
+#teamDailyCards .tdc-connected{gap:4px;font-size:9px}
+#mainApp #teamDailyCards .tdc-connected input{width:52px;flex-basis:52px}
+@media(max-width:1000px){
+  #teamDailyCards{grid-template-columns:1fr}
+  #teamDailyCards .tdc-person{max-width:none}
+}
+@media(max-width:560px){
+  #teamDailyCards .tdc-overview{grid-template-columns:1fr;gap:6px}
+  #teamDailyCards .tdc-grid{grid-template-columns:1fr}
+  #teamDailyCards .tdc-metric:nth-child(5){grid-column:auto}
+  #teamDailyCards .tdc-results{grid-template-columns:1fr}
+  #teamDailyCards .tdc-result:last-child{grid-column:auto}
+}
