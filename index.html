@@ -36,6 +36,7 @@
 <script src="os3-charts.js?v=20261027qa2"></script>
 
 <link rel="stylesheet" href="sales-board.css?v=20261027reqa">
+<link rel="stylesheet" href="./team-daily-cards.css?v=20261105a">
 </head>
 <body>
 
@@ -219,6 +220,7 @@
         <span class="outcome-note">Подключения не входят в % выполнения дня</span>
         <span class="legend-item" title="Повторный контакт — звонок, письмо или сообщение по уже тёплой сделке после встречи, КП или договорённости, чтобы перевести клиента на следующий шаг.">💬 Повторный контакт = следующий шаг по тёплой сделке</span>
       </div>
+      <div id="teamDailyCards" class="team-daily-cards"></div>
       <div class="table-wrap desktop-team"><table id="teamTable"><thead><tr>
         <th>Менеджер</th>
         <th>Звонки<div class="pair-labels"><span>автоплан</span><span>факт</span></div></th>
@@ -485,6 +487,7 @@ function renderTeam(){
     tr.querySelectorAll('input').forEach(el=>el.addEventListener('input',()=>{updateDayRowFromContainer(tr);syncSalesInputs(r.user_id,tr);changed()}));tb.appendChild(tr);
   });
   renderMobileTeam();
+  if(window.CampBoxTeamDailyCards)window.CampBoxTeamDailyCards.render();
 }
 
 function updateDayRowFromContainer(container){const r=dayRows.find(x=>x.user_id===container.dataset.userId);if(!r)return;container.querySelectorAll('[data-k]').forEach(el=>r[el.dataset.k]=el.type==='number'?num(el.value):el.value)}
@@ -873,6 +876,7 @@ function recalc(){
   if(reflectionEl){reflectionEl.textContent=`Итоги: ${reflectionDone}/${dayRows.length}`;reflectionEl.className='pill '+(dayRows.length&&reflectionDone===dayRows.length?'good':reflectionAny>0?'warn':'bad')}
   const fc=sum(monthRows,'calls_fact'),fb=sum(monthRows,'booked_fact'),fm=sum(monthRows,'meetings_fact'),fo=sum(monthRows,'offers_fact'),fn=monthSignedContracts.length;$('funnelCalls').textContent=fc;$('funnelBooked').textContent=fb;$('funnelMeetings').textContent=fm;$('funnelOffers').textContent=fo;$('funnelSigning').textContent=monthSigning;$('funnelConnected').textContent=fn;$('funnelConv1').textContent=fc>0?`${pct(fb,fc)}% · ${fb} из ${fc}`:'Недостаточно данных';$('funnelConv2').textContent=fb>0?`${pct(fm,fb)}% · ${fm} из ${fb}`:'Недостаточно данных';$('funnelConv3').textContent=fm>0?`${pct(fo,fm)}% · ${fo} из ${fm}`:'Недостаточно данных';$('funnelConv4').textContent=fo>0?`${pct(monthSigning,fo)}% · ${monthSigning} из ${fo}`:'Недостаточно данных';$('funnelConv5').textContent=monthSigning>0?`${pct(fn,monthSigning)}% · ${fn} из ${monthSigning}`:'Недостаточно данных';
   renderAnalytics(totals,overall);
+  if(window.CampBoxTeamDailyCards)window.CampBoxTeamDailyCards.refresh();
 }
 
 async function onMonthChange(){if(!isManager()){ $('reportMonth').value=selectedMonth;return }selectedMonth=$('reportMonth').value||monthISO();selectedDate=selectedMonth===monthISO()?todayISO():selectedMonth+'-01';$('reportDate').value=selectedDate;await loadAll()}
@@ -960,6 +964,7 @@ initPWA();
 })();
 </script>
 
+  <script src="./team-daily-cards.js?v=20261105a"></script>
   <script src="./os3-report.js?v=20261103signedfact"></script>
   <script src="./ui-v13.js?v=20261027qa2"></script>
   <script src="./salary-v1.js?v=20261103credit"></script>
