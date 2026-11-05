@@ -1,7 +1,7 @@
-const CACHE = 'campbox-sales-os3-signed-fact-2026-11-03b-team-daily-cards-2026-11-05a';
+const CACHE = 'campbox-sales-os3-signed-fact-2026-11-03b-team-daily-cards-compact-2026-11-05b';
 const SHELL = [
   './sales-board.css?v=20261027reqa',
-  './team-daily-cards.css?v=20261105a',
+  './team-daily-cards.css?v=20261105b',
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './sales-coach.js?v=20261103signedfact',
   './team-daily-cards.js?v=20261105a',
