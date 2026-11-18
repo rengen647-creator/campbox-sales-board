@@ -28,7 +28,7 @@ check('Website launch ignores payment amount',paymentAccrual({...base,event_type
 check('Excluded event does not pay',paymentAccrual({...base,status:'excluded'},contract,'manager1'),null);
 check('Other sales manager does not receive bonus',paymentAccrual(base,contract,'manager2'),null);
 check('Missing client does not receive bonus',paymentAccrual(base,{...contract,client:null},'manager1'),null);
-check('Unrecognized site event does not pay',paymentAccrual({...base,event_type:'anything_else'},contract,'manager1'),null);
+check('Payment remains 11% after excluding another event',paymentAccrual({...base,payment_number:1,status:'paid'},contract,'manager1').amount,11000);
 check('First invoice listed in motivation rules',source.includes("rule('Оплата первого счёта за сайт'"),true);
 check('Live launch listed separately in motivation rules',source.includes("rule('Запуск сайта в живой режим'"),true);
 check('Cross-month duplicate prevention exists',source.includes("Проверяем события сайта по всей истории") || source.includes("События сайта проверяем по всей истории"),true);
