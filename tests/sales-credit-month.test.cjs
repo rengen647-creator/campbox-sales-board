@@ -14,7 +14,7 @@ const salary=fs.readFileSync('salary-v1.js','utf8'),index=fs.readFileSync('index
 assert.match(salary,/actual=\(ds\.data\|\|\[\]\)\.filter\(c=>isCreditedInMonth\(c,S\.month\)\)/);
 assert.match(salary,/c\.contractor_id===userId&&isCreditedInMonth\(c,S\.month\)/);
 assert.match(index,/monthSignedContracts=\(signed\|\|\[\]\)\.filter\(c=>isCreditedInMonth\(c,selectedMonth\)\)/);
-assert.match(fs.readFileSync('sw.js','utf8'),/20261103credit/);
+assert.match(fs.readFileSync('sw.js','utf8'),/salary-v1\.js\?v=20261118sitebonus/);
 const migration=fs.readFileSync('migrations/20261103_sales_status_credit_month.sql','utf8');
 assert.match(migration,/old\.sales_source_contract_key is null/);
 assert.match(migration,/tg_op='INSERT'/);

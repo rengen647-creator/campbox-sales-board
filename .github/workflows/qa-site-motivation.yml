@@ -1,0 +1,25 @@
+name: Site motivation checks
+on:
+  pull_request:
+    paths:
+      - 'salary-v1.js'
+      - 'tests/site-motivation.test.cjs'
+      - '.github/workflows/qa-site-motivation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'salary-v1.js'
+      - 'tests/site-motivation.test.cjs'
+      - '.github/workflows/qa-site-motivation.yml'
+  workflow_dispatch:
+jobs:
+  salary-site-bonuses:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/site-motivation.test.cjs
