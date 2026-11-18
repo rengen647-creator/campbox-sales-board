@@ -1,4 +1,4 @@
-const CACHE = 'campbox-sales-os3-site-bonus-2026-11-18';
+const CACHE = 'campbox-sales-os3-signed-fact-2026-11-03b-site-bonus-2026-11-18';
 const SHELL = [
   './sales-board.css?v=20261027reqa',
   './team-daily-cards.css?v=20261105b',
