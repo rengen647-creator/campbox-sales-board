@@ -274,8 +274,7 @@
       if(p.event_type!=='payment')return null;amount=6000;rate='40%';formula='15 000 ₽ × 40%';
     }else if(p.product_type==='site'){
       if(p.event_type==='site_live'){base=0;amount=4025;rate='4 025 ₽';formula='фикс за выход сайта в ЖР'}
-      else if(p.event_type==='payment'){const r=Number(p.payment_number||1)===1?.11:.0805;amount=round2(base*r);rate=(r*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate}
-      else return null
+      else {const r=Number(p.payment_number||1)===1?.11:.0805;amount=round2(base*r);rate=(r*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate}
     }else if(p.product_type==='site_support'){
       if(p.event_type!=='payment')return null;const r=Number(p.payment_number||1)===1?.11:.0805;amount=round2(base*r);rate=(r*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate;
     }
