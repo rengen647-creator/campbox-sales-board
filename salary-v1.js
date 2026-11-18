@@ -274,7 +274,8 @@
       if(p.event_type!=='payment')return null;amount=6000;rate='40%';formula='15 000 ₽ × 40%';
     }else if(p.product_type==='site'){
       if(p.event_type==='site_live'){base=0;amount=4025;rate='4 025 ₽';formula='фикс за выход сайта в ЖР'}
-      else {const r=Number(p.payment_number||1)===1?.11:.0805;amount=round2(base*r);rate=(r*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate}
+      else if(p.event_type==='payment'){const r=Number(p.payment_number||1)===1?.11:.0805;amount=round2(base*r);rate=(r*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate}
+      else return null
     }else if(p.product_type==='site_support'){
       if(p.event_type!=='payment')return null;const r=Number(p.payment_number||1)===1?.11:.0805;amount=round2(base*r);rate=(r*100).toLocaleString('ru-RU')+'%';formula=money(base)+' × '+rate;
     }
@@ -416,7 +417,7 @@
     const box=q('salaryPayments');if(!box||!manager())return;
     const contracts=S.contracts.filter(c=>c.status!=='terminated');
     box.innerHTML=
-      '<div class="salary-card"><div class="salary-head"><div><h2>Добавить поступление / событие</h2><p>Поступление привязывается к конкретному договорному циклу.</p></div><span class="salary-pill blue">РУКОВОДИТЕЛЬ</span></div><div class="salary-body">'+
+      '<div class="salary-card"><div class="salary-head"><div><h2>Добавить поступление / событие</h2><p>Привязка к договору. Для сайта вводи сумму без НДС и номер платежа (первый = 1). Запуск сайта — отдельное событие с фиксированной премией.</p></div><span class="salary-pill blue">РУКОВОДИТЕЛЬ</span></div><div class="salary-body">'+
         (contracts.length?
         '<div class="salary-form-grid">'+
           '<div class="salary-field"><label>Дата</label><input id="salPayDate" type="date" value="'+todayIso()+'"></div>'+
@@ -437,12 +438,14 @@
   }
 
   function paymentPreview(){
-    const contractId=q('salPayContract')?.value,type=q('salPayProduct')?.value,event=q('salPayEvent')?.value||'payment',date=q('salPayDate')?.value,amount=Number(q('salPayAmount')?.value||0),num=Number(q('salPayNumber')?.value||1);
+    const contractId=q('salPayContract')?.value,type=q('salPayProduct')?.value,event=q('salPayEvent')?.value||'payment',date=q('salPayDate')?.value,amount=Number(q('salPayAmount')?.value||0),num=Number(q('salPayNumber')?.value||0);
     const cnt=contract(contractId),cc=contractClient(cnt),prod=product(contractId,type),cfg=PRODUCTS[type];if(!cnt||!cc||!cfg){if(q('salPayPreview'))q('salPayPreview').textContent='Сначала выбери договор.';return}
     let txt='';
     if(cnt.terminated_date&&date>cnt.terminated_date)txt='Договор расторгнут '+dateRu(cnt.terminated_date)+'. Начисление после расторжения не создаётся.';
     else if(pausedOn(cnt.id,date)){const p=contractPauses(cnt.id).find(x=>{const e=pauseEnd(x);return e&&date>=x.pause_start&&date<=e});txt='На дату платежа договор на паузе до '+dateRu(p?.pause_until)+'. Мотивация не начисляется, а 12-месячный срок заморожен.'}
-    else if(event==='site_live'&&type==='site')txt='Выход сайта в ЖР → фикс 4 025 ₽ контрактору '+profileName(cnt.contractor_id)+'.';
+    else if(event==='site_live'&&type==='site')txt='Выход сайта в ЖР → разовая выплата 4 025 ₽ контрактору '+profileName(cnt.contractor_id)+'.';
+    else if(event==='site_live')txt='Для выхода в ЖР выбери направление «Разработка сайта».';
+    else if((type==='site'||type==='site_support')&&!num)txt='Укажи номер платежа. Первый счёт = №1 (11%), последующие = 8,05%.';
     else if(type==='maps')txt='Продажа 2ГИС + Яндекс → фикс 6 000 ₽ контрактору '+profileName(cnt.contractor_id)+'.';
     else if(type==='site'||type==='site_support'){const r=num===1?.11:.0805;txt=money(amount)+' × '+(r*100).toLocaleString('ru-RU')+'% = '+money(amount*r)+' контрактору '+profileName(cnt.contractor_id)+'.'}
     else if(cfg.period){
@@ -474,6 +477,14 @@
     if(cnt.status==='terminated'){alert('Нельзя добавить новое поступление в расторгнутый договор. Создай новый договорный цикл.');return}
     if(event==='payment'&&amount<=0){alert('Для поступления сумма должна быть больше 0.');return}
     if(event==='site_live'&&type!=='site'){alert('Выход сайта в ЖР доступен только для разработки сайта.');return}
+    if(event==='payment'&&(type==='site'||type==='site_support')&&!num){alert('Укажи номер платежа: 1 для первого счёта, 2 и далее для последующих.');return}
+    // События сайта проверяем по всей истории договора, а не только за выбранный месяц.
+    if(type==='site'&&(event==='site_live'||(event==='payment'&&num===1))){
+      const {data:prior,error:checkError}=await sb.from('salary_payments').select('event_type,payment_number,status').eq('contract_id',contractId).eq('product_type','site').neq('status','excluded');
+      if(checkError){alert('Не удалось проверить историю сайта: '+checkError.message);return}
+      const already=(prior||[]).some(p=>event==='site_live'?p.event_type==='site_live':p.event_type==='payment'&&Number(p.payment_number||1)===1);
+      if(already){alert(event==='site_live'?'Запуск сайта уже зафиксирован в этом договоре. Повторная премия не начисляется.':'Первый оплаченный счёт за сайт уже зафиксирован. Повторные счета указывай с №2.');return}
+    }
     const duplicate=S.payments.some(p=>p.contract_id===contractId&&p.product_type===type&&p.payment_date===date&&p.event_type===event&&Number(p.amount)===amount&&Number(p.payment_number||0)===Number(num||0));
     if(duplicate&&!confirm('Похожая запись уже есть в этом договоре. Всё равно добавить?'))return;
 
@@ -817,7 +828,9 @@
         rule('CampBox / комиссия','Сумма вводится с НДС. 10% считается от суммы без НДС. 12 месяцев продлеваются на паузы.','(платёж / (1 + НДС)) × 10%','12 мес. + паузы')+
         rule('Order Management','8,05% от оплаты, 12 месяцев продлеваются на паузы.','платёж × 8,05%','12 мес. + паузы')+
         rule('Comfort Booking','8,05% от оплаты, 12 месяцев продлеваются на паузы.','платёж × 8,05%','12 мес. + паузы')+
-        rule('Разработка сайта','Первый платёж / следующие / выход в ЖР.','№1 = 11% · №2+ = 8,05% · ЖР = 4 025 ₽','по событиям')+
+        rule('Оплата первого счёта за сайт','11% от суммы первого оплаченного счёта за разработку сайта без НДС.','платёж №1 × 11%','1 раз / договор')+
+        rule('Запуск сайта в живой режим','После публикации работающего сайта. Независимо от платежа.','фикс 4 025 ₽','1 раз / договор')+
+        rule('Последующие платежи за сайт','Действующая ставка на платежи со второго.','платёж №2+ × 8,05%','по платежам')+
         rule('Сопровождение сайта','Первый и последующие платежи.','№1 = 11% · №2+ = 8,05%','по платежам')+
         rule('Удержание','При подтверждённом успехе менеджер получает переменную мотивацию за платежи в течение 6 календарных месяцев с даты успешного удержания. Если обычный период ещё действует, ставки не удваиваются.','дата успеха → 6 мес. · без нового фикс-бонуса','6 месяцев')+
         rule('Руководитель продаж','1% CampBox начинается после стандартного срока и всех действующих окон удержания.','(платёж без НДС) × 1%','после срока')+
