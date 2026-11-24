@@ -367,6 +367,10 @@
     var sort=document.getElementById('os3ContractSort')?.value||'age';
     visible.sort(function(a,b){if(sort==='name')return String(a.client||'').localeCompare(String(b.client||''),'ru');if(sort==='contact')return String(a.next_contact||'9999').localeCompare(String(b.next_contact||'9999'));return b.age-a.age;});
     if(badge)badge.innerHTML=pill(visible.some(function(c){return c.age>7;})?'bad':visible.length?'warn':'good',visible.length+' активных');
+    var add=document.getElementById('v13AddOwnContract');
+    if(!add){add=document.createElement('button');add.id='v13AddOwnContract';add.type='button';add.className='btn primary';add.textContent='+ Добавить договор';grid.parentElement.insertBefore(add,grid);}
+    add.hidden=!currentSelf();
+    add.onclick=function(){var uid=currentSelf();if(uid&&typeof openContracts==='function')openContracts(uid);};
     if(!visible.length){grid.innerHTML='<div class="v13-empty">Активных договоров на подписании нет.</div>';return;}
     grid.innerHTML=visible.map(function(c){
       var tone=c.age>7?'bad':c.age>=4?'warn':'good',next=c.next_action||'Следующий шаг не указан';
